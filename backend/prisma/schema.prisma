@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String     @id @default(uuid())
+  phone         String     @unique
+  name          String?
+  role          UserRole   @default(BUYER)
+  invitedById   String?
+  invitedBy     User?      @relation("UserInvited", fields: [invitedById], references: [id])
+  invitedUsers  User[]     @relation("UserInvited")
+  referralCode  String     @unique
+  bonusBalance  Float      @default(0)
+  isApproved    Boolean    @default(false)
+  passwordHash  String?
+  cometChatUid  String?    @unique
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  sentInvites   Invite[]   @relation("InviteOwner")
+  usedInvite    Invite?    @relation("InviteUsedBy")
+  products      Product[]
+  ordersBuyer   Order[]    @relation("Buyer")
+  ordersSeller  Order[]    @relation("Seller")
+  referralOrders Order[]   @relation("Referral")
+  postsAuthored  Post[]    @relation("PostAuthor")
+  postsOwnedAd   Post[]    @relation("PostAdOwner")
+  likes          Like[]
+  comments       Comment[]
+}
+
+enum UserRole {
+  BUYER
+  SELLER
+  MODERATOR
+  ADMIN
+}
+
+model Invite {
+  code       String   @id @default(uuid())
+  ownerId    String
+  owner      User     @relation("InviteOwner", fields: [ownerId], references: [id])
+  usedById   String?  @unique
+  usedBy     User?    @relation("InviteUsedBy", fields: [usedById], references: [id])
+  isUsed     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime?
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  price       Float
+  sellerId    String
+  seller      User     @relation(fields: [sellerId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  orders      Order[]
+}
+
+model Order {
+  id             String      @id @default(uuid())
+  buyerId        String
+  buyer          User        @relation("Buyer", fields: [buyerId], references: [id])
+  sellerId       String
+  seller         User        @relation("Seller", fields: [sellerId], references: [id])
+  productId      String?
+  product        Product?    @relation(fields: [productId], references: [id])
+  amount         Float
+  status         OrderStatus @default(PENDING)
+  referralUserId String?
+  referralUser   User?       @relation("Referral", fields: [referralUserId], references: [id])
+  referralBonus  Float       @default(0)
+  platformFee    Float       @default(0)
+  transactionId  String?     @unique
+  paidAt         DateTime?
+  createdAt      DateTime    @default(now())
+
+  post           Post?
+  transactions   Transaction[]
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+model Post {
+  id            String    @id @default(uuid())
+  title         String
+  content       String?
+  link          String?
+  media         Json?     // массив URL изображений
+  videoUrl      String?   // ссылка на видео (YouTube/Vimeo)
+  authorId      String
+  author        User      @relation("PostAuthor", fields: [authorId], references: [id])
+  isAd          Boolean   @default(false)
+  adOwnerId     String?
+  adOwner       User?     @relation("PostAdOwner", fields: [adOwnerId], references: [id])
+  adExpireDate  DateTime?
+  isPinned      Boolean   @default(false)
+  orderId       String?   @unique
+  order         Order?    @relation(fields: [orderId], references: [id])
+  createdAt     DateTime  @default(now())
+  likes         Like[]
+  comments      Comment[]
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  text      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id])
+  type        String
+  amount      Float
+  status      String
+  payload     Json?
+  createdAt   DateTime @default(now())
+}
+
+model ModerationLog {
+  id        String   @id @default(uuid())
+  chatMsgId String
+  reason    String
+  action    String
+  createdAt DateTime @default(now())
+}

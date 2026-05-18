@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>Marketplace</title>
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+          appId: "d1cb2724-f8e5-40c4-8dec-2db841c83cba",
+          safari_web_id: "web.onesignal.auto.26339961-08fd-44e5-8197-7ce61bb1927b",
+          notifyButton: { enable: false },
+          allowLocalhostAsSecureOrigin: true,
+        });
+        console.log('OneSignal initialized');
+        window.OneSignal = OneSignal; // ← теперь React может напрямую использовать OneSignal
+      });
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

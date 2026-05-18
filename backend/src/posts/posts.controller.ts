@@ -1,0 +1,50 @@
+import { Controller, Get, Post, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { PostsService } from './posts.service';
+import { CreatePostDto } from './dto/create-post.dto';
+import { CreateAdDto } from './dto/create-ad.dto';
+
+@Controller('posts')
+export class PostsController {
+  constructor(private postsService: PostsService) {}
+
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get('feed')
+  async feed(@Request() req) {
+    return this.postsService.getFeed(req.user?.userId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Post()
+  async create(@Request() req, @Body() dto: CreatePostDto) {
+    return this.postsService.create(req.user.userId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SELLER')
+  @Post('ad')
+  async createAd(@Request() req, @Body() dto: CreateAdDto) {
+    return this.postsService.createAd(req.user.userId, dto);
+  }
+
+  @Get()
+  async findAll() {
+    return this.postsService.findAll();
+  }
+
+  @Get(':id')
+  async findById(@Param('id') id: string) {
+    return this.postsService.findById(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Delete(':id')
+  async delete(@Param('id') id: string) {
+    return this.postsService.delete(id);
+  }
+}
