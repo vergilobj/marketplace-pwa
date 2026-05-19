@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Phone, Gift, Bell, LogIn } from 'lucide-react';
-import { getProfile } from '../api/users';
+import { User, Phone, Gift, Bell, LogIn, Edit3, Save, X } from 'lucide-react';
+import { getProfile, updateProfile } from '../api/users';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -11,6 +13,9 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [permission, setPermission] = useState<NotificationPermission>('default');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -21,7 +26,11 @@ export default function ProfilePage() {
     }
 
     getProfile()
-      .then(setProfile)
+      .then((data) => {
+        setProfile(data);
+        setEditName(data.name);
+        setEditPhone(data.phone);
+      })
       .catch((err) => {
         if (err.response?.status === 401) {
           setError('Сессия истекла. Войдите заново.');
@@ -35,6 +44,17 @@ export default function ProfilePage() {
       setPermission(Notification.permission);
     }
   }, []);
+
+  const handleSave = async () => {
+    try {
+      const updated = await updateProfile({ name: editName, phone: editPhone });
+      setProfile(updated);
+      setIsEditing(false);
+      toast.success('Профиль обновлён');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Ошибка сохранения');
+    }
+  };
 
   const requestPermission = async () => {
     if (window.OneSignal) {
@@ -66,20 +86,48 @@ export default function ProfilePage() {
       <h1 className="text-3xl font-bold">Профиль</h1>
       <Card>
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <User className="w-5 h-5 text-gray-400" />
-            <div>
-              <p className="text-sm text-gray-500">Имя</p>
-              <p className="font-semibold">{profile.name}</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <User className="w-5 h-5 text-gray-400" />
+              <div>
+                <p className="text-sm text-gray-500">Имя</p>
+                {isEditing ? (
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="font-semibold">{profile.name}</p>
+                )}
+              </div>
             </div>
+            {isEditing ? (
+              <div className="flex gap-2">
+                <button onClick={handleSave} className="p-1 text-green-600"><Save size={18} /></button>
+                <button onClick={() => { setIsEditing(false); setEditName(profile.name); setEditPhone(profile.phone); }} className="p-1 text-gray-400"><X size={18} /></button>
+              </div>
+            ) : (
+              <button onClick={() => setIsEditing(true)} className="p-1 text-gray-400 hover:text-blue-600"><Edit3 size={18} /></button>
+            )}
           </div>
+
           <div className="flex items-center gap-3">
             <Phone className="w-5 h-5 text-gray-400" />
             <div>
               <p className="text-sm text-gray-500">Телефон</p>
-              <p className="font-semibold">{profile.phone}</p>
+              {isEditing ? (
+                <Input
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="mt-1"
+                />
+              ) : (
+                <p className="font-semibold">{profile.phone}</p>
+              )}
             </div>
           </div>
+
           <div className="flex items-center gap-3">
             <Gift className="w-5 h-5 text-gray-400" />
             <div>
@@ -89,6 +137,7 @@ export default function ProfilePage() {
           </div>
         </div>
       </Card>
+
       <Card>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
