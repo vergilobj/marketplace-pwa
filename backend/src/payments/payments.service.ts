@@ -2,6 +2,7 @@ import { Injectable, Inject, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { PaymentProvider, PaymentResult } from './payment.provider';
+import { NotificationsService } from '../notifications/notifications.service'; // добавлено
 
 @Injectable()
 export class PaymentsService {
@@ -11,6 +12,7 @@ export class PaymentsService {
     private prisma: PrismaService,
     private settingsService: SettingsService,
     @Inject('PAYMENT_PROVIDER') private paymentProvider: PaymentProvider,
+    private notificationsService: NotificationsService, // добавлено
   ) {}
 
   async createPaymentForOrder(orderId: string) {
@@ -55,11 +57,13 @@ export class PaymentsService {
     });
     if (!order || order.status !== 'PENDING') return;
 
+    // Обновляем статус заказа
     await this.prisma.order.update({
       where: { id: orderId },
       data: { status: 'PAID', paidAt: new Date() },
     });
 
+    // Создаём транзакции сплитования
     await this.prisma.transaction.createMany({
       data: [
         { orderId, type: 'payout_platform', amount: order.platformFee, status: 'success' },
@@ -67,6 +71,21 @@ export class PaymentsService {
         ...(order.referralUserId ? [{ orderId, type: 'payout_referral' as const, amount: order.referralBonus, status: 'success' as const }] : []),
       ],
     });
+
+    // Начисление реферальных бонусов на баланс
+    if (order.referralUserId && order.referralBonus > 0) {
+      await this.prisma.user.update({
+        where: { id: order.referralUserId },
+        data: { bonusBalance: { increment: order.referralBonus } },
+      });
+      // Уведомление рефералу
+      await this.notificationsService.createNotification(
+        order.referralUserId,
+        'referral',
+        `Начислен реферальный бонус: ${order.referralBonus} ₽`,
+        orderId,
+      );
+    }
 
     this.logger.log(`Order ${orderId} processed successfully with splits.`);
   }

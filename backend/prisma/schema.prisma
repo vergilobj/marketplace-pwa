@@ -34,6 +34,7 @@ model User {
   likes          Like[]
   comments       Comment[]
   notifications  Notification[]
+  withdrawalRequests WithdrawalRequest[]
 }
 
 enum UserRole {
@@ -173,4 +174,14 @@ model Notification {
   relatedId String?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model WithdrawalRequest {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  amount    Float
+  status    String   @default("pending") // pending, approved, rejected
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
