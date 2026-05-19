@@ -23,16 +23,17 @@ model User {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  sentInvites   Invite[]   @relation("InviteOwner")
-  usedInvite    Invite?    @relation("InviteUsedBy")
-  products      Product[]
-  ordersBuyer   Order[]    @relation("Buyer")
-  ordersSeller  Order[]    @relation("Seller")
-  referralOrders Order[]   @relation("Referral")
-  postsAuthored  Post[]    @relation("PostAuthor")
-  postsOwnedAd   Post[]    @relation("PostAdOwner")
+  sentInvites    Invite[]        @relation("InviteOwner")
+  usedInvite     Invite?         @relation("InviteUsedBy")
+  products       Product[]
+  ordersBuyer    Order[]         @relation("Buyer")
+  ordersSeller   Order[]         @relation("Seller")
+  referralOrders Order[]         @relation("Referral")
+  postsAuthored  Post[]          @relation("PostAuthor")
+  postsOwnedAd   Post[]          @relation("PostAdOwner")
   likes          Like[]
   comments       Comment[]
+  notifications  Notification[]
 }
 
 enum UserRole {
@@ -58,6 +59,7 @@ model Product {
   title       String
   description String?
   price       Float
+  media       String[]
   sellerId    String
   seller      User     @relation(fields: [sellerId], references: [id])
   isActive    Boolean  @default(true)
@@ -100,8 +102,8 @@ model Post {
   title         String
   content       String?
   link          String?
-  media         Json?     // массив URL изображений
-  videoUrl      String?   // ссылка на видео (YouTube/Vimeo)
+  media         Json?
+  videoUrl      String?
   authorId      String
   author        User      @relation("PostAuthor", fields: [authorId], references: [id])
   isAd          Boolean   @default(false)
@@ -109,12 +111,12 @@ model Post {
   adOwner       User?     @relation("PostAdOwner", fields: [adOwnerId], references: [id])
   adExpireDate  DateTime?
   isPinned      Boolean   @default(false)
+  isHidden      Boolean   @default(false)
   orderId       String?   @unique
   order         Order?    @relation(fields: [orderId], references: [id])
   createdAt     DateTime  @default(now())
   likes         Like[]
   comments      Comment[]
-  isHidden      Boolean   @default(false)
 }
 
 model Like {
@@ -159,5 +161,16 @@ model ModerationLog {
   chatMsgId String
   reason    String
   action    String
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // "order", "like", "comment"
+  message   String
+  relatedId String?
+  isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 }

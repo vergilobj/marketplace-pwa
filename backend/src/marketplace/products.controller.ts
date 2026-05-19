@@ -41,7 +41,7 @@ export class ProductsController {
     return this.productsService.remove(id, req.user.userId);
   }
 
-  // Админские эндпоинты
+  // Админские эндпоинты (отдельные пути)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Get('admin/list')
@@ -58,7 +58,7 @@ export class ProductsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @Delete(':id')
+  @Delete('admin/:id')   // <-- отдельный путь для админского удаления
   async deleteProduct(@Param('id') id: string) {
     return this.productsService.deleteProduct(id);
   }

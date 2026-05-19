@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SocialService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async likePost(userId: string, postId: string) {
     const post = await this.prisma.post.findUnique({ where: { id: postId } });
@@ -13,6 +17,15 @@ export class SocialService {
       await this.prisma.like.create({
         data: { userId, postId },
       });
+      // Уведомление автору поста
+      if (post.authorId !== userId) {
+        await this.notificationsService.createNotification(
+          post.authorId,
+          'like',
+          `Кто-то лайкнул ваш пост`,
+          postId,
+        );
+      }
       return { liked: true };
     } catch (e) {
       if (e.code === 'P2002') throw new ConflictException('Already liked');
@@ -39,10 +52,22 @@ export class SocialService {
   async addComment(userId: string, postId: string, text: string) {
     const post = await this.prisma.post.findUnique({ where: { id: postId } });
     if (!post) throw new NotFoundException('Post not found');
-    return this.prisma.comment.create({
+
+    const comment = await this.prisma.comment.create({
       data: { userId, postId, text },
       include: { user: { select: { id: true, name: true } } },
     });
+
+    // Уведомление автору поста
+    if (post.authorId !== userId) {
+      await this.notificationsService.createNotification(
+        post.authorId,
+        'comment',
+        `Новый комментарий к вашему посту`,
+        postId,
+      );
+    }
+    return comment;
   }
 
   async getComments(postId: string) {

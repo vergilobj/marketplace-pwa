@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../common/prisma/prisma.service';
 
 @Injectable()
 export class NotificationsService {
@@ -8,14 +9,50 @@ export class NotificationsService {
   private readonly apiKey: string;
   private readonly baseUrl = 'https://onesignal.com/api/v1';
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private prisma: PrismaService,
+  ) {
     this.appId = this.configService.getOrThrow<string>('ONESIGNAL_APP_ID');
     this.apiKey = this.configService.getOrThrow<string>('ONESIGNAL_REST_API_KEY');
   }
 
-  /**
-   * Отправить уведомление всем подписанным пользователям
-   */
+  // ================== Внутренние уведомления ==================
+
+  async createNotification(userId: string, type: string, message: string, relatedId?: string) {
+    try {
+      return await this.prisma.notification.create({
+        data: { userId, type, message, relatedId },
+      });
+    } catch (err) {
+      this.logger.error(`Failed to create notification for user ${userId}: ${err.message}`);
+      return null;
+    }
+  }
+
+  async getNotifications(userId: string) {
+    return this.prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+  }
+
+  async markAsRead(id: string, userId: string) {
+    return this.prisma.notification.updateMany({
+      where: { id, userId },
+      data: { isRead: true },
+    });
+  }
+
+  async getUnreadCount(userId: string): Promise<number> {
+    return this.prisma.notification.count({
+      where: { userId, isRead: false },
+    });
+  }
+
+  // ================== Push-уведомления (существующие) ==================
+
   async sendToAll(headings: Record<string, string>, contents: Record<string, string>, data?: any) {
     const body = {
       app_id: this.appId,
@@ -27,9 +64,6 @@ export class NotificationsService {
     return this.sendNotification(body);
   }
 
-  /**
-   * Отправить уведомление конкретному пользователю по external_id (наш userId)
-   */
   async sendToUser(userId: string, headings: Record<string, string>, contents: Record<string, string>, data?: any) {
     const body = {
       app_id: this.appId,

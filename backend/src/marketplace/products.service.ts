@@ -63,11 +63,14 @@ export class ProductsService {
   }
 
   async deleteProduct(id: string) {
-    // Удаляем связанные заказы (order) для этого продукта? Заказы могут ссылаться на product, это вызовет ошибку.
-    // Лучше заказы не удалять, а сохранять историю. Поэтому делаем soft-delete: деактивируем.
-    // Но для админа нужна возможность полного удаления. Удалим заказы перед продуктом? Это опасно.
-    // Поступим так: запретим удаление, если есть заказы. Или удалим все заказы. Выберем второй вариант.
-    await this.prisma.order.deleteMany({ where: { productId: id } });
+    // Удаляем транзакции, связанные с заказами этого продукта
+    const orders = await this.prisma.order.findMany({ where: { productId: id }, select: { id: true } });
+    const orderIds = orders.map(o => o.id);
+    if (orderIds.length > 0) {
+      await this.prisma.transaction.deleteMany({ where: { orderId: { in: orderIds } } });
+      await this.prisma.order.deleteMany({ where: { productId: id } });
+    }
+    // Удаляем сам продукт
     return this.prisma.product.delete({ where: { id } });
   }
 }

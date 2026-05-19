@@ -53,7 +53,7 @@ export default function AdminPage() {
 
   const deleteProduct = async (id: string) => {
     if (!confirm('Удалить товар?')) return;
-    await api.delete(`/products/${id}`);
+    await api.delete(`/products/admin/${id}`);
     loadProducts();
   };
 

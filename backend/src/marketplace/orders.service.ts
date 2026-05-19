@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
@@ -9,6 +10,7 @@ export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private paymentsService: PaymentsService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async create(buyerId: string, dto: CreateOrderDto) {
@@ -27,7 +29,6 @@ export class OrdersService {
       select: { invitedById: true },
     });
 
-    // Создаём заказ без финальных комиссий (они вычислятся при оплате)
     const order = await this.prisma.order.create({
       data: {
         buyerId,
@@ -44,10 +45,16 @@ export class OrdersService {
       },
     });
 
-    // Сразу инициируем платёж (заглушка)
     await this.paymentsService.createPaymentForOrder(order.id);
-    // Для теста сразу подтверждаем платёж (processSuccessfulPayment)
     await this.paymentsService.processSuccessfulPayment(order.id);
+
+    // Уведомление продавцу
+    await this.notificationsService.createNotification(
+      product.sellerId,
+      'order',
+      `Новый заказ на сумму ${amount} ₽`,
+      order.id,
+    );
 
     return this.findById(order.id);
   }
@@ -83,7 +90,6 @@ export class OrdersService {
   async updateStatus(orderId: string, userId: string, role: string, dto: UpdateOrderStatusDto) {
     const order = await this.findById(orderId);
 
-    // Проверка прав: SELLER может менять только на SHIPPED/COMPLETED/CANCELLED, BUYER может CANCELLED (до PAY), ADMIN всё
     if (role === 'SELLER' && order.sellerId !== userId) {
       throw new ForbiddenException('Not your order');
     }
@@ -91,10 +97,16 @@ export class OrdersService {
       throw new ForbiddenException('Not your order');
     }
 
-    // Простейшая логика смены статусов (можно усложнить)
     if (dto.status === 'PAID') {
       if (role !== 'ADMIN') throw new ForbiddenException('Only admin can mark as paid');
       order.paidAt = new Date();
+      // Уведомление покупателю
+      await this.notificationsService.createNotification(
+        order.buyerId,
+        'order',
+        `Ваш заказ оплачен`,
+        orderId,
+      );
     }
 
     const updated = await this.prisma.order.update({

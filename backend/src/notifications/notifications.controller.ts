@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -8,6 +8,27 @@ import { NotificationsService } from './notifications.service';
 export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
 
+  // Внутренние уведомления
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  async getNotifications(@Request() req) {
+    return this.notificationsService.getNotifications(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/read')
+  async markAsRead(@Param('id') id: string, @Request() req) {
+    return this.notificationsService.markAsRead(id, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('unread-count')
+  async getUnreadCount(@Request() req) {
+    const count = await this.notificationsService.getUnreadCount(req.user.userId);
+    return { count };
+  }
+
+  // Push-уведомления (существующие)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Post('test-all')
@@ -23,8 +44,6 @@ export class NotificationsController {
   @UseGuards(JwtAuthGuard)
   @Post('register-token')
   async registerToken() {
-    // Заглушка: на фронте будет вызываться с push-токеном и сохраняться в User.
-    // Пока просто возвращаем OK.
     return { message: 'Token registration not implemented yet (client-side only)' };
   }
 }
