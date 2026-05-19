@@ -40,4 +40,26 @@ export class ProductsController {
   async remove(@Param('id') id: string, @Request() req) {
     return this.productsService.remove(id, req.user.userId);
   }
+
+  // Админские эндпоинты
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Get('admin/list')
+  async findAllAdmin() {
+    return this.productsService.findAllAdmin();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Patch(':id/toggle-active')
+  async toggleActive(@Param('id') id: string) {
+    return this.productsService.toggleActive(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Delete(':id')
+  async deleteProduct(@Param('id') id: string) {
+    return this.productsService.deleteProduct(id);
+  }
 }

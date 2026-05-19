@@ -9,10 +9,7 @@ export class ProductsService {
 
   async create(sellerId: string, dto: CreateProductDto) {
     return this.prisma.product.create({
-      data: {
-        ...dto,
-        sellerId,
-      },
+      data: { ...dto, sellerId },
     });
   }
 
@@ -38,10 +35,7 @@ export class ProductsService {
     if (product.sellerId !== sellerId) {
       throw new ForbiddenException('You can only edit your own products');
     }
-    return this.prisma.product.update({
-      where: { id },
-      data: dto,
-    });
+    return this.prisma.product.update({ where: { id }, data: dto });
   }
 
   async remove(id: string, sellerId: string) {
@@ -49,9 +43,31 @@ export class ProductsService {
     if (product.sellerId !== sellerId) {
       throw new ForbiddenException('You can only deactivate your own products');
     }
+    return this.prisma.product.update({ where: { id }, data: { isActive: false } });
+  }
+
+  // Админские методы
+  async findAllAdmin() {
+    return this.prisma.product.findMany({
+      include: { seller: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async toggleActive(id: string) {
+    const product = await this.findById(id);
     return this.prisma.product.update({
       where: { id },
-      data: { isActive: false },
+      data: { isActive: !product.isActive },
     });
+  }
+
+  async deleteProduct(id: string) {
+    // Удаляем связанные заказы (order) для этого продукта? Заказы могут ссылаться на product, это вызовет ошибку.
+    // Лучше заказы не удалять, а сохранять историю. Поэтому делаем soft-delete: деактивируем.
+    // Но для админа нужна возможность полного удаления. Удалим заказы перед продуктом? Это опасно.
+    // Поступим так: запретим удаление, если есть заказы. Или удалим все заказы. Выберем второй вариант.
+    await this.prisma.order.deleteMany({ where: { productId: id } });
+    return this.prisma.product.delete({ where: { id } });
   }
 }

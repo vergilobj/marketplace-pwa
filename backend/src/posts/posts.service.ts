@@ -16,20 +16,13 @@ export class PostsService {
 
   async create(authorId: string, dto: CreatePostDto) {
     return this.prisma.post.create({
-      data: {
-        ...dto,
-        authorId,
-      },
+      data: { ...dto, authorId },
     });
   }
 
   async createAd(sellerId: string, dto: CreateAdDto) {
-    // Получаем стоимость за день и общую сумму
     const adPricePerDay = await this.settingsService.getFloat('ad_price') || 5000;
     const totalAmount = adPricePerDay * dto.days;
-
-    // Создаём пост в неактивном состоянии (isPinned=false пока не оплачен? По ТЗ пост помечается «Реклама» и закрепляется вверху после оплаты и до истечения срока.
-    // Сначала создадим пост с isAd=true, adOwnerId=sellerId, adExpireDate позже, не показываем.
     const post = await this.prisma.post.create({
       data: {
         title: dto.title,
@@ -38,42 +31,27 @@ export class PostsService {
         authorId: sellerId,
         isAd: true,
         adOwnerId: sellerId,
-        // срок будет установлен после оплаты
         isPinned: false,
       },
     });
-
-    // Найти администратора (получателя платы за рекламу)
     const platformUser = await this.prisma.user.findFirst({ where: { role: 'ADMIN' } });
     if (!platformUser) throw new BadRequestException('Platform admin not found');
-
-    // Создаём заказ на оплату рекламы (без товара, productId=null)
     const order = await this.prisma.order.create({
-    data: {
-        buyerId: sellerId, // продавец оплачивает
-        sellerId: platformUser.id, // деньги идут платформе (админу)
+      data: {
+        buyerId: sellerId,
+        sellerId: platformUser.id,
         productId: null,
         amount: totalAmount,
         status: 'PENDING',
         referralUserId: null,
         referralBonus: 0,
-        platformFee: totalAmount, // все средства – платформе
-    },
+        platformFee: totalAmount,
+      },
     });
-
-    // Связываем пост с заказом
-    await this.prisma.post.update({
-      where: { id: post.id },
-      data: { orderId: order.id },
-    });
-
-    // Инициируем платёж (через заглушку)
+    await this.prisma.post.update({ where: { id: post.id }, data: { orderId: order.id } });
     await this.paymentsService.createPaymentForOrder(order.id);
-    await this.paymentsService.processSuccessfulPayment(order.id); // автоматическое подтверждение в тесте
-
+    await this.paymentsService.processSuccessfulPayment(order.id);
     await this.activatePost(order.id);
-
-    // После оплаты активируем пост (в processSuccessfulPayment мы добавим активацию)
     return this.prisma.post.findUnique({ where: { id: post.id }, include: { order: true } });
   }
 
@@ -81,15 +59,13 @@ export class PostsService {
     const now = new Date();
     return this.prisma.post.findMany({
       where: {
+        isHidden: false,
         OR: [
-          { isAd: false }, // обычные посты
-          { isAd: true, isPinned: true, adExpireDate: { gte: now } }, // активная реклама
+          { isAd: false },
+          { isAd: true, isPinned: true, adExpireDate: { gte: now } },
         ],
       },
-      orderBy: [
-        { isPinned: 'desc' }, // закреплённые вверху
-        { createdAt: 'desc' },
-      ],
+      orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
       include: {
         author: { select: { id: true, name: true } },
         adOwner: { select: { id: true, name: true } },
@@ -103,41 +79,36 @@ export class PostsService {
     return post;
   }
 
-  async activatePost(orderId: string) {
-    // Вызывается после успешной оплаты заказа, связанного с постом
-    const post = await this.prisma.post.findUnique({ where: { orderId } });
-    if (!post) return;
-
-    const durationDays = await this.settingsService.getFloat('ad_duration_days') || 7; // по умолчанию 7 дней
-    const expireDate = new Date();
-    expireDate.setDate(expireDate.getDate() + durationDays);
-
-    await this.prisma.post.update({
-      where: { id: post.id },
-      data: {
-        isPinned: true,
-        adExpireDate: expireDate,
-      },
-    });
-    this.logger.log(`Post ${post.id} activated until ${expireDate}`);
+  async delete(id: string) {
+    // Сначала удаляем лайки и комментарии, чтобы не было нарушения внешних ключей
+    await this.prisma.like.deleteMany({ where: { postId: id } });
+    await this.prisma.comment.deleteMany({ where: { postId: id } });
+    // Затем удаляем сам пост
+    return this.prisma.post.delete({ where: { id } });
   }
 
-  async delete(id: string) {
-    return this.prisma.post.delete({ where: { id } });
+  async activatePost(orderId: string) {
+    const post = await this.prisma.post.findUnique({ where: { orderId } });
+    if (!post) return;
+    const expireDate = new Date();
+    expireDate.setDate(expireDate.getDate() + 7);
+    await this.prisma.post.update({
+      where: { id: post.id },
+      data: { isPinned: true, adExpireDate: expireDate },
+    });
+    this.logger.log(`Post ${post.id} activated until ${expireDate}`);
   }
 
   async getFeed(userId?: string) {
     const posts = await this.prisma.post.findMany({
       where: {
+        isHidden: false,
         OR: [
           { isAd: false },
           { isAd: true, isPinned: true, adExpireDate: { gte: new Date() } },
         ],
       },
-      orderBy: [
-        { isPinned: 'desc' },
-        { createdAt: 'desc' },
-      ],
+      orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
       include: {
         author: { select: { id: true, name: true } },
         adOwner: { select: { id: true, name: true } },
@@ -145,8 +116,6 @@ export class PostsService {
         likes: userId ? { where: { userId }, take: 1 } : false,
       },
     });
-  
-    // Трансформируем для фронтенда
     return posts.map(post => ({
       ...post,
       likeCount: post._count?.likes ?? 0,
@@ -155,5 +124,25 @@ export class PostsService {
       likes: undefined,
       _count: undefined,
     }));
+  }
+
+  // Админские методы
+  async findAllAdmin() {
+    return this.prisma.post.findMany({
+      include: {
+        author: { select: { id: true, name: true } },
+        adOwner: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async toggleVisibility(id: string) {
+    const post = await this.prisma.post.findUnique({ where: { id } });
+    if (!post) throw new NotFoundException('Post not found');
+    return this.prisma.post.update({
+      where: { id },
+      data: { isHidden: !post.isHidden },
+    });
   }
 }

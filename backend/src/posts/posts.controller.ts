@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Patch, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -46,5 +46,20 @@ export class PostsController {
   @Delete(':id')
   async delete(@Param('id') id: string) {
     return this.postsService.delete(id);
+  }
+
+  // Админские эндпоинты
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Get('admin/list')
+  async findAllAdmin() {
+    return this.postsService.findAllAdmin();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Patch(':id/toggle-visibility')
+  async toggleVisibility(@Param('id') id: string) {
+    return this.postsService.toggleVisibility(id);
   }
 }
