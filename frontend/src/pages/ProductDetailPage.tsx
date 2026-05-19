@@ -5,10 +5,12 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { getProductById } from '../api/products';
 import { createOrder } from '../api/orders';
+import { useAuth } from '../hooks/useAuth';
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
@@ -47,31 +49,21 @@ export default function ProductDetailPage() {
       </Link>
       <Card>
         <div className="space-y-6">
-          {/* Галерея */}
           {product.media?.length > 0 && (
             <div className="grid grid-cols-2 gap-2">
               {product.media.map((url: string, idx: number) => (
-                <img
-                  key={idx}
-                  src={url}
-                  alt={`${product.title} ${idx + 1}`}
-                  className="rounded-xl cursor-pointer hover:opacity-90 object-cover h-48 w-full"
-                  onClick={() => setSelectedImage(url)}
-                />
+                <img key={idx} src={url} alt={`${product.title} ${idx + 1}`} className="rounded-xl cursor-pointer hover:opacity-90 object-cover h-48 w-full" onClick={() => setSelectedImage(url)} />
               ))}
             </div>
           )}
-
           <h1 className="text-3xl font-bold">{product.title}</h1>
           <p className="text-gray-600 dark:text-gray-300">{product.description}</p>
           <div className="flex items-center gap-3">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate(`/chat?uid=${product.sellerId}`)}
-            >
-              <MessageCircle size={16} className="mr-1" /> Написать продавцу
-            </Button>
+            {isAuthenticated && (
+              <Button variant="secondary" size="sm" onClick={() => navigate(`/chat?uid=${product.sellerId}`)}>
+                <MessageCircle size={16} className="mr-1" /> Написать продавцу
+              </Button>
+            )}
             <Button variant="primary" onClick={handleBuy} loading={buying} className="px-8">
               <ShoppingCart size={18} className="mr-2" /> Купить
             </Button>
@@ -83,23 +75,10 @@ export default function ProductDetailPage() {
         </div>
       </Card>
 
-      {/* Просмотр фото в полном размере */}
       {selectedImage && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-          onClick={() => setSelectedImage(null)}
-        >
-          <button
-            className="absolute top-4 right-4 text-white"
-            onClick={() => setSelectedImage(null)}
-          >
-            <X size={32} />
-          </button>
-          <img
-            src={selectedImage}
-            className="max-w-full max-h-full rounded-lg"
-            onClick={e => e.stopPropagation()}
-          />
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setSelectedImage(null)}>
+          <button className="absolute top-4 right-4 text-white" onClick={() => setSelectedImage(null)}><X size={32} /></button>
+          <img src={selectedImage} className="max-w-full max-h-full rounded-lg" onClick={e => e.stopPropagation()} />
         </div>
       )}
     </div>

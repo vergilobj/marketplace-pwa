@@ -21,7 +21,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { cart } = useApp();
-  const { isAuthenticated, isAdmin, isSeller } = useAuth();
+  const { isAuthenticated, isAdmin } = useAuth();
 
   const handleLogout = () => {
     localStorage.removeItem('accessToken');
@@ -30,13 +30,20 @@ export default function Layout() {
     navigate('/login');
   };
 
+  // Polling уведомлений
   useEffect(() => {
+    let interval: NodeJS.Timeout;
     if (isAuthenticated) {
-      api.get('/notifications/unread-count')
-        .then(r => setUnreadCount(r.data.count))
-        .catch(() => {});
+      const fetchUnread = () => {
+        api.get('/notifications/unread-count')
+          .then(r => setUnreadCount(r.data.count))
+          .catch(() => {});
+      };
+      fetchUnread();
+      interval = setInterval(fetchUnread, 30000);
     }
-  }, [isAuthenticated, location.pathname]);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 text-gray-900 dark:text-white font-sans">
