@@ -26,4 +26,32 @@ export class UsersService {
       data: dto,
     });
   }
+
+  async getReferrals(userId: string) {
+    return this.prisma.order.findMany({
+      where: { referralUserId: userId },
+      include: {
+        buyer: { select: { id: true, name: true } },
+        product: { select: { title: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async exportUsers() {
+    const users = await this.prisma.user.findMany({
+      select: {
+        id: true,
+        phone: true,
+        name: true,
+        role: true,
+        isApproved: true,
+        referralCode: true,
+        bonusBalance: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return users;
+  }
 }

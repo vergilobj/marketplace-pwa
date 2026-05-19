@@ -17,6 +17,8 @@ import LoginPage from './pages/LoginPage';
 import CreatePostPage from './pages/CreatePostPage';
 import CreateAdPage from './pages/CreateAdPage';
 import PostDetailPage from './pages/PostDetailPage';
+import PrivacyPage from './pages/PrivacyPage';
+import ReferralsPage from './pages/ReferralsPage';
 
 export default function App() {
   return (
@@ -39,6 +41,8 @@ export default function App() {
           <Route path="/posts/new" element={<CreatePostPage />} />
           <Route path="/posts/ad/new" element={<CreateAdPage />} />
           <Route path="/posts/:id" element={<PostDetailPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/referrals" element={<ReferralsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

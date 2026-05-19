@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { User, Phone, Gift, Bell, LogIn, Edit3, Save, X } from 'lucide-react';
 import { getProfile, updateProfile } from '../api/users';
 import Card from '../components/ui/Card';
@@ -135,6 +135,9 @@ export default function ProfilePage() {
               <p className="font-semibold">{profile.referralCode}</p>
             </div>
           </div>
+          <Link to="/referrals" className="text-sm text-blue-600 hover:underline">
+            История начислений
+          </Link>
         </div>
       </Card>
 
@@ -156,6 +159,9 @@ export default function ProfilePage() {
           )}
         </div>
       </Card>
+      <div className="text-center text-sm text-gray-500 mt-4">
+        <Link to="/privacy" className="hover:underline">Политика приватности</Link>
+      </div>
     </div>
   );
 }

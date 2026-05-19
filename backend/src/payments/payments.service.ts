@@ -18,26 +18,23 @@ export class PaymentsService {
     if (!order) throw new Error('Order not found');
     if (order.status !== 'PENDING') throw new Error('Order already paid or cancelled');
 
-    // Рассчитываем комиссии только для обычных заказов (с товаром) и если они ещё не заданы
     if (order.productId !== null && order.platformFee === 0 && order.referralBonus === 0) {
-        const platformPercent = await this.settingsService.getFloat('platform_fee_percent') || 10;
-        const referralPercent = await this.settingsService.getFloat('referral_percent') || 5;
-        const platformFee = (order.amount * platformPercent) / 100;
-        const referralBonus = (order.amount * referralPercent) / 100;
-        await this.prisma.order.update({
-            where: { id: order.id },
-            data: { platformFee, referralBonus },
-        });
+      const platformPercent = await this.settingsService.getFloat('platform_fee_percent') || 10;
+      const referralPercent = await this.settingsService.getFloat('referral_percent') || 5;
+      const platformFee = (order.amount * platformPercent) / 100;
+      const referralBonus = (order.amount * referralPercent) / 100;
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: { platformFee, referralBonus },
+      });
     }
 
-    // Создаём платёж через провайдер
     const result = await this.paymentProvider.createPayment(order.amount, order.id);
     await this.prisma.order.update({
       where: { id: order.id },
       data: { transactionId: result.transactionId },
     });
 
-    // Записываем транзакцию
     await this.prisma.transaction.create({
       data: {
         orderId: order.id,
@@ -52,7 +49,6 @@ export class PaymentsService {
   }
 
   async processSuccessfulPayment(orderId: string) {
-    // Вызывается, когда платёж подтверждён (через вебхук или заглушку)
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { buyer: true, seller: true, referralUser: true },
@@ -64,34 +60,26 @@ export class PaymentsService {
       data: { status: 'PAID', paidAt: new Date() },
     });
 
-    // Запись транзакций сплитования
     await this.prisma.transaction.createMany({
       data: [
-        {
-          orderId,
-          type: 'payout_platform',
-          amount: order.platformFee,
-          status: 'success',
-        },
-        {
-          orderId,
-          type: 'payout_seller',
-          amount: order.amount - order.platformFee - order.referralBonus,
-          status: 'success',
-        },
-        ...(order.referralUserId
-          ? [
-              {
-                orderId,
-                type: 'payout_referral' as const,
-                amount: order.referralBonus,
-                status: 'success' as const,
-              },
-            ]
-          : []),
+        { orderId, type: 'payout_platform', amount: order.platformFee, status: 'success' },
+        { orderId, type: 'payout_seller', amount: order.amount - order.platformFee - order.referralBonus, status: 'success' },
+        ...(order.referralUserId ? [{ orderId, type: 'payout_referral' as const, amount: order.referralBonus, status: 'success' as const }] : []),
       ],
     });
 
     this.logger.log(`Order ${orderId} processed successfully with splits.`);
+  }
+
+  async getAllTransactions() {
+    return this.prisma.transaction.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: {
+        order: {
+          select: { id: true, amount: true, status: true },
+        },
+      },
+    });
   }
 }

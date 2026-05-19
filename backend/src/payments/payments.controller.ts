@@ -1,4 +1,4 @@
-import { Controller, Post, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Param, Get, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -13,8 +13,14 @@ export class PaymentsController {
   @Post('order/:orderId/process')
   async processPayment(@Param('orderId') orderId: string) {
     await this.paymentsService.createPaymentForOrder(orderId);
-    // Сразу имитируем подтверждение для теста
     await this.paymentsService.processSuccessfulPayment(orderId);
     return { message: 'Payment processed' };
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Get('transactions')
+  async getTransactions() {
+    return this.paymentsService.getAllTransactions();
   }
 }
