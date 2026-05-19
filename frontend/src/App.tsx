@@ -14,6 +14,9 @@ import AdminPage from './pages/AdminPage';
 import NotificationsPage from './pages/NotificationsPage';
 import RegisterPage from './pages/RegisterPage';
 import LoginPage from './pages/LoginPage';
+import CreatePostPage from './pages/CreatePostPage';
+import CreateAdPage from './pages/CreateAdPage';
+import PostDetailPage from './pages/PostDetailPage';
 
 export default function App() {
   return (
@@ -33,6 +36,9 @@ export default function App() {
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/posts/new" element={<CreatePostPage />} />
+          <Route path="/posts/ad/new" element={<CreateAdPage />} />
+          <Route path="/posts/:id" element={<PostDetailPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

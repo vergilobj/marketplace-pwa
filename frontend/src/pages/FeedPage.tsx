@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getFeed } from '../api/posts';
 import { getProducts } from '../api/products';
 import PostCard from '../components/PostCard';
@@ -8,9 +9,11 @@ import ErrorState from '../components/ui/ErrorState';
 import EmptyState from '../components/ui/EmptyState';
 import Tabs from '../components/ui/Tabs';
 import Input from '../components/ui/Input';
-import { Search } from 'lucide-react';
+import Button from '../components/ui/Button';
+import { Search, FileText, Megaphone } from 'lucide-react';
 
 export default function FeedPage() {
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +38,16 @@ export default function FeedPage() {
   const filteredPosts = posts.filter(p => p.title?.toLowerCase().includes(search.toLowerCase()) || p.content?.toLowerCase().includes(search.toLowerCase()));
   const filteredProducts = products.filter(p => p.title.toLowerCase().includes(search.toLowerCase()));
 
+  // Определяем роль текущего пользователя
+  const token = localStorage.getItem('accessToken');
+  let role = '';
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      role = payload.role;
+    } catch {}
+  }
+
   const renderContent = () => {
     if (activeTab === 'Посты') return filteredPosts.map(post => <PostCard key={post.id} post={post} />);
     if (activeTab === 'Товары') return <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{filteredProducts.map(product => <ProductCard key={product.id} product={product} />)}</div>;
@@ -46,7 +59,21 @@ export default function FeedPage() {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold">Лента</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Лента</h1>
+        <div className="flex gap-2">
+          {role === 'ADMIN' && (
+            <Button variant="primary" size="sm" onClick={() => navigate('/posts/new')}>
+              <FileText size={16} className="mr-1" /> Новый пост
+            </Button>
+          )}
+          {role === 'SELLER' && (
+            <Button variant="secondary" size="sm" onClick={() => navigate('/posts/ad/new')}>
+              <Megaphone size={16} className="mr-1" /> Реклама
+            </Button>
+          )}
+        </div>
+      </div>
       <div className="relative">
         <Input
           placeholder="Поиск по ленте..."

@@ -114,6 +114,7 @@ model Post {
   createdAt     DateTime  @default(now())
   likes         Like[]
   comments      Comment[]
+  isHidden      Boolean   @default(false)
 }
 
 model Like {
