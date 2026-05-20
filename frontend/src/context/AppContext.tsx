@@ -1,4 +1,3 @@
-// src/context/AppContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
@@ -13,6 +12,8 @@ interface AppContextType {
   cart: CartItem[];
   addToCart: (product: any) => void;
   removeFromCart: (productId: string) => void;
+  updateQuantity: (productId: string, delta: number) => void;
+  moveToFavorites: (productId: string) => void;
   clearCart: () => void;
   favorites: string[];
   toggleFavorite: (productId: string) => void;
@@ -38,7 +39,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
-        toast.success('Товар уже в корзине');
+        toast.success('Добавлено в корзину');
         return prev.map(item =>
           item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
@@ -53,6 +54,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toast.success('Удалено из корзины');
   };
 
+  const updateQuantity = (productId: string, delta: number) => {
+    setCart(prev =>
+      prev.map(item => {
+        if (item.productId === productId) {
+          const newQty = item.quantity + delta;
+          if (newQty <= 0) {
+            return null; // будет удалено фильтрацией
+          }
+          return { ...item, quantity: newQty };
+        }
+        return item;
+      }).filter(Boolean) as CartItem[]
+    );
+  };
+
+  const moveToFavorites = (productId: string) => {
+    const item = cart.find(i => i.productId === productId);
+    if (item) {
+      removeFromCart(productId);
+      toggleFavorite(productId);
+      toast.success('Товар отложен в избранное');
+    }
+  };
+
   const clearCart = () => setCart([]);
 
   const toggleFavorite = (productId: string) => {
@@ -64,7 +89,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isFavorite = (productId: string) => favorites.includes(productId);
 
   return (
-    <AppContext.Provider value={{ cart, addToCart, removeFromCart, clearCart, favorites, toggleFavorite, isFavorite }}>
+    <AppContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, moveToFavorites, clearCart, favorites, toggleFavorite, isFavorite }}>
       {children}
     </AppContext.Provider>
   );

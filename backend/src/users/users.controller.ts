@@ -1,9 +1,10 @@
-import { Controller, Get, Patch, Post, UseGuards, Request, Body, NotFoundException, Param, Header } from '@nestjs/common';
+import { Controller, Get, Patch, Post, UseGuards, Request, Body, NotFoundException, Param, Header, Query } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserRole } from '@prisma/client';
 
 @Controller('users')
 export class UsersController {
@@ -21,8 +22,16 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Get()
-  async findAll() {
-    return this.usersService.findAll();
+  async findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.usersService.findAll({
+      page: Number(page) || 1,
+      limit: Number(limit) || 20,
+      search,
+    });
   }
 
   @UseGuards(JwtAuthGuard)
@@ -51,8 +60,6 @@ export class UsersController {
     return header + csv;
   }
 
-  // ====== Вывод бонусов ======
-
   @UseGuards(JwtAuthGuard)
   @Get('me/balance')
   async getBalance(@Request() req) {
@@ -71,7 +78,6 @@ export class UsersController {
     return this.usersService.getMyWithdrawalRequests(req.user.userId);
   }
 
-  // Админские методы для запросов на вывод
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Get('admin/withdrawals')
@@ -91,5 +97,12 @@ export class UsersController {
   @Patch('admin/withdrawals/:id/reject')
   async rejectWithdrawal(@Param('id') id: string) {
     return this.usersService.rejectWithdrawal(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Patch(':id/role')
+  async changeRole(@Param('id') id: string, @Body('role') role: UserRole) {
+    return this.usersService.changeRole(id, role);
   }
 }

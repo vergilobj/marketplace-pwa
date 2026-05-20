@@ -46,4 +46,11 @@ export class NotificationsController {
   async registerToken() {
     return { message: 'Token registration not implemented yet (client-side only)' };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('read-all')
+  async markAllAsRead(@Request() req) {
+    await this.notificationsService.markAllAsRead(req.user.userId);
+    return { message: 'All notifications marked as read' };
+  }
 }

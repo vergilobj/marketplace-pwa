@@ -18,6 +18,7 @@ import PrivacyPage from './pages/PrivacyPage';
 import ReferralsPage from './pages/ReferralsPage';
 import CreatePostPage from './pages/CreatePostPage';
 import CreateAdPage from './pages/CreateAdPage';
+import WithdrawalsPage from './pages/WithdrawalsPage';
 import { useAuth } from './hooks/useAuth';
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) {
@@ -52,6 +53,7 @@ export default function App() {
 
           <Route path="/admin" element={<ProtectedRoute requiredRole="ADMIN"><AdminPage /></ProtectedRoute>} />
           <Route path="/posts/new" element={<ProtectedRoute requiredRole="ADMIN"><CreatePostPage /></ProtectedRoute>} />
+          <Route path="/withdrawals" element={<ProtectedRoute><WithdrawalsPage /></ProtectedRoute>} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -80,10 +80,8 @@ export class PostsService {
   }
 
   async delete(id: string) {
-    // Сначала удаляем лайки и комментарии, чтобы не было нарушения внешних ключей
     await this.prisma.like.deleteMany({ where: { postId: id } });
     await this.prisma.comment.deleteMany({ where: { postId: id } });
-    // Затем удаляем сам пост
     return this.prisma.post.delete({ where: { id } });
   }
 
@@ -127,14 +125,31 @@ export class PostsService {
   }
 
   // Админские методы
-  async findAllAdmin() {
-    return this.prisma.post.findMany({
-      include: {
-        author: { select: { id: true, name: true } },
-        adOwner: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAllAdmin(params: { page?: number; limit?: number; search?: string; status?: string }) {
+    const page = params.page || 1;
+    const limit = params.limit || 20;
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (params.search) {
+      where.OR = [
+        { title: { contains: params.search, mode: 'insensitive' } },
+        { content: { contains: params.search, mode: 'insensitive' } },
+      ];
+    }
+    if (params.status === 'hidden') where.isHidden = true;
+    else if (params.status === 'visible') where.isHidden = false;
+
+    const [items, total] = await Promise.all([
+      this.prisma.post.findMany({
+        where,
+        include: { author: { select: { id: true, name: true } }, adOwner: { select: { id: true, name: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.post.count({ where }),
+    ]);
+    return { items, total, page, pages: Math.ceil(total / limit) };
   }
 
   async toggleVisibility(id: string) {

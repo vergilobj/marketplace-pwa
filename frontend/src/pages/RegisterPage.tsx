@@ -7,8 +7,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { CometChat } from '@cometchat/chat-sdk-javascript';
 
-// Замени на свой реальный Auth Key из панели CometChat
-const COMETCHAT_AUTH_KEY = 'fdca52860f5a94590f8095c50743331726c12205';
+const COMETCHAT_AUTH_KEY = '74c796a86c1e24ae5a158705a34926d08f0793e6';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -39,7 +38,7 @@ export default function RegisterPage() {
         await OneSignal.Notifications.requestPermission();
       });
 
-      // CometChat: логинимся напрямую через SDK
+      // CometChat
       try {
         await CometChat.login(userId, COMETCHAT_AUTH_KEY);
         console.log('CometChat logged in');

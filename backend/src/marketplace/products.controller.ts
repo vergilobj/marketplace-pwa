@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -41,12 +41,22 @@ export class ProductsController {
     return this.productsService.remove(id, req.user.userId);
   }
 
-  // Админские эндпоинты (отдельные пути)
+  // Админские эндпоинты
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Get('admin/list')
-  async findAllAdmin() {
-    return this.productsService.findAllAdmin();
+  async findAllAdmin(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.productsService.findAllAdmin({
+      page: Number(page) || 1,
+      limit: Number(limit) || 20,
+      search,
+      status,
+    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -58,7 +68,7 @@ export class ProductsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @Delete('admin/:id')   // <-- отдельный путь для админского удаления
+  @Delete('admin/:id')
   async deleteProduct(@Param('id') id: string) {
     return this.productsService.deleteProduct(id);
   }

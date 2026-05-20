@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Patch, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Patch, Param, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -52,8 +52,18 @@ export class PostsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Get('admin/list')
-  async findAllAdmin() {
-    return this.postsService.findAllAdmin();
+  async findAllAdmin(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.postsService.findAllAdmin({
+      page: Number(page) || 1,
+      limit: Number(limit) || 20,
+      search,
+      status,
+    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

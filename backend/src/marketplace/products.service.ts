@@ -47,11 +47,31 @@ export class ProductsService {
   }
 
   // Админские методы
-  async findAllAdmin() {
-    return this.prisma.product.findMany({
-      include: { seller: { select: { id: true, name: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAllAdmin(params: { page?: number; limit?: number; search?: string; status?: string }) {
+    const page = params.page || 1;
+    const limit = params.limit || 20;
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (params.search) {
+      where.OR = [
+        { title: { contains: params.search, mode: 'insensitive' } },
+        { description: { contains: params.search, mode: 'insensitive' } },
+      ];
+    }
+    if (params.status === 'active') where.isActive = true;
+    else if (params.status === 'hidden') where.isActive = false;
+
+    const [items, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        include: { seller: { select: { id: true, name: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+    return { items, total, page, pages: Math.ceil(total / limit) };
   }
 
   async toggleActive(id: string) {
@@ -63,14 +83,12 @@ export class ProductsService {
   }
 
   async deleteProduct(id: string) {
-    // Удаляем транзакции, связанные с заказами этого продукта
     const orders = await this.prisma.order.findMany({ where: { productId: id }, select: { id: true } });
     const orderIds = orders.map(o => o.id);
     if (orderIds.length > 0) {
       await this.prisma.transaction.deleteMany({ where: { orderId: { in: orderIds } } });
       await this.prisma.order.deleteMany({ where: { productId: id } });
     }
-    // Удаляем сам продукт
     return this.prisma.product.delete({ where: { id } });
   }
 }

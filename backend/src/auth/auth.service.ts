@@ -1,15 +1,17 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { RegisterDto } from './dto/register.dto';
 import { CometChatService } from '../cometchat/cometchat.service';
+import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -18,30 +20,24 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    // Проверить, не занят ли телефон
     const existingUser = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
     if (existingUser) throw new ConflictException('Phone already registered');
 
-    // Найти инвайт-код
     const invite = await this.prisma.invite.findUnique({ where: { code: dto.inviteCode } });
     if (!invite || invite.isUsed || (invite.expiresAt && invite.expiresAt < new Date())) {
       throw new BadRequestException('Invalid or expired invite code');
     }
 
-    // Хешировать пароль
     const passwordHash = await bcrypt.hash(dto.password, 10);
-
-    // Генерировать реферальный код (короткий на основе uuid)
     const referralCode = uuidv4().slice(0, 8);
 
-    // Создать пользователя и пометить инвайт использованным в транзакции
     const user = await this.prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
           phone: dto.phone,
           name: dto.name,
           passwordHash,
-          role: 'BUYER', // по умолчанию покупатель
+          role: 'BUYER',
           invitedById: invite.ownerId,
           referralCode,
         },
@@ -55,7 +51,13 @@ export class AuthService {
       return newUser;
     });
 
-    await this.cometChatService.createUser(user.id, user.name || user.phone);
+    // Создать пользователя в CometChat
+    try {
+      await this.cometChatService.createUser(user.id, user.name || user.phone);
+      this.logger.log(`CometChat user created for ${user.id}`);
+    } catch (err) {
+      this.logger.warn(`Could not create CometChat user for ${user.id}: ${err.message}`);
+    }
 
     return this.generateTokens(user);
   }
@@ -63,19 +65,17 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
     if (!user || !user.passwordHash) throw new UnauthorizedException('Invalid credentials');
+
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
-  
-    // Создать пользователя в CometChat, если его там ещё нет
-    try {
-      await this.cometChatService.createUser(user.id, user.name || user.phone);
-    } catch (err) {}
-  
+
+    // Синхронизировать всех отсутствующих пользователей с CometChat
+    await this.syncAllUsersWithCometChat();
+
     return this.generateTokens(user);
   }
-  
+
   async refreshToken(userId: string, refreshToken: string) {
-    // В будущем можно хранить refresh токены в Redis, пока пропустим
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new UnauthorizedException();
 
@@ -88,6 +88,33 @@ export class AuthService {
     }
 
     return this.generateTokens(user);
+  }
+
+  private async syncAllUsersWithCometChat() {
+    try {
+      const users = await this.prisma.user.findMany({
+        select: { id: true, name: true, phone: true, cometChatUid: true },
+      });
+
+      for (const user of users) {
+        if (!user.cometChatUid) {
+          try {
+            await this.cometChatService.createUser(user.id, user.name || user.phone);
+            await this.prisma.user.update({
+              where: { id: user.id },
+              data: { cometChatUid: user.id },
+            });
+            this.logger.log(`Synced user ${user.id} with CometChat`);
+          } catch (err) {
+            if (err.code !== 'ERR_UID_ALREADY_EXISTS') {
+              this.logger.warn(`Failed to sync user ${user.id}: ${err.message}`);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      this.logger.error('Failed to sync users with CometChat', err);
+    }
   }
 
   private async generateTokens(user: any) {

@@ -35,6 +35,7 @@ model User {
   comments       Comment[]
   notifications  Notification[]
   withdrawalRequests WithdrawalRequest[]
+  avatar        String?
 }
 
 enum UserRole {
