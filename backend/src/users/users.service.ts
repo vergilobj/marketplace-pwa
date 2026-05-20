@@ -64,6 +64,26 @@ export class UsersService {
     });
   }
 
+  // ====== Статистика ======
+  async getStats(userId: string) {
+    const [boughtCount, soldCount, referralOrders, balanceUser] = await Promise.all([
+      this.prisma.order.count({ where: { buyerId: userId } }),
+      this.prisma.order.count({ where: { sellerId: userId } }),
+      this.prisma.order.aggregate({
+        where: { referralUserId: userId },
+        _sum: { referralBonus: true },
+      }),
+      this.prisma.user.findUnique({ where: { id: userId }, select: { bonusBalance: true } }),
+    ]);
+
+    return {
+      boughtCount,
+      soldCount,
+      referralEarned: referralOrders._sum.referralBonus || 0,
+      bonusBalance: balanceUser?.bonusBalance || 0,
+    };
+  }
+
   async getBalance(userId: string) {
     const user = await this.findById(userId);
     return { balance: user?.bonusBalance ?? 0 };

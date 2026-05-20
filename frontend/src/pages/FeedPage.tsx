@@ -10,8 +10,10 @@ import ErrorState from '../components/ui/ErrorState';
 import EmptyState from '../components/ui/EmptyState';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
-import { Search, FileText, Megaphone, SlidersHorizontal, Grid3X3, List } from 'lucide-react';
+import { Search, FileText, Megaphone, SlidersHorizontal, Grid3X3, List, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import api from '../api/axios';
+import toast from 'react-hot-toast';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 type ViewMode = 'grid' | 'list';
@@ -25,10 +27,7 @@ const sortOptions: { value: SortType; label: string }[] = [
 
 const container = {
   hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.05 },
-  },
+  show: { opacity: 1, transition: { staggerChildren: 0.05 } },
 };
 
 const item = {
@@ -62,12 +61,27 @@ export default function FeedPage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // URL search param
+  // Взять search из URL при загрузке
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const q = params.get('search');
     if (q) setSearch(q);
   }, []);
+
+  const handleDeletePost = async (postId: string) => {
+    if (!confirm('Удалить пост?')) return;
+    try {
+      await api.delete(`/posts/${postId}`);
+      setPosts(prev => prev.filter(p => p.id !== postId));
+      toast.success('Пост удалён');
+    } catch (err) {
+      toast.error('Не удалось удалить пост');
+    }
+  };
+
+  const handleEditPost = (post: any) => {
+    navigate(`/posts/${post.id}/edit`);
+  };
 
   const filteredPosts = posts.filter(p =>
     p.title?.toLowerCase().includes(search.toLowerCase()) ||
@@ -94,6 +108,8 @@ export default function FeedPage() {
     ...sortedProducts.map(p => ({ ...p, type: 'product' })),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+  const hasActiveSearch = search.trim().length > 0;
+
   const renderSkeletons = (count = 6) => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {Array.from({ length: count }).map((_, i) => (
@@ -104,20 +120,11 @@ export default function FeedPage() {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <motion.h1
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="text-4xl font-bold tracking-tight"
-        >
+        <motion.h1 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="text-4xl font-bold tracking-tight">
           Лента
         </motion.h1>
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="flex gap-2"
-        >
+        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex gap-2">
           {isAdmin && (
             <Button variant="primary" size="sm" onClick={() => navigate('/posts/new')}>
               <FileText size={16} className="mr-1" /> Новый пост
@@ -131,13 +138,7 @@ export default function FeedPage() {
         </motion.div>
       </div>
 
-      {/* Search & controls */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="flex flex-col sm:flex-row gap-3"
-      >
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Input
             placeholder="Поиск по ленте..."
@@ -146,60 +147,58 @@ export default function FeedPage() {
             className="pl-10 h-12 rounded-2xl text-base"
           />
           <Search className="absolute left-4 top-4 text-gray-400" size={20} />
+          {hasActiveSearch && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-gray-100 dark:bg-gray-800">
             <SlidersHorizontal size={16} className="text-gray-500" />
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortType)}
-              className="bg-transparent text-sm font-medium outline-none"
-            >
-              {sortOptions.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
+            <select value={sort} onChange={(e) => setSort(e.target.value as SortType)} className="bg-transparent text-sm font-medium outline-none">
+              {sortOptions.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
             </select>
           </div>
           <div className="flex rounded-2xl bg-gray-100 dark:bg-gray-800 p-1">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-xl transition ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 shadow' : ''}`}
-            >
-              <Grid3X3 size={16} className="text-gray-500" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded-xl transition ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow' : ''}`}
-            >
-              <List size={16} className="text-gray-500" />
-            </button>
+            <button onClick={() => setViewMode('grid')} className={`p-2 rounded-xl transition ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 shadow' : ''}`}><Grid3X3 size={16} className="text-gray-500" /></button>
+            <button onClick={() => setViewMode('list')} className={`p-2 rounded-xl transition ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow' : ''}`}><List size={16} className="text-gray-500" /></button>
           </div>
         </div>
       </motion.div>
 
-      {/* Tabs */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="flex gap-2 p-1 rounded-2xl bg-gray-100 dark:bg-gray-800 w-fit"
-      >
+      {/* Обратная связь поиска */}
+      {hasActiveSearch && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-sm text-gray-500 flex items-center justify-between"
+        >
+          <span>Результаты поиска для «{search}»</span>
+          <button
+            onClick={() => setSearch('')}
+            className="text-blue-600 hover:underline"
+          >
+            Сбросить
+          </button>
+        </motion.div>
+      )}
+
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex gap-2 p-1 rounded-2xl bg-gray-100 dark:bg-gray-800 w-fit">
         {['all', 'products', 'posts'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab as typeof activeTab)}
-            className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${
-              activeTab === tab
-                ? 'bg-white dark:bg-gray-700 shadow text-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${activeTab === tab ? 'bg-white dark:bg-gray-700 shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
           >
             {tab === 'all' ? 'Все' : tab === 'products' ? 'Товары' : 'Посты'}
           </button>
         ))}
       </motion.div>
 
-      {/* Content */}
       {loading ? (
         renderSkeletons()
       ) : error ? (
@@ -207,40 +206,27 @@ export default function FeedPage() {
       ) : (
         <AnimatePresence mode="wait">
           {activeTab === 'posts' && sortedPosts.length === 0 && (
-            <EmptyState message={search ? `Посты по запросу «${search}» не найдены` : 'Постов пока нет'} />
+            <EmptyState message={hasActiveSearch ? `Посты по запросу «${search}» не найдены` : 'Постов пока нет'} />
           )}
           {activeTab === 'products' && sortedProducts.length === 0 && (
-            <EmptyState message={search ? `Товары по запросу «${search}» не найдены` : 'Товаров пока нет'} />
+            <EmptyState message={hasActiveSearch ? `Товары по запросу «${search}» не найдены` : 'Товаров пока нет'} />
           )}
           {activeTab === 'all' && allItems.length === 0 && (
-            <EmptyState message={search ? `Ничего не найдено по запросу «${search}»` : 'Лента пуста'} />
+            <EmptyState message={hasActiveSearch ? `Ничего не найдено по запросу «${search}»` : 'Лента пуста'} />
           )}
 
           {activeTab === 'posts' && sortedPosts.length > 0 && (
-            <motion.div
-              variants={container}
-              initial="hidden"
-              animate="show"
-              className="space-y-6"
-            >
+            <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
               {sortedPosts.map(post => (
                 <motion.div key={post.id} variants={item}>
-                  <PostCard post={post} />
+                  <PostCard post={post} onDelete={handleDeletePost} onEdit={handleEditPost} />
                 </motion.div>
               ))}
             </motion.div>
           )}
 
           {activeTab === 'products' && sortedProducts.length > 0 && (
-            <motion.div
-              variants={container}
-              initial="hidden"
-              animate="show"
-              className={viewMode === 'grid'
-                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-                : 'space-y-4'
-              }
-            >
+            <motion.div variants={container} initial="hidden" animate="show" className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
               {sortedProducts.map(product => (
                 <motion.div key={product.id} variants={item}>
                   <ProductCard product={product} />
@@ -250,12 +236,7 @@ export default function FeedPage() {
           )}
 
           {activeTab === 'all' && allItems.length > 0 && (
-            <motion.div
-              variants={container}
-              initial="hidden"
-              animate="show"
-              className="space-y-6"
-            >
+            <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
               {allItems.map(entry => (
                 <motion.div key={entry.id} variants={item}>
                   <div className="flex items-center gap-2 mb-1 ml-1">
@@ -268,7 +249,7 @@ export default function FeedPage() {
                     </span>
                   </div>
                   {entry.type === 'post' ? (
-                    <PostCard post={entry} />
+                    <PostCard post={entry} onDelete={handleDeletePost} onEdit={handleEditPost} />
                   ) : (
                     <ProductCard product={entry} />
                   )}

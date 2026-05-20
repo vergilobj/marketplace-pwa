@@ -72,4 +72,14 @@ export class PostsController {
   async toggleVisibility(@Param('id') id: string) {
     return this.postsService.toggleVisibility(id);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Request() req,
+    @Body() dto: CreatePostDto,
+  ) {
+    return this.postsService.update(id, req.user.userId, req.user.role, dto);
+  }
 }

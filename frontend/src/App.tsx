@@ -18,7 +18,9 @@ import PrivacyPage from './pages/PrivacyPage';
 import ReferralsPage from './pages/ReferralsPage';
 import CreatePostPage from './pages/CreatePostPage';
 import CreateAdPage from './pages/CreateAdPage';
+import PostDetailPage from './pages/PostDetailPage';
 import WithdrawalsPage from './pages/WithdrawalsPage';
+import EditPostPage from './pages/EditPostPage';
 import { useAuth } from './hooks/useAuth';
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) {
@@ -38,6 +40,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/products/:id" element={<ProductDetailPage />} />
+          <Route path="/posts/:id" element={<PostDetailPage />} />
           <Route path="/favorites" element={<FavoritesPage />} />
           <Route path="/cart" element={<CartPage />} />
 
@@ -47,13 +50,14 @@ export default function App() {
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
           <Route path="/referrals" element={<ProtectedRoute><ReferralsPage /></ProtectedRoute>} />
+          <Route path="/withdrawals" element={<ProtectedRoute><WithdrawalsPage /></ProtectedRoute>} />
 
           <Route path="/products/new" element={<ProtectedRoute requiredRole="SELLER"><CreateProductPage /></ProtectedRoute>} />
           <Route path="/posts/ad/new" element={<ProtectedRoute requiredRole="SELLER"><CreateAdPage /></ProtectedRoute>} />
 
           <Route path="/admin" element={<ProtectedRoute requiredRole="ADMIN"><AdminPage /></ProtectedRoute>} />
           <Route path="/posts/new" element={<ProtectedRoute requiredRole="ADMIN"><CreatePostPage /></ProtectedRoute>} />
-          <Route path="/withdrawals" element={<ProtectedRoute><WithdrawalsPage /></ProtectedRoute>} />
+          <Route path="/posts/:id/edit" element={<ProtectedRoute requiredRole="ADMIN"><EditPostPage /></ProtectedRoute>} />
         </Route>
       </Routes>
     </BrowserRouter>

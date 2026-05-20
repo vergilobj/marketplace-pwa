@@ -73,20 +73,13 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    console.log('Файл выбран:', file.name, file.type, file.size);
-
     try {
       const url = await uploadImage(file);
-      console.log('URL получен:', url);
-
       const updated = await updateProfile({ avatar: url });
-      console.log('Профиль обновлён:', updated);
       setProfile(updated);
       toast.success('Аватар обновлён');
     } catch (err: any) {
-      console.error('Ошибка загрузки аватара:', err);
-      const msg = err?.response?.data?.message || err?.message || 'Не удалось загрузить аватар';
-      toast.error(msg);
+      toast.error('Не удалось загрузить аватар');
     }
   };
 
@@ -139,7 +132,6 @@ export default function ProfilePage() {
     <div className="max-w-4xl mx-auto space-y-8">
       <h1 className="text-3xl font-bold">Профиль</h1>
 
-      {/* Статистика */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="flex items-center gap-4">
@@ -181,7 +173,6 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Аватар и основная информация */}
       <Card>
         <div className="flex flex-col sm:flex-row items-center gap-6">
           <div className="relative group">
@@ -243,7 +234,6 @@ export default function ProfilePage() {
         )}
       </Card>
 
-      {/* Уведомления */}
       <Card>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -263,7 +253,6 @@ export default function ProfilePage() {
         </div>
       </Card>
 
-      {/* Вкладки */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {tabs.map(tab => (
           <button
@@ -281,7 +270,6 @@ export default function ProfilePage() {
         ))}
       </div>
 
-      {/* Содержимое вкладок (заглушки) */}
       <motion.div
         key={activeTab}
         initial={{ opacity: 0, y: 10 }}

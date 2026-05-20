@@ -105,4 +105,11 @@ export class UsersController {
   async changeRole(@Param('id') id: string, @Body('role') role: UserRole) {
     return this.usersService.changeRole(id, role);
   }
+
+  // Эндпоинт статистики
+  @UseGuards(JwtAuthGuard)
+  @Get('me/stats')
+  async getStats(@Request() req) {
+    return this.usersService.getStats(req.user.userId);
+  }
 }

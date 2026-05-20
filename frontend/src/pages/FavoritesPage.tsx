@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { getProducts } from '../api/products';
 import ProductCard from '../components/ProductCard';
@@ -6,6 +7,7 @@ import EmptyState from '../components/ui/EmptyState';
 import Spinner from '../components/ui/Spinner';
 
 export default function FavoritesPage() {
+  const navigate = useNavigate();
   const { favorites } = useApp();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,7 +19,7 @@ export default function FavoritesPage() {
   }, [favorites]);
 
   if (loading) return <Spinner />;
-  if (products.length === 0) return <EmptyState message="В избранном пусто" />;
+  if (products.length === 0) return <EmptyState message="В избранном пусто" action={{ label: 'Перейти в ленту', onClick: () => navigate('/') }} />;
 
   return (
     <div className="space-y-6">

@@ -1,22 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, MoreHorizontal, X, Play } from 'lucide-react';
+import {
+  Heart, MessageCircle, Share2, MoreHorizontal, X, Play,
+  Copy, Flag, Pencil, Trash2
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactPlayer from 'react-player';
 import Card from './ui/Card';
 import Input from './ui/Input';
-import { likePost, unlikePost, getComments, addComment } from '../api/social';
+import { likePost, unlikePost, getComments, addComment, updateComment, deleteComment } from '../api/social';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import toast from 'react-hot-toast';
 
-export default function PostCard({ post, onLikeUpdate }: any) {
+export default function PostCard({ post, onDelete, onEdit }: any) {
   const navigate = useNavigate();
-  const [likes, setLikes] = useState(post.likeCount);
-  const [liked, setLiked] = useState(post.likedByMe);
+  const [likes, setLikes] = useState(post.likeCount || 0);
+  const [liked, setLiked] = useState(post.likedByMe || false);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Состояния для редактирования комментариев
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+
+  const userId = localStorage.getItem('userId');
+  const isAuthor = userId && userId === post.author?.id;
+
+  // Закрытие меню при клике вне
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const handleLike = async () => {
     if (liked) {
@@ -42,6 +66,67 @@ export default function PostCard({ post, onLikeUpdate }: any) {
     setNewComment('');
   };
 
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}/posts/${post.id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      toast.success('Ссылка скопирована');
+    });
+    setMenuOpen(false);
+  };
+
+  const handleReport = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toast.success('Жалоба отправлена');
+    setMenuOpen(false);
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onEdit) onEdit(post);
+    setMenuOpen(false);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete) onDelete(post.id);
+    setMenuOpen(false);
+  };
+
+  // Управление комментариями
+  const startEditingComment = (comment: any) => {
+    setEditingCommentId(comment.id);
+    setEditingText(comment.text);
+  };
+
+  const cancelEditingComment = () => {
+    setEditingCommentId(null);
+    setEditingText('');
+  };
+
+  const saveEditedComment = async (commentId: string) => {
+    if (!editingText.trim()) return;
+    try {
+      const updated = await updateComment(commentId, editingText);
+      setComments(prev => prev.map(c => c.id === commentId ? updated : c));
+      setEditingCommentId(null);
+      toast.success('Комментарий обновлён');
+    } catch (err) {
+      toast.error('Не удалось обновить комментарий');
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!confirm('Удалить комментарий?')) return;
+    try {
+      await deleteComment(commentId);
+      setComments(prev => prev.filter(c => c.id !== commentId));
+      toast.success('Комментарий удалён');
+    } catch (err) {
+      toast.error('Не удалось удалить комментарий');
+    }
+  };
+
   return (
     <motion.div
       whileHover={{ y: -2 }}
@@ -59,10 +144,50 @@ export default function PostCard({ post, onLikeUpdate }: any) {
               </div>
               <div>
                 <h4 className="font-semibold">{post.author?.name}</h4>
-                <p className="text-xs text-gray-500">{format(new Date(post.createdAt), 'dd MMM yyyy, HH:mm', { locale: ru })}</p>
+                <p className="text-xs text-gray-500">
+                  {format(new Date(post.createdAt), 'dd MMM yyyy, HH:mm', { locale: ru })}
+                </p>
               </div>
             </div>
-            <button className="p-1" onClick={(e) => e.stopPropagation()}><MoreHorizontal size={18} className="text-gray-400" /></button>
+            <div className="relative" ref={menuRef}>
+              <button
+                className="p-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen(!menuOpen);
+                }}
+              >
+                <MoreHorizontal size={18} className="text-gray-400" />
+              </button>
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button onClick={handleShare} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 w-full">
+                      <Copy size={14} /> Скопировать ссылку
+                    </button>
+                    <button onClick={handleReport} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 w-full">
+                      <Flag size={14} /> Пожаловаться
+                    </button>
+                    {isAuthor && (
+                      <>
+                        <button onClick={handleEdit} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 w-full">
+                          <Pencil size={14} /> Редактировать
+                        </button>
+                        <button onClick={handleDelete} className="flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 w-full">
+                          <Trash2 size={14} /> Удалить
+                        </button>
+                      </>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
           <p className="text-gray-700 dark:text-gray-300">{post.content}</p>
           {post.media && post.media.length > 0 && (
@@ -78,21 +203,15 @@ export default function PostCard({ post, onLikeUpdate }: any) {
             </div>
           )}
           <div className="flex items-center gap-6 text-gray-500" onClick={(e) => e.stopPropagation()}>
-            <motion.button
-              whileTap={{ scale: 0.8 }}
-              onClick={handleLike}
-              className={`flex items-center gap-1 ${liked ? 'text-red-500' : ''}`}
-            >
+            <motion.button whileTap={{ scale: 0.8 }} onClick={handleLike} className={`flex items-center gap-1 ${liked ? 'text-red-500' : ''}`}>
               <Heart size={20} fill={liked ? 'currentColor' : 'none'} /> {likes}
             </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.8 }}
-              onClick={() => { setShowComments(!showComments); if (!showComments) loadComments(); }}
-              className="flex items-center gap-1"
-            >
+            <motion.button whileTap={{ scale: 0.8 }} onClick={() => { setShowComments(!showComments); if (!showComments) loadComments(); }} className="flex items-center gap-1">
               <MessageCircle size={20} /> {post.commentCount || 0}
             </motion.button>
-            <motion.button whileTap={{ scale: 0.8 }} className="flex items-center gap-1"><Share2 size={20} /></motion.button>
+            <motion.button whileTap={{ scale: 0.8 }} onClick={handleShare} className="flex items-center gap-1">
+              <Share2 size={20} />
+            </motion.button>
           </div>
           <AnimatePresence>
             {showComments && (
@@ -107,8 +226,28 @@ export default function PostCard({ post, onLikeUpdate }: any) {
                   <div key={c.id} className="flex gap-2">
                     <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold">{c.user.name?.[0]}</div>
                     <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded-lg flex-1">
-                      <p className="text-sm font-semibold">{c.user.name}</p>
-                      <p className="text-sm">{c.text}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">{c.user.name}</p>
+                        {(c.user.id === userId || isAuthor) && (
+                          <div className="flex gap-1">
+                            <button onClick={() => startEditingComment(c)} className="text-xs text-gray-400 hover:text-blue-600"><Pencil size={12} /></button>
+                            <button onClick={() => handleDeleteComment(c.id)} className="text-xs text-gray-400 hover:text-red-600"><Trash2 size={12} /></button>
+                          </div>
+                        )}
+                      </div>
+                      {editingCommentId === c.id ? (
+                        <div className="mt-1 flex gap-2">
+                          <Input
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            className="flex-1 text-sm py-1"
+                          />
+                          <button onClick={() => saveEditedComment(c.id)} className="text-xs text-blue-600 font-medium">Сохранить</button>
+                          <button onClick={cancelEditingComment} className="text-xs text-gray-400">Отмена</button>
+                        </div>
+                      ) : (
+                        <p className="text-sm">{c.text}</p>
+                      )}
                     </div>
                   </div>
                 ))}

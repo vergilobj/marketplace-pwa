@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -158,6 +158,21 @@ export class PostsService {
     return this.prisma.post.update({
       where: { id },
       data: { isHidden: !post.isHidden },
+    });
+  }
+
+  async update(id: string, userId: string, userRole: string, data: { title?: string; content?: string; link?: string; media?: string[]; videoUrl?: string }) {
+    const post = await this.prisma.post.findUnique({ where: { id } });
+    if (!post) throw new NotFoundException('Post not found');
+
+    // Разрешить редактирование только автору или админу
+    if (post.authorId !== userId && userRole !== 'ADMIN') {
+      throw new ForbiddenException('You can only edit your own posts');
+    }
+
+    return this.prisma.post.update({
+      where: { id },
+      data,
     });
   }
 }

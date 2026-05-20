@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -14,10 +14,7 @@ export class SocialService {
     if (!post) throw new NotFoundException('Post not found');
 
     try {
-      await this.prisma.like.create({
-        data: { userId, postId },
-      });
-      // Уведомление автору поста
+      await this.prisma.like.create({ data: { userId, postId } });
       if (post.authorId !== userId) {
         await this.notificationsService.createNotification(
           post.authorId,
@@ -58,7 +55,6 @@ export class SocialService {
       include: { user: { select: { id: true, name: true } } },
     });
 
-    // Уведомление автору поста
     if (post.authorId !== userId) {
       await this.notificationsService.createNotification(
         post.authorId,
@@ -78,9 +74,25 @@ export class SocialService {
     });
   }
 
-  async deleteComment(commentId: string, userId: string) {
+  async updateComment(commentId: string, userId: string, userRole: string, text: string) {
     const comment = await this.prisma.comment.findUnique({ where: { id: commentId } });
-    if (!comment || comment.userId !== userId) throw new NotFoundException();
+    if (!comment) throw new NotFoundException('Comment not found');
+    if (comment.userId !== userId && userRole !== 'ADMIN') {
+      throw new ForbiddenException('You can only edit your own comments');
+    }
+    return this.prisma.comment.update({
+      where: { id: commentId },
+      data: { text },
+      include: { user: { select: { id: true, name: true } } },
+    });
+  }
+
+  async deleteComment(commentId: string, userId: string, userRole: string) {
+    const comment = await this.prisma.comment.findUnique({ where: { id: commentId } });
+    if (!comment) throw new NotFoundException('Comment not found');
+    if (comment.userId !== userId && userRole !== 'ADMIN') {
+      throw new ForbiddenException('You can only delete your own comments');
+    }
     await this.prisma.comment.delete({ where: { id: commentId } });
     return { deleted: true };
   }

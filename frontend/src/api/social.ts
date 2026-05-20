@@ -5,3 +5,7 @@ export const unlikePost = (postId: string) => api.delete(`/social/${postId}/like
 export const getComments = (postId: string) => api.get(`/social/${postId}/comments`).then(r => r.data);
 export const addComment = (postId: string, text: string) =>
   api.post(`/social/${postId}/comments`, { text }).then(r => r.data);
+export const updateComment = (commentId: string, text: string) =>
+  api.patch(`/social/comments/${commentId}`, { text }).then(r => r.data);
+export const deleteComment = (commentId: string) =>
+  api.delete(`/social/comments/${commentId}`);
