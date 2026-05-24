@@ -90,15 +90,31 @@ export class PaymentsService {
     this.logger.log(`Order ${orderId} processed successfully with splits.`);
   }
 
-  async getAllTransactions() {
-    return this.prisma.transaction.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      include: {
-        order: {
-          select: { id: true, amount: true, status: true },
+  async getAllTransactions(filters?: { type?: string; orderSearch?: string; page?: number; limit?: number }) {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 20;
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (filters?.type) {
+      where.type = filters.type;
+    }
+    if (filters?.orderSearch) {
+      where.orderId = { contains: filters.orderSearch, mode: 'insensitive' };
+    }
+    const [items, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          order: {
+            select: { id: true, amount: true, status: true },
+          },
         },
-      },
-    });
+      }),
+      this.prisma.transaction.count({ where }),
+    ]);
+    return { items, total, page, pages: Math.ceil(total / limit) };
   }
 }

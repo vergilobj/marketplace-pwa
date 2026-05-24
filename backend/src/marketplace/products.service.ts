@@ -91,4 +91,20 @@ export class ProductsService {
     }
     return this.prisma.product.delete({ where: { id } });
   }
+
+  async adminUpdate(id: string, dto: UpdateProductDto) {
+    const product = await this.prisma.product.findUnique({ where: { id } });
+    if (!product) throw new NotFoundException('Product not found');
+    return this.prisma.product.update({
+      where: { id },
+      data: dto,
+    });
+  }
+
+  async findBySeller(sellerId: string) {
+    return this.prisma.product.findMany({
+      where: { sellerId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

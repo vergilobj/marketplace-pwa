@@ -46,4 +46,37 @@ export class AdminService {
     ]);
     return { items, total, page, pages: Math.ceil(total / limit) };
   }
+
+  async getSellerStats() {
+    const sellers = await this.prisma.user.findMany({
+      where: { role: 'SELLER' },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        _count: { select: { products: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+  
+    const stats = await Promise.all(
+      sellers.map(async (seller) => {
+        const orders = await this.prisma.order.aggregate({
+          where: { sellerId: seller.id, status: 'PAID' },
+          _count: { id: true },
+          _sum: { amount: true },
+        });
+        return {
+          id: seller.id,
+          name: seller.name,
+          phone: seller.phone,
+          productsCount: seller._count.products,
+          ordersCount: orders._count.id,
+          revenue: orders._sum.amount || 0,
+        };
+      })
+    );
+  
+    return stats;
+  }
 }

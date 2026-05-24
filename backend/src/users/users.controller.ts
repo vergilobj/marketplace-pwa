@@ -112,4 +112,20 @@ export class UsersController {
   async getStats(@Request() req) {
     return this.usersService.getStats(req.user.userId);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Patch('batch/role')
+  async batchChangeRole(@Body() body: { userIds: string[]; role: UserRole }) {
+    await this.usersService.batchChangeRole(body.userIds, body.role);
+    return { message: 'Roles updated' };
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Patch('batch/approve')
+  async batchApprove(@Body() body: { userIds: string[] }) {
+    await this.usersService.batchApprove(body.userIds);
+    return { message: 'Users approved' };
+  }
 }

@@ -11,7 +11,11 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Skeleton from '../components/ui/Skeleton';
+import EmptyState from '../components/ui/EmptyState';
 import toast from 'react-hot-toast';
+import api from '../api/axios';
+import { useApp } from '../context/AppContext';
+import ProductCard from '../components/ProductCard';
 
 type Tab = 'info' | 'orders' | 'favorites' | 'referrals' | 'withdrawals';
 
@@ -27,6 +31,15 @@ export default function ProfilePage() {
   const [editPhone, setEditPhone] = useState('');
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Данные для вкладок
+  const [orders, setOrders] = useState<any[]>([]);
+  const [favProducts, setFavProducts] = useState<any[]>([]);
+  const [referrals, setReferrals] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [loadingTab, setLoadingTab] = useState(false);
+
+  const { favorites } = useApp(); // избранное из контекста
 
   const loadData = async () => {
     setLoading(true);
@@ -57,6 +70,41 @@ export default function ProfilePage() {
   useEffect(() => {
     if ('Notification' in window) setPermission(Notification.permission);
   }, []);
+
+  // Загрузка данных для вкладки
+  useEffect(() => {
+    if (!profile) return;
+    setLoadingTab(true);
+    const fetchTabData = async () => {
+      try {
+        switch (activeTab) {
+          case 'orders':
+            const ordersRes = await api.get('/orders/my');
+            setOrders(ordersRes.data);
+            break;
+          case 'favorites':
+            // загружаем все товары и фильтруем по избранному
+            const productsRes = await api.get('/products');
+            const allProducts = productsRes.data;
+            setFavProducts(allProducts.filter((p: any) => favorites.includes(p.id)));
+            break;
+          case 'referrals':
+            const refRes = await api.get('/users/me/referrals');
+            setReferrals(refRes.data);
+            break;
+          case 'withdrawals':
+            const wdRes = await api.get('/users/me/withdrawals');
+            setWithdrawals(wdRes.data);
+            break;
+        }
+      } catch (err) {
+        console.error('Failed to load tab data', err);
+      } finally {
+        setLoadingTab(false);
+      }
+    };
+    fetchTabData();
+  }, [activeTab, profile, favorites]);
 
   const handleSaveProfile = async () => {
     try {
@@ -127,6 +175,20 @@ export default function ProfilePage() {
     { key: 'referrals', label: 'Рефералы', icon: Users },
     { key: 'withdrawals', label: 'Выводы', icon: Wallet },
   ];
+
+  const statusMap: Record<string, string> = {
+    PENDING: 'Ожидает',
+    PAID: 'Оплачен',
+    SHIPPED: 'Отправлен',
+    COMPLETED: 'Завершён',
+    CANCELLED: 'Отменён',
+  };
+
+  const withdrawalStatusMap: Record<string, string> = {
+    pending: 'На рассмотрении',
+    approved: 'Одобрена',
+    rejected: 'Отклонена',
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -253,6 +315,7 @@ export default function ProfilePage() {
         </div>
       </Card>
 
+      {/* Вкладки */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {tabs.map(tab => (
           <button
@@ -270,6 +333,7 @@ export default function ProfilePage() {
         ))}
       </div>
 
+      {/* Содержимое вкладок */}
       <motion.div
         key={activeTab}
         initial={{ opacity: 0, y: 10 }}
@@ -278,28 +342,89 @@ export default function ProfilePage() {
       >
         {activeTab === 'info' && (
           <Card>
-            <p className="text-gray-500">Добро пожаловать в ваш профиль! Здесь будет отображаться основная информация.</p>
+            <p className="text-gray-500">Добро пожаловать в ваш профиль! Здесь отображается основная информация.</p>
           </Card>
         )}
+
         {activeTab === 'orders' && (
-          <Card>
-            <p>Список заказов будет здесь (скоро).</p>
-          </Card>
+          <div className="space-y-4">
+            {loadingTab ? (
+              <Skeleton className="h-40 rounded-3xl" />
+            ) : orders.length === 0 ? (
+              <EmptyState message="Заказов пока нет" />
+            ) : (
+              orders.map((o: any) => (
+                <Card key={o.id} className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">{o.product?.title || 'Товар'}</h3>
+                    <p className="text-sm text-gray-500">Сумма: {o.amount.toLocaleString()} ₽</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      o.status === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {statusMap[o.status] || o.status}
+                    </span>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
         )}
+
         {activeTab === 'favorites' && (
-          <Card>
-            <p>Избранные товары будут здесь (скоро).</p>
-          </Card>
+          <div className="space-y-4">
+            {loadingTab ? (
+              <Skeleton className="h-40 rounded-3xl" />
+            ) : favProducts.length === 0 ? (
+              <EmptyState message="Нет избранных товаров" />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {favProducts.map((p: any) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
+              </div>
+            )}
+          </div>
         )}
+
         {activeTab === 'referrals' && (
-          <Card>
-            <p>Реферальная история будет здесь (скоро).</p>
-          </Card>
+          <div className="space-y-4">
+            {loadingTab ? (
+              <Skeleton className="h-40 rounded-3xl" />
+            ) : referrals.length === 0 ? (
+              <EmptyState message="Реферальных начислений пока нет" />
+            ) : (
+              referrals.map((r: any) => (
+                <Card key={r.id} className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{r.product?.title || 'Товар'}</p>
+                    <p className="text-sm text-gray-500">Покупатель: {r.buyer?.name}</p>
+                    <p className="text-sm text-green-600">+{r.referralBonus.toLocaleString()} ₽</p>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
         )}
+
         {activeTab === 'withdrawals' && (
-          <Card>
-            <p>Запросы на вывод будут здесь (скоро).</p>
-          </Card>
+          <div className="space-y-4">
+            {loadingTab ? (
+              <Skeleton className="h-40 rounded-3xl" />
+            ) : withdrawals.length === 0 ? (
+              <EmptyState message="Заявок на вывод пока нет" />
+            ) : (
+              withdrawals.map((w: any) => (
+                <Card key={w.id} className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{w.amount.toLocaleString()} ₽</p>
+                    <p className={`text-sm ${w.status === 'approved' ? 'text-green-600' : w.status === 'rejected' ? 'text-red-500' : 'text-yellow-600'}`}>
+                      {withdrawalStatusMap[w.status] || w.status}
+                    </p>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
         )}
       </motion.div>
 

@@ -148,4 +148,18 @@ export class UsersService {
       data: { role: newRole },
     });
   }
+
+  async batchChangeRole(userIds: string[], newRole: UserRole) {
+    await this.prisma.user.updateMany({
+      where: { id: { in: userIds } },
+      data: { role: newRole },
+    });
+  }
+  
+  async batchApprove(userIds: string[]) {
+    await this.prisma.user.updateMany({
+      where: { id: { in: userIds }, isApproved: false },
+      data: { isApproved: true },
+    });
+  }
 }

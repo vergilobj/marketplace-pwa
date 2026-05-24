@@ -72,4 +72,18 @@ export class ProductsController {
   async deleteProduct(@Param('id') id: string) {
     return this.productsService.deleteProduct(id);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Patch('admin/:id')
+  async adminUpdate(@Param('id') id: string, @Body() dto: UpdateProductDto) {
+    return this.productsService.adminUpdate(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SELLER')
+  @Get('my')
+  async findMyProducts(@Request() req) {
+    return this.productsService.findBySeller(req.user.userId);
+  }
 }

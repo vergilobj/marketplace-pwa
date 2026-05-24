@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Param, UseGuards, Request, Body } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -11,8 +11,8 @@ export class InvitesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'MODERATOR')
   @Post()
-  async create(@Request() req) {
-    return this.invitesService.createInvite(req.user.userId);
+  async create(@Request() req, @Body('code') code?: string) {
+    return this.invitesService.createInvite(req.user.userId, code);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

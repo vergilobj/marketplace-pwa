@@ -25,4 +25,9 @@ export class AdminController {
       Number(limit) || 20,
     );
   }
+
+  @Get('seller-stats')
+  getSellerStats() {
+    return this.adminService.getSellerStats();
+  }
 }

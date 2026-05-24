@@ -3,10 +3,11 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { NotificationsService } from './notifications.service';
+import { PrismaService } from 'src/common/prisma/prisma.service';
 
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private notificationsService: NotificationsService) {}
+  constructor(private notificationsService: NotificationsService, private prisma: PrismaService) {}
 
   // Внутренние уведомления
   @UseGuards(JwtAuthGuard)
@@ -52,5 +53,29 @@ export class NotificationsController {
   async markAllAsRead(@Request() req) {
     await this.notificationsService.markAllAsRead(req.user.userId);
     return { message: 'All notifications marked as read' };
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Post('broadcast')
+  async broadcast(
+    @Body('message') message: string,
+    @Body('role') role?: string,
+  ) {
+    // Получаем всех пользователей (или по роли)
+    const users = await this.prisma.user.findMany({
+      where: role ? { role: role as any } : {},
+      select: { id: true },
+    });
+
+    for (const user of users) {
+      await this.notificationsService.createNotification(
+        user.id,
+        'broadcast',
+        message,
+      );
+    }
+
+    return { message: `Sent to ${users.length} users` };
   }
 }

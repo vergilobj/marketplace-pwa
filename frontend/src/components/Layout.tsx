@@ -7,6 +7,7 @@ import {
 import api from '../api/axios';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
+import PageTransition from './PageTransition';
 
 // Хук для закрытия по клику вне элемента
 function useClickAway(callback: () => void) {
@@ -148,9 +149,12 @@ export default function Layout() {
                         <Settings size={16} /> Рефералы
                       </Link>
                       {isSeller && (
-                        <Link to="/products/new" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => setProfileMenuOpen(false)}>
+                       <>
+                         <Link to="/products/new" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => setProfileMenuOpen(false)}>
                           <PlusCircle size={16} /> Создать товар
                         </Link>
+                        <Link to="/my-products" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => setProfileMenuOpen(false)}>Мои товары</Link>
+                       </>
                       )}
                       {isAdmin && (
                         <Link to="/admin" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => setProfileMenuOpen(false)}>
@@ -212,7 +216,9 @@ export default function Layout() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-24 md:pb-10">
-        <Outlet />
+        <PageTransition>
+          <Outlet />
+        </PageTransition>
       </main>
 
       {/* Mobile bottom navigation */}

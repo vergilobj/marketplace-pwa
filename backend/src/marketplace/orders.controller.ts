@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -19,8 +19,8 @@ export class OrdersController {
 
   @UseGuards(JwtAuthGuard)
   @Get('my')
-  async findMyOrders(@Request() req) {
-    return this.ordersService.findMyOrders(req.user.userId, req.user.role);
+  async findMyOrders(@Request() req, @Query('status') status?: string) {
+    return this.ordersService.findMyOrders(req.user.userId, req.user.role, status);
   }
 
   @UseGuards(JwtAuthGuard)

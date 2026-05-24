@@ -2,13 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart, MessageCircle, Share2, MoreHorizontal, X, Play,
-  Copy, Flag, Pencil, Trash2
+  Copy, Flag, Pencil, Trash2, Link as LinkIcon, Video
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactPlayer from 'react-player';
 import Card from './ui/Card';
 import Input from './ui/Input';
-import { likePost, unlikePost, getComments, addComment, updateComment, deleteComment } from '../api/social';
+import { likePost, unlikePost, getComments, addComment } from '../api/social';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -24,14 +24,9 @@ export default function PostCard({ post, onDelete, onEdit }: any) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Состояния для редактирования комментариев
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editingText, setEditingText] = useState('');
-
   const userId = localStorage.getItem('userId');
   const isAuthor = userId && userId === post.author?.id;
 
-  // Закрытие меню при клике вне
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -69,9 +64,7 @@ export default function PostCard({ post, onDelete, onEdit }: any) {
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
     const url = `${window.location.origin}/posts/${post.id}`;
-    navigator.clipboard.writeText(url).then(() => {
-      toast.success('Ссылка скопирована');
-    });
+    navigator.clipboard.writeText(url).then(() => toast.success('Ссылка скопирована'));
     setMenuOpen(false);
   };
 
@@ -93,37 +86,12 @@ export default function PostCard({ post, onDelete, onEdit }: any) {
     setMenuOpen(false);
   };
 
-  // Управление комментариями
-  const startEditingComment = (comment: any) => {
-    setEditingCommentId(comment.id);
-    setEditingText(comment.text);
-  };
-
-  const cancelEditingComment = () => {
-    setEditingCommentId(null);
-    setEditingText('');
-  };
-
-  const saveEditedComment = async (commentId: string) => {
-    if (!editingText.trim()) return;
+  const truncateUrl = (url: string) => {
     try {
-      const updated = await updateComment(commentId, editingText);
-      setComments(prev => prev.map(c => c.id === commentId ? updated : c));
-      setEditingCommentId(null);
-      toast.success('Комментарий обновлён');
-    } catch (err) {
-      toast.error('Не удалось обновить комментарий');
-    }
-  };
-
-  const handleDeleteComment = async (commentId: string) => {
-    if (!confirm('Удалить комментарий?')) return;
-    try {
-      await deleteComment(commentId);
-      setComments(prev => prev.filter(c => c.id !== commentId));
-      toast.success('Комментарий удалён');
-    } catch (err) {
-      toast.error('Не удалось удалить комментарий');
+      const u = new URL(url);
+      return u.hostname + u.pathname;
+    } catch {
+      return url.length > 40 ? url.slice(0, 40) + '...' : url;
     }
   };
 
@@ -189,7 +157,29 @@ export default function PostCard({ post, onDelete, onEdit }: any) {
               </AnimatePresence>
             </div>
           </div>
-          <p className="text-gray-700 dark:text-gray-300">{post.content}</p>
+
+          {/* Заголовок (если есть) */}
+          {post.title && <h3 className="text-xl font-semibold">{post.title}</h3>}
+
+          {/* Текст */}
+          {post.content && <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{post.content}</p>}
+
+          {/* Ссылка */}
+          {post.link && (
+            <a
+              href={post.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-2 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors group"
+            >
+              <LinkIcon size={18} className="flex-shrink-0" />
+              <span className="text-sm truncate">{truncateUrl(post.link)}</span>
+              <span className="ml-auto text-xs opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
+            </a>
+          )}
+
+          {/* Медиа */}
           {post.media && post.media.length > 0 && (
             <div className="grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
               {post.media.map((url: string, idx: number) => (
@@ -197,11 +187,22 @@ export default function PostCard({ post, onDelete, onEdit }: any) {
               ))}
             </div>
           )}
+
+          {/* Видео */}
           {post.videoUrl && (
             <div className="rounded-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
               <ReactPlayer url={post.videoUrl} width="100%" height="300px" controls light={post.media?.[0] || true} playIcon={<div className="absolute inset-0 flex items-center justify-center"><Play size={48} className="text-white bg-black/30 rounded-full p-2" /></div>} />
             </div>
           )}
+
+          {/* Индикатор видео (если есть URL, но медиа ещё не загружено) */}
+          {post.videoUrl && !post.media && (
+            <div className="flex items-center gap-2 text-sm text-blue-600">
+              <Video size={16} /> Видео в посте
+            </div>
+          )}
+
+          {/* Действия */}
           <div className="flex items-center gap-6 text-gray-500" onClick={(e) => e.stopPropagation()}>
             <motion.button whileTap={{ scale: 0.8 }} onClick={handleLike} className={`flex items-center gap-1 ${liked ? 'text-red-500' : ''}`}>
               <Heart size={20} fill={liked ? 'currentColor' : 'none'} /> {likes}
@@ -213,6 +214,8 @@ export default function PostCard({ post, onDelete, onEdit }: any) {
               <Share2 size={20} />
             </motion.button>
           </div>
+
+          {/* Комментарии (в ленте только превью) */}
           <AnimatePresence>
             {showComments && (
               <motion.div
@@ -222,35 +225,20 @@ export default function PostCard({ post, onDelete, onEdit }: any) {
                 className="border-t pt-3 space-y-3 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
-                {comments.map(c => (
+                {comments.slice(0, 3).map(c => (
                   <div key={c.id} className="flex gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold">{c.user.name?.[0]}</div>
+                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-bold">{c.user?.name?.[0] || '?'}</div>
                     <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded-lg flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold">{c.user.name}</p>
-                        {(c.user.id === userId || isAuthor) && (
-                          <div className="flex gap-1">
-                            <button onClick={() => startEditingComment(c)} className="text-xs text-gray-400 hover:text-blue-600"><Pencil size={12} /></button>
-                            <button onClick={() => handleDeleteComment(c.id)} className="text-xs text-gray-400 hover:text-red-600"><Trash2 size={12} /></button>
-                          </div>
-                        )}
-                      </div>
-                      {editingCommentId === c.id ? (
-                        <div className="mt-1 flex gap-2">
-                          <Input
-                            value={editingText}
-                            onChange={(e) => setEditingText(e.target.value)}
-                            className="flex-1 text-sm py-1"
-                          />
-                          <button onClick={() => saveEditedComment(c.id)} className="text-xs text-blue-600 font-medium">Сохранить</button>
-                          <button onClick={cancelEditingComment} className="text-xs text-gray-400">Отмена</button>
-                        </div>
-                      ) : (
-                        <p className="text-sm">{c.text}</p>
-                      )}
+                      <p className="text-sm font-semibold">{c.user?.name}</p>
+                      <p className="text-sm">{c.text}</p>
                     </div>
                   </div>
                 ))}
+                {comments.length > 3 && (
+                  <p className="text-sm text-blue-600 cursor-pointer" onClick={() => navigate(`/posts/${post.id}`)}>
+                    Показать все комментарии ({comments.length})
+                  </p>
+                )}
                 <form onSubmit={submitComment} className="flex gap-2 mt-3">
                   <Input placeholder="Напишите комментарий..." value={newComment} onChange={e => setNewComment(e.target.value)} className="flex-1" />
                   <button type="submit" className="text-blue-600 font-medium">Отправить</button>
@@ -258,6 +246,8 @@ export default function PostCard({ post, onDelete, onEdit }: any) {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Модальное окно изображения */}
           {selectedImage && (
             <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setSelectedImage(null)}>
               <button className="absolute top-4 right-4 text-white" onClick={() => setSelectedImage(null)}><X size={32} /></button>

@@ -59,8 +59,11 @@ export class OrdersService {
     return this.findById(order.id);
   }
 
-  async findMyOrders(userId: string, role: string) {
-    const where = role === 'SELLER' ? { sellerId: userId } : { buyerId: userId };
+  async findMyOrders(userId: string, role: string, status?: string) {
+    const where: any = role === 'SELLER' ? { sellerId: userId } : { buyerId: userId };
+    if (status) {
+      where.status = status;
+    }
     return this.prisma.order.findMany({
       where,
       include: {

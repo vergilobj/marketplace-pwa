@@ -1,4 +1,4 @@
-import { Controller, Post, Param, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Param, Get, UseGuards, Query } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -20,7 +20,17 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Get('transactions')
-  async getTransactions() {
-    return this.paymentsService.getAllTransactions();
+  async getTransactions(
+    @Query('type') type?: string,
+    @Query('orderSearch') orderSearch?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.paymentsService.getAllTransactions({
+      type,
+      orderSearch,
+      page: Number(page) || 1,
+      limit: Number(limit) || 20,
+    });
   }
 }
