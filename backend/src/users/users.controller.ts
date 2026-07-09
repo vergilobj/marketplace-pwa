@@ -1,4 +1,16 @@
-import { Controller, Get, Patch, Post, UseGuards, Request, Body, NotFoundException, Param, Header, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Post,
+  UseGuards,
+  Request,
+  Body,
+  NotFoundException,
+  Param,
+  Header,
+  Query,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -15,7 +27,8 @@ export class UsersController {
   async getProfile(@Request() req) {
     const user = await this.usersService.findById(req.user.userId);
     if (!user) throw new NotFoundException('User not found');
-    const { passwordHash, ...result } = user;
+
+    const { passwordHash: _passwordHash, ...result } = user;
     return result;
   }
 
@@ -53,10 +66,14 @@ export class UsersController {
   @Header('Content-Disposition', 'attachment; filename="users.csv"')
   async exportUsers(): Promise<string> {
     const users = await this.usersService.exportUsers();
-    const header = 'ID,Phone,Name,Role,IsApproved,ReferralCode,BonusBalance,CreatedAt\n';
-    const csv = users.map(u =>
-      `"${u.id}","${u.phone}","${u.name || ''}","${u.role}",${u.isApproved},"${u.referralCode}",${u.bonusBalance},"${u.createdAt?.toISOString() || ''}"`
-    ).join('\n');
+    const header =
+      'ID,Phone,Name,Role,IsApproved,ReferralCode,BonusBalance,CreatedAt\n';
+    const csv = users
+      .map(
+        (u) =>
+          `"${u.id}","${u.phone}","${u.name || ''}","${u.role}",${u.isApproved},"${u.referralCode}",${u.bonusBalance},"${u.createdAt?.toISOString() || ''}"`,
+      )
+      .join('\n');
     return header + csv;
   }
 

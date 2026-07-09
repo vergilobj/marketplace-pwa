@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ShoppingCart, MessageCircle, Minus, Plus, Heart, Truck, ShieldCheck, RotateCcw, Star } from 'lucide-react';
+import { ShoppingCart, MessageCircle, Minus, Plus, Truck, ShieldCheck, RotateCcw } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { getProductById, getSimilarProducts } from '../api/products';

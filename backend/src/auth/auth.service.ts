@@ -1,4 +1,10 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
@@ -20,11 +26,19 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const existingUser = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
+    const existingUser = await this.prisma.user.findUnique({
+      where: { phone: dto.phone },
+    });
     if (existingUser) throw new ConflictException('Phone already registered');
 
-    const invite = await this.prisma.invite.findUnique({ where: { code: dto.inviteCode } });
-    if (!invite || invite.isUsed || (invite.expiresAt && invite.expiresAt < new Date())) {
+    const invite = await this.prisma.invite.findUnique({
+      where: { code: dto.inviteCode },
+    });
+    if (
+      !invite ||
+      invite.isUsed ||
+      (invite.expiresAt && invite.expiresAt < new Date())
+    ) {
       throw new BadRequestException('Invalid or expired invite code');
     }
 
@@ -56,15 +70,20 @@ export class AuthService {
       await this.cometChatService.createUser(user.id, user.name || user.phone);
       this.logger.log(`CometChat user created for ${user.id}`);
     } catch (err) {
-      this.logger.warn(`Could not create CometChat user for ${user.id}: ${err.message}`);
+      this.logger.warn(
+        `Could not create CometChat user for ${user.id}: ${err.message}`,
+      );
     }
 
     return this.generateTokens(user);
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
-    if (!user || !user.passwordHash) throw new UnauthorizedException('Invalid credentials');
+    const user = await this.prisma.user.findUnique({
+      where: { phone: dto.phone },
+    });
+    if (!user || !user.passwordHash)
+      throw new UnauthorizedException('Invalid credentials');
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
@@ -99,7 +118,10 @@ export class AuthService {
       for (const user of users) {
         if (!user.cometChatUid) {
           try {
-            await this.cometChatService.createUser(user.id, user.name || user.phone);
+            await this.cometChatService.createUser(
+              user.id,
+              user.name || user.phone,
+            );
             await this.prisma.user.update({
               where: { id: user.id },
               data: { cometChatUid: user.id },
@@ -107,7 +129,9 @@ export class AuthService {
             this.logger.log(`Synced user ${user.id} with CometChat`);
           } catch (err) {
             if (err.code !== 'ERR_UID_ALREADY_EXISTS') {
-              this.logger.warn(`Failed to sync user ${user.id}: ${err.message}`);
+              this.logger.warn(
+                `Failed to sync user ${user.id}: ${err.message}`,
+              );
             }
           }
         }
@@ -117,7 +141,7 @@ export class AuthService {
     }
   }
 
-  private async generateTokens(user: any) {
+  private generateTokens(user: any) {
     const payload = { sub: user.id, phone: user.phone, role: user.role };
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, {

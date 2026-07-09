@@ -14,18 +14,27 @@ export class NotificationsService {
     private prisma: PrismaService,
   ) {
     this.appId = this.configService.getOrThrow<string>('ONESIGNAL_APP_ID');
-    this.apiKey = this.configService.getOrThrow<string>('ONESIGNAL_REST_API_KEY');
+    this.apiKey = this.configService.getOrThrow<string>(
+      'ONESIGNAL_REST_API_KEY',
+    );
   }
 
   // ================== Внутренние уведомления ==================
 
-  async createNotification(userId: string, type: string, message: string, relatedId?: string) {
+  async createNotification(
+    userId: string,
+    type: string,
+    message: string,
+    relatedId?: string,
+  ) {
     try {
       return await this.prisma.notification.create({
         data: { userId, type, message, relatedId },
       });
     } catch (err) {
-      this.logger.error(`Failed to create notification for user ${userId}: ${err.message}`);
+      this.logger.error(
+        `Failed to create notification for user ${userId}: ${err.message}`,
+      );
       return null;
     }
   }
@@ -53,7 +62,11 @@ export class NotificationsService {
 
   // ================== Push-уведомления (существующие) ==================
 
-  async sendToAll(headings: Record<string, string>, contents: Record<string, string>, data?: any) {
+  async sendToAll(
+    headings: Record<string, string>,
+    contents: Record<string, string>,
+    data?: any,
+  ) {
     const body = {
       app_id: this.appId,
       included_segments: ['All'],
@@ -64,7 +77,12 @@ export class NotificationsService {
     return this.sendNotification(body);
   }
 
-  async sendToUser(userId: string, headings: Record<string, string>, contents: Record<string, string>, data?: any) {
+  async sendToUser(
+    userId: string,
+    headings: Record<string, string>,
+    contents: Record<string, string>,
+    data?: any,
+  ) {
     const body = {
       app_id: this.appId,
       include_external_user_ids: [userId],
@@ -81,7 +99,7 @@ export class NotificationsService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${this.apiKey}`,
+          Authorization: `Basic ${this.apiKey}`,
         },
         body: JSON.stringify(body),
       });

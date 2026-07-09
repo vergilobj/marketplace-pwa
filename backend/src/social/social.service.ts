@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -74,8 +79,15 @@ export class SocialService {
     });
   }
 
-  async updateComment(commentId: string, userId: string, userRole: string, text: string) {
-    const comment = await this.prisma.comment.findUnique({ where: { id: commentId } });
+  async updateComment(
+    commentId: string,
+    userId: string,
+    userRole: string,
+    text: string,
+  ) {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id: commentId },
+    });
     if (!comment) throw new NotFoundException('Comment not found');
     if (comment.userId !== userId && userRole !== 'ADMIN') {
       throw new ForbiddenException('You can only edit your own comments');
@@ -88,7 +100,9 @@ export class SocialService {
   }
 
   async deleteComment(commentId: string, userId: string, userRole: string) {
-    const comment = await this.prisma.comment.findUnique({ where: { id: commentId } });
+    const comment = await this.prisma.comment.findUnique({
+      where: { id: commentId },
+    });
     if (!comment) throw new NotFoundException('Comment not found');
     if (comment.userId !== userId && userRole !== 'ADMIN') {
       throw new ForbiddenException('You can only delete your own comments');

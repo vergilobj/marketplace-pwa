@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, Logger, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -21,7 +27,8 @@ export class PostsService {
   }
 
   async createAd(sellerId: string, dto: CreateAdDto) {
-    const adPricePerDay = await this.settingsService.getFloat('ad_price') || 5000;
+    const adPricePerDay =
+      (await this.settingsService.getFloat('ad_price')) || 5000;
     const totalAmount = adPricePerDay * dto.days;
     const post = await this.prisma.post.create({
       data: {
@@ -34,8 +41,11 @@ export class PostsService {
         isPinned: false,
       },
     });
-    const platformUser = await this.prisma.user.findFirst({ where: { role: 'ADMIN' } });
-    if (!platformUser) throw new BadRequestException('Platform admin not found');
+    const platformUser = await this.prisma.user.findFirst({
+      where: { role: 'ADMIN' },
+    });
+    if (!platformUser)
+      throw new BadRequestException('Platform admin not found');
     const order = await this.prisma.order.create({
       data: {
         buyerId: sellerId,
@@ -48,14 +58,20 @@ export class PostsService {
         platformFee: totalAmount,
       },
     });
-    await this.prisma.post.update({ where: { id: post.id }, data: { orderId: order.id } });
+    await this.prisma.post.update({
+      where: { id: post.id },
+      data: { orderId: order.id },
+    });
     await this.paymentsService.createPaymentForOrder(order.id);
     await this.paymentsService.processSuccessfulPayment(order.id);
     await this.activatePost(order.id);
-    return this.prisma.post.findUnique({ where: { id: post.id }, include: { order: true } });
+    return this.prisma.post.findUnique({
+      where: { id: post.id },
+      include: { order: true },
+    });
   }
 
-  async findAll(onlyVisible = true) {
+  async findAll() {
     const now = new Date();
     return this.prisma.post.findMany({
       where: {
@@ -94,7 +110,9 @@ export class PostsService {
       where: { id: post.id },
       data: { isPinned: true, adExpireDate: expireDate },
     });
-    this.logger.log(`Post ${post.id} activated until ${expireDate}`);
+    this.logger.log(
+      `Post ${post.id} activated until ${expireDate.toISOString()}`,
+    );
   }
 
   async getFeed(userId?: string) {
@@ -114,7 +132,7 @@ export class PostsService {
         likes: userId ? { where: { userId }, take: 1 } : false,
       },
     });
-    return posts.map(post => ({
+    return posts.map((post) => ({
       ...post,
       likeCount: post._count?.likes ?? 0,
       commentCount: post._count?.comments ?? 0,
@@ -125,7 +143,12 @@ export class PostsService {
   }
 
   // Админские методы
-  async findAllAdmin(params: { page?: number; limit?: number; search?: string; status?: string }) {
+  async findAllAdmin(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+  }) {
     const page = params.page || 1;
     const limit = params.limit || 20;
     const skip = (page - 1) * limit;
@@ -142,7 +165,10 @@ export class PostsService {
     const [items, total] = await Promise.all([
       this.prisma.post.findMany({
         where,
-        include: { author: { select: { id: true, name: true } }, adOwner: { select: { id: true, name: true } } },
+        include: {
+          author: { select: { id: true, name: true } },
+          adOwner: { select: { id: true, name: true } },
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -161,7 +187,18 @@ export class PostsService {
     });
   }
 
-  async update(id: string, userId: string, userRole: string, data: { title?: string; content?: string; link?: string; media?: string[]; videoUrl?: string }) {
+  async update(
+    id: string,
+    userId: string,
+    userRole: string,
+    data: {
+      title?: string;
+      content?: string;
+      link?: string;
+      media?: string[];
+      videoUrl?: string;
+    },
+  ) {
     const post = await this.prisma.post.findUnique({ where: { id } });
     if (!post) throw new NotFoundException('Post not found');
 

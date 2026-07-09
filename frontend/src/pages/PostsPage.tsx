@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Megaphone, Pin } from 'lucide-react';
 import { getPosts } from '../api/posts';
 import Card from '../components/ui/Card';

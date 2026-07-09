@@ -14,17 +14,22 @@ export class ChatService {
   async moderateMessage(message: CometChatMessageDto) {
     // Получить стоп-слова из настроек
     const stopWordsSetting = await this.settingsService.get('stop_words');
-    const stopWords: string[] = stopWordsSetting ? JSON.parse(stopWordsSetting) : [];
+    const stopWords: string[] = stopWordsSetting
+      ? JSON.parse(stopWordsSetting)
+      : [];
 
     // Проверка контактов и стоп-слов
-    const contactRegex = /(?:\+?\d{10,})|(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})|(?:https?:\/\/\S+)/gi;
+    const contactRegex =
+      /(?:\+?\d{10,})|(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})|(?:https?:\/\/\S+)/gi;
     const hasContact = contactRegex.test(message.text);
     const hasStopWord = stopWords.some((word: string) =>
       message.text.toLowerCase().includes(word.toLowerCase()),
     );
 
     if (hasContact || hasStopWord) {
-      const reason = hasContact ? 'Contact info detected' : 'Stop word detected';
+      const reason = hasContact
+        ? 'Contact info detected'
+        : 'Stop word detected';
       await this.prisma.moderationLog.create({
         data: {
           chatMsgId: message.id,

@@ -45,7 +45,7 @@ export default function Layout() {
 
   // Unread count polling
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (isAuthenticated) {
       const fetchUnread = () => {
         api.get('/notifications/unread-count')

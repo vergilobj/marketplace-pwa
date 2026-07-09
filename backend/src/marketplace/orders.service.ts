@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -60,7 +65,8 @@ export class OrdersService {
   }
 
   async findMyOrders(userId: string, role: string, status?: string) {
-    const where: any = role === 'SELLER' ? { sellerId: userId } : { buyerId: userId };
+    const where: any =
+      role === 'SELLER' ? { sellerId: userId } : { buyerId: userId };
     if (status) {
       where.status = status;
     }
@@ -90,7 +96,12 @@ export class OrdersService {
     return order;
   }
 
-  async updateStatus(orderId: string, userId: string, role: string, dto: UpdateOrderStatusDto) {
+  async updateStatus(
+    orderId: string,
+    userId: string,
+    role: string,
+    dto: UpdateOrderStatusDto,
+  ) {
     const order = await this.findById(orderId);
 
     if (role === 'SELLER' && order.sellerId !== userId) {
@@ -101,7 +112,8 @@ export class OrdersService {
     }
 
     if (dto.status === 'PAID') {
-      if (role !== 'ADMIN') throw new ForbiddenException('Only admin can mark as paid');
+      if (role !== 'ADMIN')
+        throw new ForbiddenException('Only admin can mark as paid');
       order.paidAt = new Date();
       // Уведомление покупателю
       await this.notificationsService.createNotification(

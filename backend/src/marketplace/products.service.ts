@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -43,11 +47,19 @@ export class ProductsService {
     if (product.sellerId !== sellerId) {
       throw new ForbiddenException('You can only deactivate your own products');
     }
-    return this.prisma.product.update({ where: { id }, data: { isActive: false } });
+    return this.prisma.product.update({
+      where: { id },
+      data: { isActive: false },
+    });
   }
 
   // Админские методы
-  async findAllAdmin(params: { page?: number; limit?: number; search?: string; status?: string }) {
+  async findAllAdmin(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+  }) {
     const page = params.page || 1;
     const limit = params.limit || 20;
     const skip = (page - 1) * limit;
@@ -83,10 +95,15 @@ export class ProductsService {
   }
 
   async deleteProduct(id: string) {
-    const orders = await this.prisma.order.findMany({ where: { productId: id }, select: { id: true } });
-    const orderIds = orders.map(o => o.id);
+    const orders = await this.prisma.order.findMany({
+      where: { productId: id },
+      select: { id: true },
+    });
+    const orderIds = orders.map((o) => o.id);
     if (orderIds.length > 0) {
-      await this.prisma.transaction.deleteMany({ where: { orderId: { in: orderIds } } });
+      await this.prisma.transaction.deleteMany({
+        where: { orderId: { in: orderIds } },
+      });
       await this.prisma.order.deleteMany({ where: { productId: id } });
     }
     return this.prisma.product.delete({ where: { id } });

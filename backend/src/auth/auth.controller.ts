@@ -1,4 +1,5 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -7,11 +8,13 @@ import { LoginDto } from './dto/login.dto';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post('register')
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(@Body() dto: LoginDto) {
@@ -19,7 +22,8 @@ export class AuthController {
   }
 
   @Post('refresh')
-  async refresh(@Body('refreshToken') refreshToken: string) {
+  refresh(@Body('refreshToken') refreshToken: string) {
+    void refreshToken; // will be implemented with proper token extraction
     // нужно извлечь userId из токена, но для простоты пока так
     // лучше передавать userId вместе с токеном, но пока опустим
     // На практике нужно декодировать refreshToken и извлечь sub

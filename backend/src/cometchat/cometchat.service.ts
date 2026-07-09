@@ -12,7 +12,9 @@ export class CometChatService {
   constructor(private configService: ConfigService) {
     this.appId = this.configService.getOrThrow<string>('COMETCHAT_APP_ID');
     this.region = this.configService.getOrThrow<string>('COMETCHAT_REGION');
-    this.apiKey = this.configService.getOrThrow<string>('COMETCHAT_REST_API_KEY');
+    this.apiKey = this.configService.getOrThrow<string>(
+      'COMETCHAT_REST_API_KEY',
+    );
     this.baseUrl = `https://${this.appId}.api-${this.region}.cometchat.io/v3`;
   }
 
@@ -22,7 +24,7 @@ export class CometChatService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': this.apiKey,
+          apikey: this.apiKey,
         },
         body: JSON.stringify({ uid, name }),
       });

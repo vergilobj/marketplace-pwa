@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { login } from '../api/auth';
-import { LogIn, ArrowLeft } from 'lucide-react';
-import Input from '../components/ui/Input';
-import Button from '../components/ui/Button';
-import Card from '../components/ui/Card';
+import { LogIn, ArrowLeft, Sparkles } from 'lucide-react';
 import { CometChat } from '@cometchat/chat-sdk-javascript';
-
-const COMETCHAT_AUTH_KEY = '74c796a86c1e24ae5a158705a34926d08f0793e6';
+const COMETCHAT_AUTH_KEY='74c79666693a39e55df53b4a2e93d93ef6f993e6';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -16,86 +13,40 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+    e.preventDefault(); setLoading(true); setError('');
     try {
       const { accessToken, refreshToken } = await login(form.phone, form.password);
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      const payload = JSON.parse(atob(accessToken.split('.')[1]));
-      localStorage.setItem('userId', payload.sub);
-
-      // OneSignal
-      window.OneSignalDeferred?.push(async (OneSignal: any) => {
-        await OneSignal.login(payload.sub);
-        await OneSignal.Notifications.requestPermission();
-      });
-
-      // CometChat
-      try {
-        await CometChat.login(payload.sub, COMETCHAT_AUTH_KEY);
-        console.log('CometChat logged in');
-      } catch (chatErr) {
-        console.warn('CometChat login failed, will retry via CometChatInit', chatErr);
-      }
-
+      localStorage.setItem('accessToken', accessToken); localStorage.setItem('refreshToken', refreshToken);
+      const payload = JSON.parse(atob(accessToken.split('.')[1])); localStorage.setItem('userId', payload.sub);
+      try { await CometChat.login(payload.sub, COMETCHAT_AUTH_KEY); } catch { /* CometChat login failed, non-blocking */ }
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка входа');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.response?.data?.message || 'Ошибка входа'); } finally { setLoading(false); }
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center">
-      <div className="w-full max-w-md">
-        <Link to="/" className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-8">
-          <ArrowLeft size={16} className="mr-1" /> На главную
-        </Link>
-        <Card>
+    <div className="min-h-[80vh] flex items-center justify-center px-4">
+      <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
+        <Link to="/" className="inline-flex items-center gap-2 text-white/60 hover:text-white mb-8 transition-colors text-sm"><ArrowLeft size={16} /> На главную</Link>
+        
+        <div className="bg-[#1a1a24] border border-white/[0.06] rounded-3xl p-8 shadow-2xl shadow-black/50">
           <div className="text-center mb-8">
-            <div className="mx-auto w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-4">
-              <LogIn className="w-6 h-6 text-blue-600" />
-            </div>
-            <h1 className="text-2xl font-bold">Добро пожаловать</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-2">
-              Войдите в свой аккаунт
-            </p>
+            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25"><LogIn size={24} className="text-white" /></div>
+            <h1 className="text-2xl font-bold text-white mb-1">С возвращением</h1>
+            <p className="text-white/60 text-sm">Войдите в свой аккаунт</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Телефон"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              placeholder="+7 (999) 123-45-67"
-              required
-            />
-            <Input
-              label="Пароль"
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="Ваш пароль"
-              required
-              error={error}
-            />
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <Button type="submit" loading={loading} className="w-full">
-              Войти
-            </Button>
+            <div><label className="block text-sm font-medium text-white/60 mb-1.5">Телефон</label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+7 (999) 123-45-67" className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/35 outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all" required /></div>
+            <div><label className="block text-sm font-medium text-white/60 mb-1.5">Пароль</label><input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Ваш пароль" className="w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/35 outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all" required /></div>
+            {error && <p className="text-sm font-medium text-red-400 bg-red-400/5 rounded-xl px-4 py-2.5">{error}</p>}
+            <button type="submit" disabled={loading} className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-semibold text-sm hover:from-indigo-400 transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50">{loading ? '...' : <><Sparkles size={16} /> Войти</>}</button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-gray-500">
-            Нет аккаунта?{' '}
-            <Link to="/register" className="text-blue-600 font-medium hover:underline">
-              Зарегистрироваться
-            </Link>
-          </p>
-        </Card>
-      </div>
+          <div className="mt-6 pt-6 border-t border-white/[0.06] text-center">
+            <p className="text-white/60 text-sm">Нет аккаунта? <Link to="/register" className="text-indigo-400 hover:text-indigo-300 font-semibold">Зарегистрироваться</Link></p>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }

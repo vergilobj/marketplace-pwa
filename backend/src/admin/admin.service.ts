@@ -58,7 +58,7 @@ export class AdminService {
       },
       orderBy: { name: 'asc' },
     });
-  
+
     const stats = await Promise.all(
       sellers.map(async (seller) => {
         const orders = await this.prisma.order.aggregate({
@@ -74,9 +74,9 @@ export class AdminService {
           ordersCount: orders._count.id,
           revenue: orders._sum.amount || 0,
         };
-      })
+      }),
     );
-  
+
     return stats;
   }
 }

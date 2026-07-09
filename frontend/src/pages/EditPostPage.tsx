@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, ImagePlus, X, Video } from 'lucide-react';
+import { ArrowLeft, FileText, ImagePlus, X } from 'lucide-react';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -75,7 +75,7 @@ export default function EditPostPage() {
       });
       toast.success('Пост обновлён');
       navigate(`/posts/${id}`);
-    } catch (err) {
+    } catch (_err) {
       toast.error('Ошибка при сохранении');
     } finally {
       setSaving(false);

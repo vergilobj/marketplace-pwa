@@ -1,176 +1,33 @@
 import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import api from '../api/axios';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import EmptyState from '../components/ui/EmptyState';
-import Skeleton from '../components/ui/Skeleton';
-import { Bell, ShoppingCart, Heart, MessageCircle, CheckCircle } from 'lucide-react';
-import { format, isToday, isYesterday, isThisWeek } from 'date-fns';
+import { Bell, Heart, MessageCircle, ShoppingBag, Gift, CheckCheck } from 'lucide-react';
+import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 
-const iconMap: Record<string, React.ComponentType<any>> = {
-  order: ShoppingCart,
-  like: Heart,
-  comment: MessageCircle,
-};
-
-const typeOptions = [
-  { value: 'all', label: 'Все' },
-  { value: 'order', label: 'Заказы' },
-  { value: 'like', label: 'Лайки' },
-  { value: 'comment', label: 'Комментарии' },
-];
-
-function groupNotifications(notifications: any[]) {
-  const groups: { title: string; items: any[] }[] = [];
-  let lastDate: string | null = null;
-  for (const n of notifications) {
-    const date = new Date(n.createdAt);
-    let title: string;
-    if (isToday(date)) title = 'Сегодня';
-    else if (isYesterday(date)) title = 'Вчера';
-    else if (isThisWeek(date, { weekStartsOn: 1 })) title = 'На этой неделе';
-    else title = 'Ранее';
-
-    if (lastDate !== title) {
-      groups.push({ title, items: [] });
-      lastDate = title;
-    }
-    groups[groups.length - 1].items.push(n);
-  }
-  return groups;
-}
+const icons: Record<string, React.ReactNode> = { like: <Heart size={13} className="text-rose-400" />, comment: <MessageCircle size={13} className="text-blue-400" />, order: <ShoppingBag size={13} className="text-emerald-400" />, referral: <Gift size={13} className="text-amber-400" />, broadcast: <Bell size={13} className="text-purple-400" /> };
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
 
-  useEffect(() => {
-    api.get('/notifications')
-      .then(r => setNotifications(r.data))
-      .finally(() => setLoading(false));
-  }, []);
+  useEffect(() => { api.get('/notifications').then(r => setList(r.data||[])).finally(() => setLoading(false)); }, []);
 
-  const markAsRead = async (id: string) => {
-    await api.patch(`/notifications/${id}/read`);
-    setNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, isRead: true } : n)
-    );
-  };
+  const readAll = async () => { try { await api.patch('/notifications/read-all'); setList(p => p.map(n=>({...n,isRead:true}))); toast.success('Всё прочитано'); } catch { toast.error('Ошибка'); } };
+  const markRead = async (id:string) => { try { await api.patch(`/notifications/${id}/read`); setList(p => p.map(n=>n.id===id?{...n,isRead:true}:n)); } catch {} };
 
-  const markAllAsRead = async () => {
-    await api.patch('/notifications/read-all');
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-  };
-
-  const filtered = filter === 'all'
-    ? notifications
-    : notifications.filter(n => n.type === filter);
-
-  const grouped = groupNotifications(filtered);
-
-  const hasUnread = notifications.some(n => !n.isRead);
-
-  if (loading) {
-    return (
-      <div className="max-w-xl mx-auto space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-20 w-full rounded-3xl" />
-        <Skeleton className="h-20 w-full rounded-3xl" />
-        <Skeleton className="h-20 w-full rounded-3xl" />
-      </div>
-    );
-  }
+  if (loading) return <div className="flex justify-center py-32"><div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 animate-pulse" /></div>;
 
   return (
-    <div className="max-w-xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Уведомления</h1>
-        {hasUnread && (
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={markAllAsRead}
-            className="text-sm text-blue-600 flex items-center gap-1 hover:underline"
-          >
-            <CheckCircle size={16} />
-            Прочитать все
-          </motion.button>
-        )}
-      </div>
-
-      {/* Фильтр по типу */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {typeOptions.map(opt => (
-          <motion.button
-            key={opt.value}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setFilter(opt.value)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
-              filter === opt.value
-                ? 'bg-blue-600 text-white shadow'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            {opt.label}
-          </motion.button>
-        ))}
-      </div>
-
-      {grouped.length === 0 && (
-        <EmptyState message="Нет уведомлений" />
+    <div className="max-w-2xl mx-auto px-6 py-8">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
+        <div><h1 className="text-2xl font-bold text-white mb-1">Уведомления</h1><p className="text-white/60 text-sm">{list.filter(n=>!n.isRead).length} непрочитанных</p></div>
+        {list.some(n=>!n.isRead) && <button onClick={readAll} className="text-sm text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1"><CheckCheck size={14} /> Прочитать все</button>}
+      </motion.div>
+      {list.length === 0 ? <div className="text-center py-16"><Bell size={40} className="mx-auto text-white/10 mb-4" /><p className="text-white/60">Уведомлений нет</p></div> : (
+        <div className="space-y-2">{list.map((n,i)=><motion.div key={n.id} initial={{opacity:0,x:-8}} animate={{opacity:1,x:0}} transition={{delay:i*0.02}} onClick={()=>!n.isRead&&markRead(n.id)} className={`bg-[#1a1a24] border rounded-2xl p-4 cursor-pointer transition-all hover:border-white/[0.1] ${!n.isRead?'border-l-indigo-500 border-l-2 border-white/[0.06]':'border-white/[0.04]'}`}><div className="flex items-start gap-3"><div className="w-9 h-9 rounded-xl bg-white/[0.03] flex items-center justify-center shrink-0">{icons[n.type]||<Bell size={13}/>}</div><div className="flex-1 min-w-0"><p className={`text-sm ${!n.isRead?'font-semibold text-white':'text-white/60'}`}>{n.message}</p><p className="text-[11px] text-white/35 mt-1">{n.createdAt?format(new Date(n.createdAt),'d MMM, HH:mm',{locale:ru}):''}</p></div>{!n.isRead&&<div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 mt-1.5"/>}</div></motion.div>)}</div>
       )}
-
-      <AnimatePresence>
-        {grouped.map((group, groupIndex) => (
-          <motion.div
-            key={group.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: groupIndex * 0.05 }}
-            className="space-y-3"
-          >
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-              {group.title}
-            </h3>
-            {group.items.map((n, idx) => {
-              const Icon = iconMap[n.type] || Bell;
-              const date = new Date(n.createdAt);
-              const timeStr = format(date, 'HH:mm');
-              return (
-                <motion.div
-                  key={n.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.03 }}
-                  layout
-                >
-                  <Card
-                    className={`flex items-start gap-4 cursor-pointer transition-all hover:shadow-md ${
-                      !n.isRead
-                        ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-600'
-                        : ''
-                    }`}
-                    onClick={() => !n.isRead && markAsRead(n.id)}
-                  >
-                    <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full mt-1">
-                      <Icon size={18} className={n.isRead ? 'text-gray-400' : 'text-blue-600'} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{n.message}</p>
-                      <p className="text-xs text-gray-400 mt-1">{timeStr}</p>
-                    </div>
-                    {!n.isRead && (
-                      <div className="w-2 h-2 bg-blue-600 rounded-full mt-2" />
-                    )}
-                  </Card>
-                </motion.div>
-              );
-            })}
-          </motion.div>
-        ))}
-      </AnimatePresence>
     </div>
   );
 }

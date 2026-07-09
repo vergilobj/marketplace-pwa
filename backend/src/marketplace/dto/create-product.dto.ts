@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsNumber, Min, IsOptional, IsArray } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  Min,
+  IsOptional,
+  IsArray,
+} from 'class-validator';
 
 export class CreateProductDto {
   @IsString()

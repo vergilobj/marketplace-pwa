@@ -1,13 +1,25 @@
-import { Controller, Post, Get, Patch, Param, Body, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Param,
+  Body,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { NotificationsService } from './notifications.service';
-import { PrismaService } from 'src/common/prisma/prisma.service';
+import { PrismaService } from '../common/prisma/prisma.service';
 
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private notificationsService: NotificationsService, private prisma: PrismaService) {}
+  constructor(
+    private notificationsService: NotificationsService,
+    private prisma: PrismaService,
+  ) {}
 
   // Внутренние уведомления
   @UseGuards(JwtAuthGuard)
@@ -25,7 +37,9 @@ export class NotificationsController {
   @UseGuards(JwtAuthGuard)
   @Get('unread-count')
   async getUnreadCount(@Request() req) {
-    const count = await this.notificationsService.getUnreadCount(req.user.userId);
+    const count = await this.notificationsService.getUnreadCount(
+      req.user.userId,
+    );
     return { count };
   }
 
@@ -37,15 +51,17 @@ export class NotificationsController {
     await this.notificationsService.sendToAll(
       { en: 'Test Title' },
       { en: 'Test message from marketplace' },
-      { screen: 'orders' }
+      { screen: 'orders' },
     );
     return { message: 'Sent to all' };
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('register-token')
-  async registerToken() {
-    return { message: 'Token registration not implemented yet (client-side only)' };
+  registerToken() {
+    return {
+      message: 'Token registration not implemented yet (client-side only)',
+    };
   }
 
   @UseGuards(JwtAuthGuard)

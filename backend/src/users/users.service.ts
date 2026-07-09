@@ -29,7 +29,13 @@ export class UsersService {
     const [items, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
-        select: { id: true, phone: true, name: true, role: true, isApproved: true },
+        select: {
+          id: true,
+          phone: true,
+          name: true,
+          role: true,
+          isApproved: true,
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -57,8 +63,14 @@ export class UsersService {
   async exportUsers() {
     return this.prisma.user.findMany({
       select: {
-        id: true, phone: true, name: true, role: true,
-        isApproved: true, referralCode: true, bonusBalance: true, createdAt: true,
+        id: true,
+        phone: true,
+        name: true,
+        role: true,
+        isApproved: true,
+        referralCode: true,
+        bonusBalance: true,
+        createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -66,15 +78,19 @@ export class UsersService {
 
   // ====== Статистика ======
   async getStats(userId: string) {
-    const [boughtCount, soldCount, referralOrders, balanceUser] = await Promise.all([
-      this.prisma.order.count({ where: { buyerId: userId } }),
-      this.prisma.order.count({ where: { sellerId: userId } }),
-      this.prisma.order.aggregate({
-        where: { referralUserId: userId },
-        _sum: { referralBonus: true },
-      }),
-      this.prisma.user.findUnique({ where: { id: userId }, select: { bonusBalance: true } }),
-    ]);
+    const [boughtCount, soldCount, referralOrders, balanceUser] =
+      await Promise.all([
+        this.prisma.order.count({ where: { buyerId: userId } }),
+        this.prisma.order.count({ where: { sellerId: userId } }),
+        this.prisma.order.aggregate({
+          where: { referralUserId: userId },
+          _sum: { referralBonus: true },
+        }),
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { bonusBalance: true },
+        }),
+      ]);
 
     return {
       boughtCount,
@@ -98,7 +114,8 @@ export class UsersService {
     });
     const totalPending = pendingRequests.reduce((sum, r) => sum + r.amount, 0);
     const available = user.bonusBalance - totalPending;
-    if (available < amount) throw new Error(`Insufficient bonus balance. Available: ${available} ₽`);
+    if (available < amount)
+      throw new Error(`Insufficient bonus balance. Available: ${available} ₽`);
     return this.prisma.withdrawalRequest.create({
       data: { userId, amount, status: 'pending' },
     });
@@ -119,10 +136,14 @@ export class UsersService {
   }
 
   async approveWithdrawal(requestId: string) {
-    const request = await this.prisma.withdrawalRequest.findUnique({ where: { id: requestId } });
-    if (!request || request.status !== 'pending') throw new Error('Invalid request');
+    const request = await this.prisma.withdrawalRequest.findUnique({
+      where: { id: requestId },
+    });
+    if (!request || request.status !== 'pending')
+      throw new Error('Invalid request');
     const user = await this.findById(request.userId);
-    if (!user || user.bonusBalance < request.amount) throw new Error('Insufficient balance');
+    if (!user || user.bonusBalance < request.amount)
+      throw new Error('Insufficient balance');
     await this.prisma.user.update({
       where: { id: request.userId },
       data: { bonusBalance: { decrement: request.amount } },
@@ -134,8 +155,11 @@ export class UsersService {
   }
 
   async rejectWithdrawal(requestId: string) {
-    const request = await this.prisma.withdrawalRequest.findUnique({ where: { id: requestId } });
-    if (!request || request.status !== 'pending') throw new Error('Invalid request');
+    const request = await this.prisma.withdrawalRequest.findUnique({
+      where: { id: requestId },
+    });
+    if (!request || request.status !== 'pending')
+      throw new Error('Invalid request');
     return this.prisma.withdrawalRequest.update({
       where: { id: requestId },
       data: { status: 'rejected' },
@@ -155,7 +179,7 @@ export class UsersService {
       data: { role: newRole },
     });
   }
-  
+
   async batchApprove(userIds: string[]) {
     await this.prisma.user.updateMany({
       where: { id: { in: userIds }, isApproved: false },

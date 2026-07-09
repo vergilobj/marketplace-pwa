@@ -1,4 +1,14 @@
-import { Controller, Post, Delete, Get, Patch, Param, Body, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Delete,
+  Get,
+  Patch,
+  Param,
+  Body,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SocialService } from './social.service';
 
@@ -25,7 +35,11 @@ export class SocialController {
 
   @UseGuards(JwtAuthGuard)
   @Post(':postId/comments')
-  async addComment(@Request() req, @Param('postId') postId: string, @Body('text') text: string) {
+  async addComment(
+    @Request() req,
+    @Param('postId') postId: string,
+    @Body('text') text: string,
+  ) {
     return this.socialService.addComment(req.user.userId, postId, text);
   }
 
@@ -41,15 +55,21 @@ export class SocialController {
     @Param('commentId') commentId: string,
     @Body('text') text: string,
   ) {
-    return this.socialService.updateComment(commentId, req.user.userId, req.user.role, text);
+    return this.socialService.updateComment(
+      commentId,
+      req.user.userId,
+      req.user.role,
+      text,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete('comments/:commentId')
-  async deleteComment(
-    @Request() req,
-    @Param('commentId') commentId: string,
-  ) {
-    return this.socialService.deleteComment(commentId, req.user.userId, req.user.role);
+  async deleteComment(@Request() req, @Param('commentId') commentId: string) {
+    return this.socialService.deleteComment(
+      commentId,
+      req.user.userId,
+      req.user.role,
+    );
   }
 }

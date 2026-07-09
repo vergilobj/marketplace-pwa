@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+  Request,
+  Query,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -30,7 +41,11 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('SELLER')
   @Patch(':id')
-  async update(@Param('id') id: string, @Request() req, @Body() dto: UpdateProductDto) {
+  async update(
+    @Param('id') id: string,
+    @Request() req,
+    @Body() dto: UpdateProductDto,
+  ) {
     return this.productsService.update(id, req.user.userId, dto);
   }
 

@@ -1,295 +1,102 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { getFeed } from '../api/posts';
 import { getProducts } from '../api/products';
 import PostCard from '../components/PostCard';
 import ProductCard from '../components/ProductCard';
-import Skeleton from '../components/ui/Skeleton';
-import ErrorState from '../components/ui/ErrorState';
-import EmptyState from '../components/ui/EmptyState';
-import Input from '../components/ui/Input';
-import Button from '../components/ui/Button';
-import { Search, FileText, Megaphone, SlidersHorizontal, Grid3X3, List, X } from 'lucide-react';
+import { Search, X, Sparkles, FileText, Grid3X3, Megaphone, Clock, Flame, TrendingUp, List, ArrowRight, Zap } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
-type ViewMode = 'grid' | 'list';
 
-const sortOptions: { value: SortType; label: string }[] = [
-  { value: 'newest', label: 'Новые' },
-  { value: 'popular', label: 'Популярные' },
-  { value: 'price_asc', label: 'Цена ↑' },
-  { value: 'price_desc', label: 'Цена ↓' },
+const sortOptions: { value: SortType; label: string; icon: React.ReactNode }[] = [
+  { value: 'newest', label: 'Новые', icon: <Clock size={13} /> },
+  { value: 'popular', label: 'Популярные', icon: <Flame size={13} /> },
+  { value: 'price_asc', label: 'Дешевле', icon: <TrendingUp size={13} /> },
+  { value: 'price_desc', label: 'Дороже', icon: <TrendingUp size={13} className="rotate-180" /> },
 ];
 
-const container = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.05 } },
-};
-
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' } },
-};
-
+ 
 export default function FeedPage() {
   const navigate = useNavigate();
-  const { isAdmin, isSeller } = useAuth();
+  const [sp] = useSearchParams();
+  const { isAdmin, isSeller, isAuthenticated } = useAuth();
   const [posts, setPosts] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'products' | 'posts'>('all');
+  const [activeTab, setActiveTab] = useState<'all'|'posts'|'products'|'ads'>('all');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortType>('newest');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [viewMode, setViewMode] = useState<'grid'|'list'>('grid');
 
-  const fetchData = async () => {
-    try {
-      const [postsRes, productsRes] = await Promise.all([getFeed(), getProducts()]);
-      setPosts(postsRes);
-      setProducts(productsRes);
-    } catch (e) {
-      setError('Ошибка загрузки данных');
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => { Promise.all([getFeed(), getProducts()]).then(([p, pr]) => { setPosts(Array.isArray(p)?p:[]); setProducts(Array.isArray(pr)?pr:[]); }).finally(() => setLoading(false)); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { const q = sp.get('search'); if (q) setSearch(q); }, [sp]);
 
-  useEffect(() => { fetchData(); }, []);
+  const delPost = async (id: string) => { if (!confirm('Удалить?')) return; try { await api.delete('/posts/'+id); setPosts(p => p.filter(x => x.id !== id)); toast.success('Удалён'); } catch { toast.error('Ошибка'); } };
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const q = params.get('search');
-    if (q) setSearch(q);
-  }, []);
+  const fp = posts.filter(p => p.title?.toLowerCase().includes(search.toLowerCase()) || p.content?.toLowerCase().includes(search.toLowerCase()));
+  const fpr = products.filter(p => p.title?.toLowerCase().includes(search.toLowerCase()));
+  const sf = (a:any,b:any) => { switch(sort) { case 'popular': return (b.likeCount||0)-(a.likeCount||0); case 'price_asc': return (a.price||0)-(b.price||0); case 'price_desc': return (b.price||0)-(a.price||0); default: return new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime(); } };
+  const sposts = [...fp].sort(sf); const sproducts = [...fpr].sort(sf);
+  const ads = sposts.filter(p=>p.isAd); const regular = sposts.filter(p=>!p.isAd);
 
-  const handleDeletePost = async (postId: string) => {
-    if (!confirm('Удалить пост?')) return;
-    try {
-      await api.delete(`/posts/${postId}`);
-      setPosts(prev => prev.filter(p => p.id !== postId));
-      toast.success('Пост удалён');
-    } catch (err) {
-      toast.error('Не удалось удалить пост');
-    }
-  };
-
-  const handleEditPost = (post: any) => {
-    navigate(`/posts/${post.id}/edit`);
-  };
-
-  const filteredPosts = posts.filter(p =>
-    p.title?.toLowerCase().includes(search.toLowerCase()) ||
-    p.content?.toLowerCase().includes(search.toLowerCase())
-  );
-  const filteredProducts = products.filter(p =>
-    p.title.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const sortFn = (a: any, b: any) => {
-    switch (sort) {
-      case 'popular': return (b.likeCount || 0) - (a.likeCount || 0);
-      case 'price_asc': return (a.price || 0) - (b.price || 0);
-      case 'price_desc': return (b.price || 0) - (a.price || 0);
-      default: return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    }
-  };
-
-  const sortedPosts = [...filteredPosts].sort(sortFn);
-  const sortedProducts = [...filteredProducts].sort(sortFn);
-
-  const allItems = [
-    ...sortedPosts.map(p => ({ ...p, type: 'post' })),
-    ...sortedProducts.map(p => ({ ...p, type: 'product' })),
-  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  // Разделяем посты и товары для смешанной ленты
-  const mixedPosts = allItems.filter(e => e.type === 'post');
-  const mixedProducts = allItems.filter(e => e.type === 'product');
-
-  const hasActiveSearch = search.trim().length > 0;
-
-  const renderSkeletons = (count = 6) => (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-      {Array.from({ length: count }).map((_, i) => (
-        <Skeleton key={i} className="aspect-square rounded-3xl" />
-      ))}
-    </div>
-  );
+  const items = (() => { switch(activeTab) { case 'posts': return regular.map(p=>({...p,type:'post'})); case 'products': return sproducts.map(p=>({...p,type:'product'})); case 'ads': return ads.map(p=>({...p,type:'post'})); default: return [...ads.map(p=>({...p,type:'post'})),...regular.map(p=>({...p,type:'post'})),...sproducts.map(p=>({...p,type:'product'}))]; } })();
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <motion.h1 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="text-4xl font-bold tracking-tight">
-          Лента
-        </motion.h1>
-        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex gap-2">
-          {isAdmin && (
-            <Button variant="primary" size="sm" onClick={() => navigate('/posts/new')}>
-              <FileText size={16} className="mr-1" /> Новый пост
-            </Button>
-          )}
-          {isSeller && (
-            <Button variant="secondary" size="sm" onClick={() => navigate('/posts/ad/new')}>
-              <Megaphone size={16} className="mr-1" /> Реклама
-            </Button>
-          )}
-        </motion.div>
+    <div className="max-w-6xl mx-auto px-6 py-10">
+      {/* Hero */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl mb-10 p-6 sm:p-10 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500">
+        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+        <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-purple-400/20 rounded-full blur-3xl" />
+        <div className="relative z-10">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white/90 text-sm font-medium mb-6"><Zap size={14} className="text-yellow-300" /> Закрытый маркетплейс</div>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-3 tracking-tight leading-[1.1]">Покупайте и продавайте<br/>в надёжном сообществе</h1>
+          <p className="text-white/70 text-base max-w-lg mb-5">Закрытая площадка для проверенных участников. Товары, чат, реферальная программа — всё в одном месте.</p>
+          <div className="flex flex-wrap gap-3">
+            {isSeller && <button onClick={() => navigate('/products/new')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-slate-900 font-semibold text-sm hover:bg-white/90 transition-all shadow-xl"><Sparkles size={16} /> Выставить товар</button>}
+            {isAdmin && <button onClick={() => navigate('/posts/new')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/15 backdrop-blur-sm text-white font-semibold text-sm border border-white/20 hover:bg-white/25 transition-all"><FileText size={16} /> Новый пост</button>}
+            {!isAuthenticated && <button onClick={() => navigate('/register')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-slate-900 font-semibold text-sm hover:bg-white/90 transition-all shadow-xl">Присоединиться <ArrowRight size={16} /></button>}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Unified Toolbar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
+        <div className="relative flex-1 w-full">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/35" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по ленте..." className="w-full pl-11 pr-10 py-3 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder:text-white/25 outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all" />
+          {search && <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/35 hover:text-white/70 transition-colors"><X size={16} /></button>}
+        </div>
+        <div className="flex items-center gap-1.5 p-1 bg-white/[0.04] rounded-2xl shrink-0">
+          {sortOptions.map(opt => (
+            <button key={opt.value} onClick={() => setSort(opt.value)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${sort === opt.value ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{opt.icon}{opt.label}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1 p-1 bg-white/[0.04] rounded-2xl shrink-0">
+          <button onClick={() => setViewMode('grid')} className={`p-2 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white/[0.08] text-white' : 'text-white/35 hover:text-white'}`}><Grid3X3 size={15} /></button>
+          <button onClick={() => setViewMode('list')} className={`p-2 rounded-xl transition-all ${viewMode === 'list' ? 'bg-white/[0.08] text-white' : 'text-white/35 hover:text-white'}`}><List size={15} /></button>
+        </div>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Input
-            placeholder="Поиск по ленте..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 h-12 rounded-2xl text-base"
-          />
-          <Search className="absolute left-4 top-4 text-gray-400" size={20} />
-          {hasActiveSearch && (
-            <button onClick={() => setSearch('')} className="absolute right-4 top-4 text-gray-400 hover:text-gray-600">
-              <X size={18} />
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-gray-100 dark:bg-gray-800">
-            <SlidersHorizontal size={16} className="text-gray-500" />
-            <select value={sort} onChange={(e) => setSort(e.target.value as SortType)} className="bg-transparent text-sm font-medium outline-none">
-              {sortOptions.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-            </select>
-          </div>
-          <div className="flex rounded-2xl bg-gray-100 dark:bg-gray-800 p-1">
-            <button onClick={() => setViewMode('grid')} className={`p-2 rounded-xl transition ${viewMode === 'grid' ? 'bg-white dark:bg-gray-700 shadow' : ''}`}><Grid3X3 size={16} className="text-gray-500" /></button>
-            <button onClick={() => setViewMode('list')} className={`p-2 rounded-xl transition ${viewMode === 'list' ? 'bg-white dark:bg-gray-700 shadow' : ''}`}><List size={16} className="text-gray-500" /></button>
-          </div>
-        </div>
-      </motion.div>
-
-      {hasActiveSearch && (
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-sm text-gray-500 flex items-center justify-between">
-          <span>Результаты поиска для «{search}»</span>
-          <button onClick={() => setSearch('')} className="text-blue-600 hover:underline">Сбросить</button>
-        </motion.div>
-      )}
-
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex gap-2 p-1 rounded-2xl bg-gray-100 dark:bg-gray-800 w-fit">
-        {[
-          { key: 'all', label: 'Все' },
-          { key: 'products', label: 'Товары' },
-          { key: 'posts', label: 'Посты' },
-        ].map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as typeof activeTab)}
-            className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${
-              activeTab === tab.key ? 'bg-white dark:bg-gray-700 shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {tab.label}
-          </button>
+      {/* Tabs */}
+      <div className="flex items-center gap-2 mb-8">
+        {[{ key: 'all', label: 'Всё', icon: <Sparkles size={13} /> }, { key: 'products', label: 'Товары', icon: <Grid3X3 size={13} /> }, { key: 'posts', label: 'Посты', icon: <FileText size={13} /> }, { key: 'ads', label: 'Реклама', icon: <Megaphone size={13} /> }].map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key as any)} className={`flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeTab === tab.key ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{tab.icon}{tab.label}</button>
         ))}
-      </motion.div>
+      </div>
 
+      {/* Content */}
       {loading ? (
-        renderSkeletons()
-      ) : error ? (
-        <ErrorState message={error} onRetry={fetchData} />
+        <div className={viewMode==='grid'?'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5':'space-y-5'}>{Array.from({length:6}).map((_, idx)=><div key={idx} className="rounded-2xl overflow-hidden"><div className="skeleton h-52 rounded-2xl mb-3"/><div className="skeleton h-4 w-3/4 rounded-lg mb-2"/><div className="skeleton h-3 w-1/2 rounded-lg"/></div>)}</div>
+      ) : items.length === 0 ? (
+        <div className="text-center py-24"><div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/[0.04] flex items-center justify-center"><Search size={24} className="text-white/25"/></div><p className="text-white/50 text-sm">Ничего не найдено</p></div>
       ) : (
-        <AnimatePresence mode="wait">
-          {activeTab === 'posts' && (
-            <motion.div key="posts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              {sortedPosts.length === 0 ? (
-                <EmptyState message={hasActiveSearch ? `Посты по запросу «${search}» не найдены` : 'Постов пока нет'} />
-              ) : (
-                <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
-                  {sortedPosts.map(post => (
-                    <motion.div key={post.id} variants={item}>
-                      <PostCard post={post} onDelete={handleDeletePost} onEdit={handleEditPost} />
-                    </motion.div>
-                  ))}
-                </motion.div>
-              )}
-            </motion.div>
-          )}
-
-          {activeTab === 'products' && (
-            <motion.div key="products" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              {sortedProducts.length === 0 ? (
-                <EmptyState message={hasActiveSearch ? `Товары по запросу «${search}» не найдены` : 'Товаров пока нет'} />
-              ) : (
-                <motion.div
-                  variants={container}
-                  initial="hidden"
-                  animate="show"
-                  className={`grid gap-6 ${
-                    viewMode === 'grid'
-                      ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
-                      : 'grid-cols-1 sm:grid-cols-2'
-                  }`}
-                >
-                  {sortedProducts.map(product => (
-                    <motion.div key={product.id} variants={item}>
-                      <ProductCard product={product} />
-                    </motion.div>
-                  ))}
-                </motion.div>
-              )}
-            </motion.div>
-          )}
-
-          {activeTab === 'all' && (
-            <motion.div key="all" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              {allItems.length === 0 ? (
-                <EmptyState message={hasActiveSearch ? `Ничего не найдено по запросу «${search}»` : 'Лента пуста'} />
-              ) : (
-                <div className="space-y-6">
-                  {/* Посты (каждый на всю ширину) */}
-                  {mixedPosts.map(post => (
-                    <motion.div key={post.id} variants={item}>
-                      <div className="flex items-center gap-2 mb-1 ml-1">
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                          Пост
-                        </span>
-                      </div>
-                      <PostCard post={post} onDelete={handleDeletePost} onEdit={handleEditPost} />
-                    </motion.div>
-                  ))}
-                  {/* Товары (сеткой в ряд) */}
-                  {mixedProducts.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-2 mb-3 ml-1">
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
-                          Товары
-                        </span>
-                      </div>
-                      <motion.div
-                        variants={container}
-                        initial="hidden"
-                        animate="show"
-                        className={`grid gap-6 ${
-                          viewMode === 'grid'
-                            ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
-                            : 'grid-cols-1 sm:grid-cols-2'
-                        }`}
-                      >
-                        {mixedProducts.map(product => (
-                          <motion.div key={product.id} variants={item}>
-                            <ProductCard product={product} />
-                          </motion.div>
-                        ))}
-                      </motion.div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <motion.div className={viewMode==='grid'?'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5':'space-y-5'} initial="hidden" animate="show" variants={{hidden:{},show:{transition:{staggerChildren:0.04}}}}>{items.map((item, _i)=><motion.div key={item.type+'-'+item.id} variants={{hidden:{opacity:0,y:20},show:{opacity:1,y:0}}}>{item.type==='post'?<PostCard post={item} onDelete={isAdmin?delPost:undefined}/>:<ProductCard product={item}/>}</motion.div>)}</motion.div>
       )}
     </div>
   );

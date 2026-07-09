@@ -1,96 +1,55 @@
-import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Trash2, ShoppingBag, ArrowLeft, Heart, Minus, Plus } from 'lucide-react';
+import { Trash2, ShoppingBag, Heart, Minus, Plus, ArrowLeft, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import EmptyState from '../components/ui/EmptyState';
 
 export default function CartPage() {
-  const { cart, removeFromCart, updateQuantity, moveToFavorites, clearCart } = useApp();
   const navigate = useNavigate();
+  const { cart, removeFromCart, updateQuantity, moveToFavorites } = useApp();
 
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const total = cart.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
+  const formatted = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(total);
 
-  if (cart.length === 0) return <EmptyState message="Корзина пуста" />;
+  if (cart.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-24 text-center">
+        <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center"><ShoppingBag size={32} className="text-white/35" /></div>
+        <h1 className="text-2xl font-bold text-white mb-2">Корзина пуста</h1>
+        <p className="text-white/60 mb-6">Добавьте товары из каталога</p>
+        <Link to="/" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-semibold text-sm hover:from-indigo-400 transition-all shadow-lg shadow-indigo-500/25"><ShoppingBag size={16} /> К покупкам</Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Корзина</h1>
-        <button onClick={clearCart} className="text-sm text-red-500 hover:text-red-600">
-          Очистить всё
-        </button>
-      </div>
-      <div className="space-y-4">
+    <div className="max-w-2xl mx-auto px-6 py-8">
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-white/50 hover:text-white mb-6 transition-colors text-sm"><ArrowLeft size={16} /> Назад</button>
+      <h1 className="text-2xl font-bold text-white mb-6">Корзина ({cart.length})</h1>
+      
+      <div className="space-y-3 mb-8">
         <AnimatePresence>
-          {cart.map(item => (
-            <motion.div
-              key={item.productId}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Card className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h3 className="font-semibold">{item.title}</h3>
-                  <p className="text-sm text-gray-500">{item.price.toLocaleString()} ₽</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
-                    <motion.button
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => updateQuantity(item.productId, -1)}
-                      className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-gray-700"
-                    >
-                      <Minus size={14} />
-                    </motion.button>
-                    <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
-                    <motion.button
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => updateQuantity(item.productId, 1)}
-                      className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-gray-700"
-                    >
-                      <Plus size={14} />
-                    </motion.button>
-                  </div>
-                  <span className="font-bold text-blue-600 w-24 text-right">
-                    {(item.price * item.quantity).toLocaleString()} ₽
-                  </span>
-                  <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => moveToFavorites(item.productId)}
-                    className="p-1.5 text-gray-400 hover:text-red-500"
-                    title="Отложить в избранное"
-                  >
-                    <Heart size={16} />
-                  </motion.button>
-                  <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => removeFromCart(item.productId)}
-                    className="p-1.5 text-gray-400 hover:text-red-500"
-                  >
-                    <Trash2 size={16} />
-                  </motion.button>
-                </div>
-              </Card>
+          {cart.map((item: any) => (
+            <motion.div key={item.productId} exit={{ opacity: 0, x: 20 }} className="flex items-center gap-4 p-4 bg-[#1a1a24] border border-white/[0.06] rounded-2xl">
+              <div className="w-16 h-16 rounded-xl bg-[#111115] shrink-0" />
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-white truncate">{item.title}</h3>
+                <p className="text-sm text-indigo-400 font-bold">{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(item.price * item.quantity)}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => updateQuantity(item.productId, -1)} className="p-1.5 rounded-lg bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.08] transition-all"><Minus size={14} /></button>
+                <span className="text-sm font-semibold text-white w-6 text-center">{item.quantity}</span>
+                <button onClick={() => updateQuantity(item.productId, 1)} className="p-1.5 rounded-lg bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.08] transition-all"><Plus size={14} /></button>
+              </div>
+              <button onClick={() => moveToFavorites(item.productId)} className="p-2 rounded-lg text-white/50 hover:text-rose-400 hover:bg-rose-400/5 transition-all"><Heart size={16} /></button>
+              <button onClick={() => removeFromCart(item.productId)} className="p-2 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-400/5 transition-all"><Trash2 size={16} /></button>
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
-      <div className="flex justify-between items-center text-lg font-bold">
-        <span>Итого:</span>
-        <span className="text-2xl text-blue-600">{total.toLocaleString()} ₽</span>
-      </div>
-      <Button className="w-full py-4 text-lg rounded-2xl" onClick={() => navigate('/checkout')}>
-        <ShoppingBag size={20} className="mr-2" /> Оформить заказ
-      </Button>
-      <div className="text-center">
-        <Link to="/" className="text-sm text-blue-600 hover:underline">
-          Продолжить покупки
-        </Link>
+
+      <div className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-5">
+        <div className="flex justify-between items-center mb-4"><span className="text-white/50 text-sm">Итого</span><span className="text-xl font-bold text-white">{formatted}</span></div>
+        <button onClick={() => navigate('/checkout')} className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-semibold text-sm hover:from-indigo-400 transition-all shadow-lg shadow-indigo-500/25"><Sparkles size={16} /> Оформить заказ</button>
       </div>
     </div>
   );

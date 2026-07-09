@@ -1,436 +1,70 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  User, Phone, Gift, Bell, Camera, Package, Heart, Users, Wallet,
-  ShoppingBag, TrendingUp, LogIn
-} from 'lucide-react';
 import { getProfile, updateProfile, getStats } from '../api/users';
-import { uploadImage } from '../api/upload';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Input from '../components/ui/Input';
-import Skeleton from '../components/ui/Skeleton';
-import EmptyState from '../components/ui/EmptyState';
+import { User, Settings, TrendingUp, Gift, LogOut, Save } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import api from '../api/axios';
-import { useApp } from '../context/AppContext';
-import ProductCard from '../components/ProductCard';
-
-type Tab = 'info' | 'orders' | 'favorites' | 'referrals' | 'withdrawals';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<Tab>('info');
-  const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editPhone, setEditPhone] = useState('');
-  const [permission, setPermission] = useState<NotificationPermission>('default');
-  const avatarInputRef = useRef<HTMLInputElement>(null);
-
-  // Данные для вкладок
-  const [orders, setOrders] = useState<any[]>([]);
-  const [favProducts, setFavProducts] = useState<any[]>([]);
-  const [referrals, setReferrals] = useState<any[]>([]);
-  const [withdrawals, setWithdrawals] = useState<any[]>([]);
-  const [loadingTab, setLoadingTab] = useState(false);
-
-  const { favorites } = useApp(); // избранное из контекста
-
-  const loadData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [profileData, statsData] = await Promise.all([getProfile(), getStats()]);
-      setProfile(profileData);
-      setStats(statsData);
-      setEditName(profileData.name);
-      setEditPhone(profileData.phone);
-    } catch (err: any) {
-      console.error('Profile load error', err);
-      if (err?.response?.status === 401) {
-        setError('Сессия истекла. Войдите заново.');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('userId');
-      } else {
-        setError('Не удалось загрузить профиль');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { loadData(); }, []);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ name: '', phone: '' });
 
   useEffect(() => {
-    if ('Notification' in window) setPermission(Notification.permission);
+    Promise.all([getProfile(), getStats()]).then(([p, s]) => { setProfile(p); setStats(s); setForm({ name: p.name || '', phone: p.phone || '' }); }).finally(() => setLoading(false));
   }, []);
 
-  // Загрузка данных для вкладки
-  useEffect(() => {
-    if (!profile) return;
-    setLoadingTab(true);
-    const fetchTabData = async () => {
-      try {
-        switch (activeTab) {
-          case 'orders':
-            const ordersRes = await api.get('/orders/my');
-            setOrders(ordersRes.data);
-            break;
-          case 'favorites':
-            // загружаем все товары и фильтруем по избранному
-            const productsRes = await api.get('/products');
-            const allProducts = productsRes.data;
-            setFavProducts(allProducts.filter((p: any) => favorites.includes(p.id)));
-            break;
-          case 'referrals':
-            const refRes = await api.get('/users/me/referrals');
-            setReferrals(refRes.data);
-            break;
-          case 'withdrawals':
-            const wdRes = await api.get('/users/me/withdrawals');
-            setWithdrawals(wdRes.data);
-            break;
-        }
-      } catch (err) {
-        console.error('Failed to load tab data', err);
-      } finally {
-        setLoadingTab(false);
-      }
-    };
-    fetchTabData();
-  }, [activeTab, profile, favorites]);
+  const handleSave = async () => { try { await updateProfile(form); const p = await getProfile(); setProfile(p); setEditing(false); toast.success('Профиль обновлён'); } catch { toast.error('Ошибка'); } };
+  const handleLogout = () => { localStorage.clear(); navigate('/login'); };
 
-  const handleSaveProfile = async () => {
-    try {
-      const updated = await updateProfile({ name: editName, phone: editPhone });
-      setProfile(updated);
-      setIsEditing(false);
-      toast.success('Профиль обновлён');
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Ошибка сохранения');
-    }
-  };
-
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const url = await uploadImage(file);
-      const updated = await updateProfile({ avatar: url });
-      setProfile(updated);
-      toast.success('Аватар обновлён');
-    } catch (err: any) {
-      toast.error('Не удалось загрузить аватар');
-    }
-  };
-
-  const requestPermission = async () => {
-    if (window.OneSignal) {
-      await window.OneSignal.Notifications.requestPermission();
-      setPermission(Notification.permission);
-    } else {
-      window.OneSignalDeferred?.push(async (OneSignal: any) => {
-        await OneSignal.Notifications.requestPermission();
-        setPermission(Notification.permission);
-      });
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="max-w-4xl mx-auto space-y-8">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Skeleton className="h-40 rounded-3xl" />
-          <Skeleton className="h-40 rounded-3xl" />
-          <Skeleton className="h-40 rounded-3xl" />
-        </div>
-        <Skeleton className="h-64 rounded-3xl" />
-      </div>
-    );
-  }
-
-  if (error || !profile) {
-    return (
-      <div className="max-w-xl mx-auto text-center space-y-4 py-20">
-        <p className="text-red-500">{error || 'Профиль не загружен'}</p>
-        <Button variant="primary" onClick={() => navigate('/login')}>
-          <LogIn size={18} className="mr-2" /> Войти
-        </Button>
-      </div>
-    );
-  }
-
-  const tabs: { key: Tab; label: string; icon: React.ComponentType<any> }[] = [
-    { key: 'info', label: 'Инфо', icon: User },
-    { key: 'orders', label: 'Заказы', icon: Package },
-    { key: 'favorites', label: 'Избранное', icon: Heart },
-    { key: 'referrals', label: 'Рефералы', icon: Users },
-    { key: 'withdrawals', label: 'Выводы', icon: Wallet },
-  ];
-
-  const statusMap: Record<string, string> = {
-    PENDING: 'Ожидает',
-    PAID: 'Оплачен',
-    SHIPPED: 'Отправлен',
-    COMPLETED: 'Завершён',
-    CANCELLED: 'Отменён',
-  };
-
-  const withdrawalStatusMap: Record<string, string> = {
-    pending: 'На рассмотрении',
-    approved: 'Одобрена',
-    rejected: 'Отклонена',
-  };
+  if (loading) return <div className="flex justify-center py-32"><div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 animate-pulse" /></div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <h1 className="text-3xl font-bold">Профиль</h1>
+    <div className="max-w-2xl mx-auto px-6 py-8">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}><h1 className="text-2xl font-bold text-white mb-2">Профиль</h1><p className="text-white/60 text-sm mb-8">Управление аккаунтом</p></motion.div>
+
+      <div className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-6 mb-6">
+        <div className="flex items-center gap-5 mb-6">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xl font-bold flex items-center justify-center shadow-lg shadow-indigo-500/25">{(profile?.name?.[0] || '?').toUpperCase()}</div>
+          <div>
+            <h2 className="text-lg font-bold text-white">{profile?.name || 'Пользователь'}</h2>
+            <p className="text-white/60 text-sm">{profile?.phone}</p>
+            <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-indigo-400/10 text-indigo-400 text-[11px] font-semibold">{profile?.role === 'ADMIN' ? 'Админ' : profile?.role === 'SELLER' ? 'Продавец' : 'Покупатель'}</span>
+          </div>
+        </div>
+        {editing ? (
+          <div className="space-y-3">
+            <div><label className="block text-sm text-white/60 mb-1">Имя</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-indigo-500/50 transition-all" /></div>
+            <div><label className="block text-sm text-white/60 mb-1">Телефон</label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="w-full px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm outline-none focus:border-indigo-500/50 transition-all" /></div>
+            <div className="flex gap-2"><button onClick={handleSave} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 transition-all shadow-lg"><Save size={14} /> Сохранить</button><button onClick={() => setEditing(false)} className="px-5 py-2.5 rounded-xl bg-white/[0.04] text-white/60 text-sm font-medium hover:bg-white/[0.08] transition-all">Отмена</button></div>
+          </div>
+        ) : (
+          <button onClick={() => setEditing(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.04] text-white/60 text-sm font-medium hover:bg-white/[0.08] hover:text-white transition-all"><Settings size={14} /> Редактировать</button>
+        )}
+      </div>
 
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="flex items-center gap-4">
-            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-2xl">
-              <ShoppingBag size={22} className="text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Куплено</p>
-              <p className="text-xl font-bold">{stats.boughtCount}</p>
-            </div>
-          </Card>
-          <Card className="flex items-center gap-4">
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-2xl">
-              <TrendingUp size={22} className="text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Продано</p>
-              <p className="text-xl font-bold">{stats.soldCount}</p>
-            </div>
-          </Card>
-          <Card className="flex items-center gap-4">
-            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-2xl">
-              <Gift size={22} className="text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Заработано</p>
-              <p className="text-xl font-bold">{stats.referralEarned.toLocaleString()} ₽</p>
-            </div>
-          </Card>
-          <Card className="flex items-center gap-4">
-            <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-2xl">
-              <Wallet size={22} className="text-orange-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Баланс</p>
-              <p className="text-xl font-bold">{stats.bonusBalance.toLocaleString()} ₽</p>
-            </div>
-          </Card>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          {[{ label: 'Покупок', value: stats.boughtCount, icon: <TrendingUp size={16} />, color: 'from-indigo-500 to-blue-600' }, { label: 'Продаж', value: stats.soldCount, icon: <Gift size={16} />, color: 'from-purple-500 to-pink-600' }, { label: 'Рефералы', value: `${stats.referralEarned || 0} ₽`, icon: <User size={16} />, color: 'from-amber-500 to-orange-600' }, { label: 'Баланс', value: `${stats.bonusBalance || 0} ₽`, icon: <TrendingUp size={16} />, color: 'from-emerald-500 to-teal-600' }].map((s, i) => (
+            <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-4 text-center">
+              <div className={`w-9 h-9 mx-auto mb-2 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center text-white`}>{s.icon}</div>
+              <div className="text-lg font-bold text-white">{s.value}</div>
+              <div className="text-[11px] text-white/50">{s.label}</div>
+            </motion.div>
+          ))}
         </div>
       )}
 
-      <Card>
-        <div className="flex flex-col sm:flex-row items-center gap-6">
-          <div className="relative group">
-            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-3xl font-bold overflow-hidden">
-              {profile.avatar ? (
-                <img
-                  src={profile.avatar}
-                  alt={profile.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const img = e.target as HTMLImageElement;
-                    img.style.display = 'none';
-                    const parent = img.parentElement;
-                    if (parent) {
-                      parent.innerHTML = profile.name?.[0] || '?';
-                    }
-                  }}
-                />
-              ) : (
-                profile.name?.[0] || '?'
-              )}
-            </div>
-            <button
-              onClick={() => avatarInputRef.current?.click()}
-              className="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center"
-            >
-              <Camera size={20} className="text-white" />
-            </button>
-            <input
-              ref={avatarInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarChange}
-              className="hidden"
-            />
-          </div>
-          <div className="flex-1 text-center sm:text-left">
-            <h2 className="text-2xl font-bold">{profile.name}</h2>
-            <p className="text-gray-500">{profile.phone}</p>
-            <p className="text-sm text-gray-400 mt-1">
-              Реферальный код: <span className="font-mono font-bold">{profile.referralCode}</span>
-            </p>
-          </div>
-          <Button variant="ghost" onClick={() => setIsEditing(!isEditing)}>
-            {isEditing ? 'Отменить' : 'Редактировать'}
-          </Button>
-        </div>
-
-        {isEditing && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            className="mt-6 space-y-3 border-t pt-4"
-          >
-            <Input label="Имя" value={editName} onChange={e => setEditName(e.target.value)} />
-            <Input label="Телефон" value={editPhone} onChange={e => setEditPhone(e.target.value)} />
-            <Button onClick={handleSaveProfile}>Сохранить</Button>
-          </motion.div>
-        )}
-      </Card>
-
-      <Card>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Bell className="w-5 h-5 text-gray-400" />
-            <div>
-              <p className="text-sm text-gray-500">Уведомления</p>
-              <p className="font-semibold">
-                {permission === 'granted' ? 'Разрешены' : permission === 'denied' ? 'Заблокированы' : 'Не настроены'}
-              </p>
-            </div>
-          </div>
-          {permission !== 'granted' && (
-            <Button variant="secondary" size="sm" onClick={requestPermission}>
-              Включить
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      {/* Вкладки */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition whitespace-nowrap ${
-              activeTab === tab.key
-                ? 'bg-blue-600 text-white shadow'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            <tab.icon size={16} />
-            {tab.label}
-          </button>
+      <div className="space-y-2">
+        {[{ label: 'Мои заказы', to: '/orders' }, { label: 'Рефералы', to: '/referrals' }, { label: 'Вывод средств', to: '/withdrawals' }].map((item, i) => (
+          <button key={i} onClick={() => navigate(item.to)} className="w-full bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-4 text-left hover:border-white/[0.12] transition-all flex items-center justify-between"><span className="text-sm font-medium text-white">{item.label}</span><span className="text-white/35">→</span></button>
         ))}
       </div>
 
-      {/* Содержимое вкладок */}
-      <motion.div
-        key={activeTab}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2 }}
-      >
-        {activeTab === 'info' && (
-          <Card>
-            <p className="text-gray-500">Добро пожаловать в ваш профиль! Здесь отображается основная информация.</p>
-          </Card>
-        )}
-
-        {activeTab === 'orders' && (
-          <div className="space-y-4">
-            {loadingTab ? (
-              <Skeleton className="h-40 rounded-3xl" />
-            ) : orders.length === 0 ? (
-              <EmptyState message="Заказов пока нет" />
-            ) : (
-              orders.map((o: any) => (
-                <Card key={o.id} className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold">{o.product?.title || 'Товар'}</h3>
-                    <p className="text-sm text-gray-500">Сумма: {o.amount.toLocaleString()} ₽</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      o.status === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {statusMap[o.status] || o.status}
-                    </span>
-                  </div>
-                </Card>
-              ))
-            )}
-          </div>
-        )}
-
-        {activeTab === 'favorites' && (
-          <div className="space-y-4">
-            {loadingTab ? (
-              <Skeleton className="h-40 rounded-3xl" />
-            ) : favProducts.length === 0 ? (
-              <EmptyState message="Нет избранных товаров" />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {favProducts.map((p: any) => (
-                  <ProductCard key={p.id} product={p} />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'referrals' && (
-          <div className="space-y-4">
-            {loadingTab ? (
-              <Skeleton className="h-40 rounded-3xl" />
-            ) : referrals.length === 0 ? (
-              <EmptyState message="Реферальных начислений пока нет" />
-            ) : (
-              referrals.map((r: any) => (
-                <Card key={r.id} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{r.product?.title || 'Товар'}</p>
-                    <p className="text-sm text-gray-500">Покупатель: {r.buyer?.name}</p>
-                    <p className="text-sm text-green-600">+{r.referralBonus.toLocaleString()} ₽</p>
-                  </div>
-                </Card>
-              ))
-            )}
-          </div>
-        )}
-
-        {activeTab === 'withdrawals' && (
-          <div className="space-y-4">
-            {loadingTab ? (
-              <Skeleton className="h-40 rounded-3xl" />
-            ) : withdrawals.length === 0 ? (
-              <EmptyState message="Заявок на вывод пока нет" />
-            ) : (
-              withdrawals.map((w: any) => (
-                <Card key={w.id} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{w.amount.toLocaleString()} ₽</p>
-                    <p className={`text-sm ${w.status === 'approved' ? 'text-green-600' : w.status === 'rejected' ? 'text-red-500' : 'text-yellow-600'}`}>
-                      {withdrawalStatusMap[w.status] || w.status}
-                    </p>
-                  </div>
-                </Card>
-              ))
-            )}
-          </div>
-        )}
-      </motion.div>
-
-      <div className="text-center text-sm text-gray-500">
-        <Link to="/privacy" className="hover:underline">Политика приватности</Link>
-      </div>
+      <div className="mt-6"><button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-red-400/5 border border-red-400/20 text-red-400 font-semibold text-sm hover:bg-red-400/10 transition-all"><LogOut size={16} /> Выйти</button></div>
     </div>
   );
 }

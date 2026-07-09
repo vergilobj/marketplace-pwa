@@ -1,12 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Package, Edit3, Eye, EyeOff, Trash2, Plus } from 'lucide-react';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import EmptyState from '../components/ui/EmptyState';
-import Skeleton from '../components/ui/Skeleton';
 import api from '../api/axios';
+import { useNavigate } from 'react-router-dom';
+import { Package, Plus, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function MyProductsPage() {
@@ -14,114 +10,18 @@ export default function MyProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadProducts = () => {
-    setLoading(true);
-    api.get('/products/my')
-      .then(res => setProducts(res.data))
-      .catch(() => toast.error('Не удалось загрузить товары'))
-      .finally(() => setLoading(false));
-  };
+  useEffect(() => { api.get('/products/my').then(r=>setProducts(r.data||[])).finally(()=>setLoading(false)); }, []);
 
-  useEffect(() => { loadProducts(); }, []);
+  const toggle = async (id:string) => { try { await api.patch(`/products/${id}/toggle-active`); toast.success('Обновлено'); setProducts(p=>p.map(x=>x.id===id?{...x,isActive:!x.isActive}:x)); } catch { toast.error('Ошибка'); } };
 
-  const toggleActive = async (product: any) => {
-    try {
-      await api.patch(`/products/${product.id}`, { isActive: !product.isActive });
-      setProducts(prev =>
-        prev.map(p => p.id === product.id ? { ...p, isActive: !p.isActive } : p)
-      );
-      toast.success(product.isActive ? 'Товар скрыт' : 'Товар опубликован');
-    } catch (err) {
-      toast.error('Ошибка');
-    }
-  };
-
-  const deleteProduct = async (id: string) => {
-    if (!confirm('Удалить товар?')) return;
-    try {
-      await api.delete(`/products/${id}`);
-      setProducts(prev => prev.filter(p => p.id !== id));
-      toast.success('Товар удалён');
-    } catch (err) {
-      toast.error('Не удалось удалить');
-    }
-  };
-
-  const container = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.05 } },
-  };
-  const item = {
-    hidden: { opacity: 0, y: 10 },
-    show: { opacity: 1, y: 0 },
-  };
+  if (loading) return <div className="flex justify-center py-32"><div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 animate-pulse" /></div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Мои товары</h1>
-        <Button variant="primary" onClick={() => navigate('/products/new')}>
-          <Plus size={18} className="mr-1" /> Создать
-        </Button>
-      </div>
+    <div className="max-w-5xl mx-auto px-6 py-8">
+      <motion.div initial={{opacity:0,y:-10}} animate={{opacity:1,y:0}} className="flex items-center justify-between mb-8"><div><h1 className="text-2xl font-bold text-white mb-1">Мои товары</h1><p className="text-white/60 text-sm">{products.length} товаров</p></div><button onClick={()=>navigate('/products/new')} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 transition-all shadow-lg"><Plus size={15}/>Добавить</button></motion.div>
 
-      {loading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-24 rounded-3xl" />
-          <Skeleton className="h-24 rounded-3xl" />
-          <Skeleton className="h-24 rounded-3xl" />
-        </div>
-      ) : products.length === 0 ? (
-        <EmptyState message="У вас пока нет товаров" />
-      ) : (
-        <motion.div variants={container} initial="hidden" animate="show" className="space-y-4">
-          {products.map(product => (
-            <motion.div key={product.id} variants={item}>
-              <Card className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                    <img
-                      src={product.media?.[0] || '/placeholder.jpg'}
-                      alt={product.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{product.title}</h3>
-                    <p className="text-sm text-gray-500">{product.price.toLocaleString()} ₽</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${product.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {product.isActive ? 'Активен' : 'Скрыт'}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate(`/products/${product.id}/edit`)}
-                  >
-                    <Edit3 size={16} className="mr-1" /> Ред.
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleActive(product)}
-                  >
-                    {product.isActive ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-500"
-                    onClick={() => deleteProduct(product.id)}
-                  >
-                    <Trash2 size={16} />
-                  </Button>
-                </div>
-              </Card>
-            </motion.div>
-          ))}
-        </motion.div>
+      {products.length===0 ? <div className="text-center py-24"><Package size={40} className="mx-auto text-white/10 mb-4"/><p className="text-white/60">Нет товаров</p></div> : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">{products.map((p,i)=>(<motion.div key={p.id} initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{delay:i*.04}} onClick={()=>navigate(`/products/${p.id}`)} className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl overflow-hidden hover:border-white/[0.12] transition-all cursor-pointer group"><div className="aspect-video bg-[#111115] relative">{p.media?.[0]?<img src={p.media[0]} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>:<div className="w-full h-full flex items-center justify-center"><Package size={28} className="text-white/10"/></div>}<span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-semibold ${p.isActive?'bg-emerald-400/10 text-emerald-400':'bg-red-400/10 text-red-400'}`}>{p.isActive?'Активен':'Скрыт'}</span></div><div className="p-4"><h3 className="text-sm font-semibold text-white line-clamp-2 mb-2">{p.title}</h3><p className="text-indigo-400 font-bold text-sm mb-3">{new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',minimumFractionDigits:0}).format(p.price)}</p><button onClick={e=>{e.stopPropagation();toggle(p.id)}} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] text-white/60 text-xs font-medium hover:text-white hover:bg-white/[0.08] transition-all"><EyeOff size={12}/>{p.isActive?'Скрыть':'Показать'}</button></div></motion.div>))}</div>
       )}
     </div>
   );

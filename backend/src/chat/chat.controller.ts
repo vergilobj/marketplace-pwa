@@ -1,4 +1,12 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+} from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ChatService } from './chat.service';
 import { CometChatMessageDto } from './dto/webhook.dto';
 
@@ -6,6 +14,7 @@ import { CometChatMessageDto } from './dto/webhook.dto';
 export class ChatController {
   constructor(private chatService: ChatService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   async handleWebhook(@Body() body: CometChatMessageDto) {

@@ -1,4 +1,10 @@
-import { Controller, Post, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -12,17 +18,19 @@ export class UploadController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: './uploads',
-      filename: (req, file, cb) => {
-        const uniqueName = uuidv4() + extname(file.originalname);
-        cb(null, uniqueName);
-      },
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const uniqueName = uuidv4() + extname(file.originalname);
+          cb(null, uniqueName);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
     }),
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
-  }))
-  async uploadFile(@UploadedFile() file: Express.Multer.File) {
+  )
+  uploadFile(@UploadedFile() file: Express.Multer.File) {
     return { url: this.uploadService.getFileUrl(file.filename) };
   }
 }

@@ -4,24 +4,22 @@ import { PaymentProvider, PaymentResult } from './payment.provider';
 
 @Injectable()
 export class StubPaymentProvider extends PaymentProvider {
-  async createPayment(amount: number, orderId: string): Promise<PaymentResult> {
-    // Имитация успешного платежа
+  createPayment(amount: number, orderId: string): Promise<PaymentResult> {
     const transactionId = `stub_${uuidv4()}`;
-    return {
+    return Promise.resolve({
       success: true,
       transactionId,
       status: 'pending',
       raw: { message: 'Stub payment created', orderId, amount },
-    };
+    });
   }
 
-  async verifyPayment(transactionId: string): Promise<PaymentResult> {
-    // Всегда возвращает успех
-    return {
+  verifyPayment(transactionId: string): Promise<PaymentResult> {
+    return Promise.resolve({
       success: true,
       transactionId,
       status: 'success',
       raw: { message: 'Stub payment verified' },
-    };
+    });
   }
 }

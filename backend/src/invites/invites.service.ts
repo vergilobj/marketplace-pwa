@@ -18,7 +18,9 @@ export class InvitesService {
   async createInvite(ownerId: string, customCode?: string) {
     if (customCode) {
       // Проверить, что такой код ещё не занят
-      const existing = await this.prisma.invite.findUnique({ where: { code: customCode } });
+      const existing = await this.prisma.invite.findUnique({
+        where: { code: customCode },
+      });
       if (existing) {
         throw new BadRequestException('Invite code already exists');
       }

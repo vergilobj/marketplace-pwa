@@ -10,14 +10,13 @@ import { InvitesModule } from '../invites/invites.module';
 import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
 import { CometChatModule } from '../cometchat/cometchat.module';
 
-
 @Module({
   imports: [
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (config: ConfigService) => ({
+      useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_ACCESS_SECRET'),
         signOptions: { expiresIn: '15m' },
       }),

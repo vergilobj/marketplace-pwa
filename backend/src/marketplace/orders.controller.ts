@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, Request, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  UseGuards,
+  Request,
+  Query,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -20,7 +30,11 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   @Get('my')
   async findMyOrders(@Request() req, @Query('status') status?: string) {
-    return this.ordersService.findMyOrders(req.user.userId, req.user.role, status);
+    return this.ordersService.findMyOrders(
+      req.user.userId,
+      req.user.role,
+      status,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -31,7 +45,16 @@ export class OrdersController {
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id/status')
-  async updateStatus(@Param('id') id: string, @Request() req, @Body() dto: UpdateOrderStatusDto) {
-    return this.ordersService.updateStatus(id, req.user.userId, req.user.role, dto);
+  async updateStatus(
+    @Param('id') id: string,
+    @Request() req,
+    @Body() dto: UpdateOrderStatusDto,
+  ) {
+    return this.ordersService.updateStatus(
+      id,
+      req.user.userId,
+      req.user.role,
+      dto,
+    );
   }
 }

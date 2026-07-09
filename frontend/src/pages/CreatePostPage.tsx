@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, ImagePlus, X, Video } from 'lucide-react';
+import { ArrowLeft, FileText, ImagePlus, X } from 'lucide-react';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';

@@ -1,134 +1,55 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { PackageCheck, Gift, TrendingUp, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import api from '../api/axios';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import EmptyState from '../components/ui/EmptyState';
-import Skeleton from '../components/ui/Skeleton';
+import { getMyOrders, updateOrderStatus } from '../api/orders';
+import { PackageCheck, Clock, Truck, CheckCircle2, XCircle } from 'lucide-react';
+import { format } from 'date-fns';
+import { ru } from 'date-fns/locale';
+import toast from 'react-hot-toast';
 
-const statusList = [
-  { value: '', label: 'Все' },
-  { value: 'PENDING', label: 'Ожидают' },
-  { value: 'PAID', label: 'Оплачены' },
-  { value: 'SHIPPED', label: 'Отправлены' },
-  { value: 'COMPLETED', label: 'Завершены' },
-  { value: 'CANCELLED', label: 'Отменены' },
-];
-
-const statusMap: Record<string, string> = {
-  PENDING: 'Ожидает',
-  PAID: 'Оплачен',
-  SHIPPED: 'Отправлен',
-  COMPLETED: 'Завершён',
-  CANCELLED: 'Отменён',
-};
-
-const statusColor = (s: string) => {
-  switch (s) {
-    case 'PAID': return 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
-    case 'SHIPPED': return 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300';
-    case 'COMPLETED': return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300';
-    case 'CANCELLED': return 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300';
-    default: return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300';
-  }
+const statusConfig: Record<string, { icon: React.ReactNode; variant: string; label: string }> = {
+  PENDING: { icon: <Clock size={14} />, variant: 'warning', label: 'Ожидает' },
+  PAID: { icon: <CheckCircle2 size={14} />, variant: 'success', label: 'Оплачен' },
+  SHIPPED: { icon: <Truck size={14} />, variant: 'info', label: 'Отправлен' },
+  COMPLETED: { icon: <PackageCheck size={14} />, variant: 'success', label: 'Завершён' },
+  CANCELLED: { icon: <XCircle size={14} />, variant: 'danger', label: 'Отменён' },
 };
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [searchParams] = useSearchParams();
-  const highlightId = searchParams.get('highlight');
-  const navigate = useNavigate();
+  const [filter, setFilter] = useState('');
 
-  useEffect(() => {
-    setLoading(true);
-    const params = statusFilter ? `?status=${statusFilter}` : '';
-    api.get(`/orders/my${params}`)
-      .then(res => setOrders(res.data))
-      .finally(() => setLoading(false));
-  }, [statusFilter]);
+  const fetchOrders = async () => { try { setLoading(true); const data = await getMyOrders(); setOrders(Array.isArray(data) ? data : []); } finally { setLoading(false); } };
+  useEffect(() => { fetchOrders(); }, []);
+
+  const handleStatus = async (id: string, status: string) => { try { await updateOrderStatus(id, status); toast.success('Статус обновлён'); fetchOrders(); } catch { toast.error('Ошибка'); } };
+  const filtered = filter ? orders.filter(o => o.status === filter) : orders;
+
+  if (loading) return <div className="flex justify-center py-32"><div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 animate-pulse" /></div>;
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-3xl font-bold">Мои заказы</h1>
+    <div className="max-w-3xl mx-auto px-6 py-8">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}><h1 className="text-2xl font-bold text-white mb-2">Заказы</h1><p className="text-white/60 text-sm mb-6">История покупок и продаж</p></motion.div>
 
-      {/* Фильтр по статусу */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {statusList.map(opt => (
-          <motion.button
-            key={opt.value}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setStatusFilter(opt.value)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition whitespace-nowrap ${
-              statusFilter === opt.value
-                ? 'bg-blue-600 text-white shadow'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            {opt.label}
-          </motion.button>
-        ))}
-      </div>
+      <div className="flex gap-2 mb-6 flex-wrap">{['', 'PENDING', 'PAID', 'SHIPPED', 'COMPLETED', 'CANCELLED'].map(s => <button key={s} onClick={() => setFilter(s)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${filter === s ? 'bg-indigo-500 text-white' : 'bg-white/[0.04] text-white/50 hover:text-white hover:bg-white/[0.08]'}`}>{s ? statusConfig[s]?.label : 'Все'}</button>)}</div>
 
-      {loading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-24 rounded-3xl" />
-          <Skeleton className="h-24 rounded-3xl" />
-          <Skeleton className="h-24 rounded-3xl" />
-        </div>
-      ) : orders.length === 0 ? (
-        <EmptyState message="Заказов не найдено" />
-      ) : (
-        <div className="space-y-4">
-          {orders.map((o: any) => (
-            <Card key={o.id} className={`relative transition-all ${highlightId === o.id ? 'ring-2 ring-blue-500 shadow-xl' : ''}`}>
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-lg">{o.product?.title || 'Товар'}</h3>
-                  <p className="text-gray-500 text-sm">Сумма: {o.amount.toLocaleString()} ₽</p>
-                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(o.status)}`}>
-                    {statusMap[o.status] || o.status}
-                  </span>
-                  {o.referralBonus > 0 && (
-                    <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 mt-2">
-                      <Gift size={14} />
-                      <span>Реферальный бонус: {o.referralBonus.toLocaleString()} ₽</span>
-                    </div>
-                  )}
-                  {o.platformFee > 0 && (
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <TrendingUp size={14} />
-                      <span>Комиссия платформы: {o.platformFee.toLocaleString()} ₽</span>
-                    </div>
-                  )}
-
-                  {/* Кнопки чата */}
-                  <div className="flex gap-2 mt-2">
-                    {o.buyer?.id && (
-                      <button
-                        onClick={() => navigate(`/chat?uid=${o.buyer.id}`)}
-                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        <MessageCircle size={14} /> Написать покупателю
-                      </button>
-                    )}
-                    {o.seller?.id && (
-                      <button
-                        onClick={() => navigate(`/chat?uid=${o.seller.id}`)}
-                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
-                      >
-                        <MessageCircle size={14} /> Написать продавцу
-                      </button>
-                    )}
+      {filtered.length === 0 ? <div className="text-center py-16"><PackageCheck size={40} className="mx-auto text-white/10 mb-4" /><p className="text-white/60">Заказов нет</p></div> : (
+        <div className="space-y-3">
+          {filtered.map((order, i) => {
+            const cfg = statusConfig[order.status] || statusConfig.PENDING;
+            return (
+              <motion.div key={order.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.1] transition-all">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2"><h3 className="font-semibold text-white text-sm truncate">{order.product?.title || `Заказ #${order.id.slice(0, 8)}`}</h3><span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] text-[11px] font-semibold text-white/60">{cfg.icon}{cfg.label}</span></div>
+                    <div className="flex items-center gap-3 text-xs text-white/50"><span>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(order.amount)}</span><span>•</span><span>{order.createdAt ? format(new Date(order.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</span></div>
                   </div>
+                  {order.status === 'PENDING' && <button onClick={() => handleStatus(order.id, 'CANCELLED')} className="text-xs text-red-400 hover:text-red-300 font-medium px-3 py-1.5 rounded-lg hover:bg-red-400/5 transition-all">Отменить</button>}
+                  {order.status === 'SHIPPED' && <button onClick={() => handleStatus(order.id, 'COMPLETED')} className="text-xs text-emerald-400 hover:text-emerald-300 font-medium px-3 py-1.5 rounded-lg hover:bg-emerald-400/5 transition-all">Подтвердить</button>}
                 </div>
-                <PackageCheck className="w-6 h-6 text-gray-300" />
-              </div>
-            </Card>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </div>

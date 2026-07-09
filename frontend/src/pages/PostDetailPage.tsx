@@ -1,239 +1,65 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, MessageCircle, Share2, MoreHorizontal, Copy, Flag, Pencil, Trash2, X, Play, Link as LinkIcon } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import ReactPlayer from 'react-player';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import api from '../api/axios';
-import Card from '../components/ui/Card';
-import Input from '../components/ui/Input';
-import Button from '../components/ui/Button';
-import Skeleton from '../components/ui/Skeleton';
-import { likePost, unlikePost, getComments, addComment } from '../api/social';
+import { getComments, addComment, deleteComment, likePost, unlikePost } from '../api/social';
+import { Heart, MessageCircle, ArrowLeft, Send, Megaphone, Trash2, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 
 export default function PostDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const { id } = useParams(); const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
   const [post, setPost] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [likes, setLikes] = useState(0);
-  const [liked, setLiked] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
-  const [newComment, setNewComment] = useState('');
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  const userId = localStorage.getItem('userId');
-  const isAuthor = userId && post && userId === post.author?.id;
+  const [loading, setLoading] = useState(true);
+  const [commentText, setCommentText] = useState('');
+  const [liked, setLiked] = useState(false); const [likes, setLikes] = useState(0);
 
   useEffect(() => {
-    if (id) {
-      api.get(`/posts/${id}`).then(res => {
-        const p = res.data;
-        setPost(p);
-        setLikes(p.likeCount || 0);
-        setLiked(p.likedByMe || false);
-        return getComments(p.id);
-      }).then(commentsData => {
-        setComments(commentsData);
-      }).finally(() => setLoading(false));
-    }
+    Promise.all([api.get(`/posts/${id}`).then(r => r.data), getComments(id!)])
+      .then(([p, c]) => { setPost(p); setComments(c); setLiked(p.likedByMe || false); setLikes(p.likeCount || 0); })
+      .finally(() => setLoading(false));
   }, [id]);
 
-  const handleLike = async () => {
-    if (liked) {
-      await unlikePost(post.id);
-      setLikes(l => l - 1);
-    } else {
-      await likePost(post.id);
-      setLikes(l => l + 1);
-    }
-    setLiked(!liked);
-  };
+  const handleLike = async () => { try { if (liked) { await unlikePost(id!); setLikes((c:number)=>c-1); } else { await likePost(id!); setLikes((c:number)=>c+1); } setLiked(!liked); } catch {} };
+  const handleComment = async () => { if (!commentText.trim()) return; try { const c = await addComment(id!, commentText); setComments(p => [...p, c]); setCommentText(''); } catch { toast.error('Ошибка'); } };
+  const delComment = async (cid: string) => { try { await deleteComment(cid); setComments(p => p.filter(c => c.id !== cid)); } catch { toast.error('Ошибка'); } };
 
-  const submitComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
-    const comment = await addComment(post.id, newComment);
-    setComments([...comments, comment]);
-    setNewComment('');
-  };
+  if (loading) return <div className="flex justify-center py-32"><div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 animate-pulse" /></div>;
+  if (!post) return <div className="text-center py-32"><p className="text-white/50">Пост не найден</p></div>;
 
-  const handleShare = () => {
-    const url = `${window.location.origin}/posts/${post.id}`;
-    navigator.clipboard.writeText(url).then(() => toast.success('Ссылка скопирована'));
-    setMenuOpen(false);
-  };
-
-  const handleReport = () => {
-    toast.success('Жалоба отправлена');
-    setMenuOpen(false);
-  };
-
-  const handleDelete = async () => {
-    if (!confirm('Удалить пост?')) return;
-    await api.delete(`/posts/${post.id}`);
-    toast.success('Пост удалён');
-    navigate('/');
-  };
-
-  const truncateUrl = (url: string) => {
-    try {
-      const u = new URL(url);
-      return u.hostname + u.pathname;
-    } catch {
-      return url.length > 40 ? url.slice(0, 40) + '...' : url;
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="max-w-2xl mx-auto space-y-6 py-10">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 rounded-3xl" />
-        <Skeleton className="h-40 rounded-3xl" />
-      </div>
-    );
-  }
-
-  if (!post) return <p className="text-center py-10 text-red-500">Пост не найден</p>;
+  const media = Array.isArray(post.media) ? post.media : typeof post.media === 'string' ? [post.media] : [];
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-10">
-      <Link to="/" className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4">
-        <ArrowLeft size={16} className="mr-1" /> Назад к ленте
-      </Link>
+    <div className="max-w-2xl mx-auto px-6 py-8">
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-white/50 hover:text-white mb-6 transition-colors text-sm"><ArrowLeft size={16} /> Назад</button>
 
-      <Card className="space-y-6">
-        {/* Заголовок и мета */}
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{post.title || 'Без названия'}</h1>
-          <div className="flex items-center gap-3 mt-2 text-sm text-gray-500">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-xs">
-                {post.author?.name?.[0] || 'A'}
-              </div>
-              <span className="font-medium text-gray-700 dark:text-gray-300">{post.author?.name}</span>
-            </div>
-            <span>·</span>
-            <span>{format(new Date(post.createdAt), 'dd MMM yyyy, HH:mm', { locale: ru })}</span>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl overflow-hidden">
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-[11px] font-bold flex items-center justify-center">{(post.author?.name||post.adOwner?.name||'A')[0].toUpperCase()}</div>
+            <div><div className="flex items-center gap-2"><span className="text-sm font-semibold text-white">{post.author?.name||post.adOwner?.name||'Аноним'}</span>{post.isAd && <span className="text-[10px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded-full"><Megaphone size={10} /> Реклама</span>}</div><span className="text-[11px] text-white/50">{post.createdAt ? format(new Date(post.createdAt), 'd MMMM в HH:mm', { locale: ru }) : ''}</span></div>
+          </div>
+          <h1 className="text-xl font-bold text-white mb-3">{post.title}</h1>
+          {post.content && <p className="text-white/50 text-sm leading-relaxed mb-4">{post.content}</p>}
+          {post.link && <a href={post.link} target="_blank" className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 mb-4"><ExternalLink size={12} /> Ссылка</a>}
+          {media.length > 0 && <div className="rounded-xl overflow-hidden mb-4">{media.map((url:string,i:number)=><img key={i} src={url} alt="" className="w-full max-h-96 object-cover" />)}</div>}
+
+          <div className="flex items-center gap-4 pt-4 border-t border-white/[0.06]">
+            <button onClick={handleLike} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${liked?'text-rose-400 bg-rose-400/10':'text-white/60 hover:text-white hover:bg-white/[0.04]'}`}><Heart size={14} fill={liked?'currentColor':'none'}/>{likes>0&&likes}</button>
+            <div className="flex items-center gap-1.5 text-xs text-white/60"><MessageCircle size={14} />{comments.length}</div>
           </div>
         </div>
+      </motion.div>
 
-        {/* Контент */}
-        {post.content && <p className="text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-line">{post.content}</p>}
-
-        {/* Ссылка */}
-        {post.link && (
-          <a
-            href={post.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors group"
-          >
-            <LinkIcon size={18} className="flex-shrink-0" />
-            <span className="text-sm truncate">{truncateUrl(post.link)}</span>
-            <span className="ml-auto text-xs opacity-0 group-hover:opacity-100 transition-opacity">↗</span>
-          </a>
-        )}
-
-        {/* Медиа */}
-        {post.media && post.media.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {post.media.map((url: string, idx: number) => (
-              <img
-                key={idx}
-                src={url}
-                alt={`${post.title} ${idx + 1}`}
-                className="rounded-2xl cursor-pointer hover:opacity-90 transition object-cover h-64 w-full"
-                onClick={() => setSelectedImage(url)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Видео */}
-        {post.videoUrl && (
-          <div className="rounded-2xl overflow-hidden">
-            <ReactPlayer url={post.videoUrl} width="100%" height="400px" controls light={post.media?.[0] || true} playIcon={<div className="absolute inset-0 flex items-center justify-center"><Play size={48} className="text-white bg-black/30 rounded-full p-2" /></div>} />
-          </div>
-        )}
-
-        {/* Действия */}
-        <div className="flex items-center gap-6 text-gray-500 border-t pt-4">
-          <motion.button whileTap={{ scale: 0.8 }} onClick={handleLike} className={`flex items-center gap-1 ${liked ? 'text-red-500' : ''}`}>
-            <Heart size={20} fill={liked ? 'currentColor' : 'none'} /> {likes}
-          </motion.button>
-          <motion.button whileTap={{ scale: 0.8 }} className="flex items-center gap-1">
-            <MessageCircle size={20} /> {comments.length}
-          </motion.button>
-          <motion.button whileTap={{ scale: 0.8 }} onClick={handleShare} className="flex items-center gap-1">
-            <Share2 size={20} />
-          </motion.button>
-          <div className="relative ml-auto">
-            <button onClick={() => setMenuOpen(!menuOpen)} className="p-1">
-              <MoreHorizontal size={20} />
-            </button>
-            <AnimatePresence>
-              {menuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50"
-                >
-                  <button onClick={handleShare} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 w-full"><Copy size={14} /> Скопировать ссылку</button>
-                  <button onClick={handleReport} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 w-full"><Flag size={14} /> Пожаловаться</button>
-                  {isAuthor && (
-                    <>
-                      <button onClick={() => navigate(`/posts/${post.id}/edit`)} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 w-full"><Pencil size={14} /> Редактировать</button>
-                      <button onClick={handleDelete} className="flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 w-full"><Trash2 size={14} /> Удалить</button>
-                    </>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* Комментарии */}
-        <div className="border-t pt-4 space-y-4">
-          <h3 className="font-semibold text-lg">Комментарии ({comments.length})</h3>
-          <AnimatePresence>
-            {comments.map(c => (
-              <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-bold">{c.user?.name?.[0] || '?'}</div>
-                <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-2xl flex-1">
-                  <p className="text-sm font-semibold">{c.user?.name}</p>
-                  <p className="text-sm">{c.text}</p>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-          <form onSubmit={submitComment} className="flex gap-2 mt-4">
-            <Input placeholder="Напишите комментарий..." value={newComment} onChange={e => setNewComment(e.target.value)} className="flex-1" />
-            <Button type="submit" variant="primary" size="sm">Отправить</Button>
-          </form>
-        </div>
-      </Card>
-
-      {/* Модальное окно изображения */}
-      <AnimatePresence>
-        {selectedImage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-            onClick={() => setSelectedImage(null)}
-          >
-            <button className="absolute top-4 right-4 text-white" onClick={() => setSelectedImage(null)}><X size={32} /></button>
-            <motion.img initial={{ scale: 0.8 }} animate={{ scale: 1 }} exit={{ scale: 0.8 }} src={selectedImage} className="max-w-full max-h-full rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Comments */}
+      <div className="mt-8"><h3 className="text-base font-bold text-white mb-4">Комментарии ({comments.length})</h3>
+        <div className="space-y-2 mb-6">{comments.map((c,i)=><motion.div key={c.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:i*0.02}} className="bg-[#1a1a24] border border-white/[0.04] rounded-xl p-4"><div className="flex items-start gap-3"><div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-[9px] font-bold flex items-center justify-center shrink-0">{(c.user?.name||'?')[0].toUpperCase()}</div><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-1"><span className="text-xs font-semibold text-white">{c.user?.name||'Аноним'}</span><span className="text-[10px] text-white/35">{c.createdAt ? format(new Date(c.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</span></div><p className="text-xs text-white/50">{c.text}</p></div>{(c.userId===user?.id||isAdmin)&&<button onClick={()=>delComment(c.id)} className="text-white/35 hover:text-red-400 transition-colors"><Trash2 size={13}/></button>}</div></motion.div>)}</div>
+        <div className="flex gap-2"><input value={commentText} onChange={e=>setCommentText(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleComment()} placeholder="Написать комментарий..." className="flex-1 px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/35 outline-none focus:border-indigo-500/50 transition-all" /><button onClick={handleComment} className="px-5 py-3 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 transition-all flex items-center gap-1.5"><Send size={14}/>Отпр.</button></div>
+      </div>
     </div>
   );
 }
