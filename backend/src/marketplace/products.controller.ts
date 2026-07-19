@@ -21,42 +21,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 export class ProductsController {
   constructor(private productsService: ProductsService) {}
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SELLER')
-  @Post()
-  async create(@Request() req, @Body() dto: CreateProductDto) {
-    return this.productsService.create(req.user.userId, dto);
-  }
-
-  @Get()
-  async findAll() {
-    return this.productsService.findAll();
-  }
-
-  @Get(':id')
-  async findById(@Param('id') id: string) {
-    return this.productsService.findById(id);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SELLER')
-  @Patch(':id')
-  async update(
-    @Param('id') id: string,
-    @Request() req,
-    @Body() dto: UpdateProductDto,
-  ) {
-    return this.productsService.update(id, req.user.userId, dto);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SELLER')
-  @Delete(':id')
-  async remove(@Param('id') id: string, @Request() req) {
-    return this.productsService.remove(id, req.user.userId);
-  }
-
-  // Админские эндпоинты
+  // Эндпоинты с фиксированными путями ДО :id
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Get('admin/list')
@@ -76,13 +41,6 @@ export class ProductsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  @Patch(':id/toggle-active')
-  async toggleActive(@Param('id') id: string) {
-    return this.productsService.toggleActive(id);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
   @Delete('admin/:id')
   async deleteProduct(@Param('id') id: string) {
     return this.productsService.deleteProduct(id);
@@ -96,9 +54,54 @@ export class ProductsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SELLER')
+  @Roles('SELLER', 'ADMIN')
   @Get('my')
-  async findMyProducts(@Request() req) {
+  async findMyProducts(@Request() req: AuthenticatedRequest) {
     return this.productsService.findBySeller(req.user.userId);
+  }
+
+  @Get()
+  async findAll() {
+    return this.productsService.findAll();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SELLER', 'ADMIN')
+  @Post()
+  async create(
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: CreateProductDto,
+  ) {
+    return this.productsService.create(req.user.userId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Patch(':id/toggle-active')
+  async toggleActive(@Param('id') id: string) {
+    return this.productsService.toggleActive(id);
+  }
+
+  @Get(':id')
+  async findById(@Param('id') id: string) {
+    return this.productsService.findById(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SELLER', 'ADMIN')
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: UpdateProductDto,
+  ) {
+    return this.productsService.update(id, req.user.userId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SELLER', 'ADMIN')
+  @Delete(':id')
+  async remove(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    return this.productsService.remove(id, req.user.userId);
   }
 }

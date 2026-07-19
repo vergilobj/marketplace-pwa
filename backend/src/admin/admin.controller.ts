@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards, Query } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -29,5 +29,16 @@ export class AdminController {
   @Get('seller-stats')
   getSellerStats() {
     return this.adminService.getSellerStats();
+  }
+
+  @Get('export-users')
+  async exportUsers() {
+    const csv = await this.adminService.exportUsers();
+    return csv;
+  }
+
+  @Post('backup')
+  async backupDatabase() {
+    return this.adminService.backupDatabase();
   }
 }

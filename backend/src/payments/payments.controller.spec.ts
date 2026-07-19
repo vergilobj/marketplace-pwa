@@ -22,7 +22,9 @@ describe('PaymentsController', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(controller).toBeDefined(); });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
 
   describe('processPayment', () => {
     it('should process payment', async () => {
@@ -38,7 +40,10 @@ describe('PaymentsController', () => {
       service.getAllTransactions.mockResolvedValue({ items: [], total: 0 });
       await controller.getTransactions('payment', '', '1', '10');
       expect(service.getAllTransactions).toHaveBeenCalledWith({
-        type: 'payment', orderSearch: '', page: 1, limit: 10,
+        type: 'payment',
+        orderSearch: '',
+        page: 1,
+        limit: 10,
       });
     });
 
@@ -46,7 +51,10 @@ describe('PaymentsController', () => {
       service.getAllTransactions.mockResolvedValue({ items: [], total: 0 });
       await controller.getTransactions();
       expect(service.getAllTransactions).toHaveBeenCalledWith({
-        type: undefined, orderSearch: undefined, page: 1, limit: 20,
+        type: undefined,
+        orderSearch: undefined,
+        page: 1,
+        limit: 20,
       });
     });
   });

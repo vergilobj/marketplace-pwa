@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
-  let prisma: any;
+  let _prisma: any;
 
   const mockPrisma = {
     notification: {
@@ -37,21 +37,41 @@ describe('NotificationsService', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(service).toBeDefined(); });
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
 
   describe('createNotification', () => {
     it('should create a notification', async () => {
-      mockPrisma.notification.create.mockResolvedValue({ id: 'n1', type: 'order', message: 'Test' });
-      const result = await service.createNotification('user-1', 'order', 'Test', 'rel-1');
+      mockPrisma.notification.create.mockResolvedValue({
+        id: 'n1',
+        type: 'order',
+        message: 'Test',
+      });
+      const result = await service.createNotification(
+        'user-1',
+        'order',
+        'Test',
+        'rel-1',
+      );
       expect(result).toBeDefined();
       expect(mockPrisma.notification.create).toHaveBeenCalledWith({
-        data: { userId: 'user-1', type: 'order', message: 'Test', relatedId: 'rel-1' },
+        data: {
+          userId: 'user-1',
+          type: 'order',
+          message: 'Test',
+          relatedId: 'rel-1',
+        },
       });
     });
 
     it('should return null on error', async () => {
       mockPrisma.notification.create.mockRejectedValue(new Error('DB Error'));
-      const result = await service.createNotification('user-1', 'order', 'Test');
+      const result = await service.createNotification(
+        'user-1',
+        'order',
+        'Test',
+      );
       expect(result).toBeNull();
     });
   });

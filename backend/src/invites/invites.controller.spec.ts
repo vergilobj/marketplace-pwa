@@ -21,12 +21,17 @@ describe('InvitesController', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(controller).toBeDefined(); });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
 
   describe('create', () => {
     it('should create invite', async () => {
       service.createInvite.mockResolvedValue({ code: 'CODE', ownerId: 'u1' });
-      const result = await controller.create({ user: { userId: 'u1' } }, 'MYCODE');
+      const result = await controller.create(
+        { user: { userId: 'u1' } },
+        'MYCODE',
+      );
       expect(result.code).toBe('CODE');
       expect(service.createInvite).toHaveBeenCalledWith('u1', 'MYCODE');
     });

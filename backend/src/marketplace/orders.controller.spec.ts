@@ -23,21 +23,32 @@ describe('OrdersController', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(controller).toBeDefined(); });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
 
   describe('create', () => {
     it('should create order', async () => {
       service.create.mockResolvedValue({ id: 'order-1' });
-      const result = await controller.create({ user: { userId: 'buyer-1' } }, { productId: 'prod-1' });
+      const result = await controller.create(
+        { user: { userId: 'buyer-1' } },
+        { productId: 'prod-1' },
+      );
       expect(result.id).toBe('order-1');
-      expect(service.create).toHaveBeenCalledWith('buyer-1', expect.any(Object));
+      expect(service.create).toHaveBeenCalledWith(
+        'buyer-1',
+        expect.any(Object),
+      );
     });
   });
 
   describe('findMyOrders', () => {
     it('should return orders filtered by status', async () => {
       service.findMyOrders.mockResolvedValue([]);
-      await controller.findMyOrders({ user: { userId: 'u1', role: 'BUYER' } }, 'PAID');
+      await controller.findMyOrders(
+        { user: { userId: 'u1', role: 'BUYER' } },
+        'PAID',
+      );
       expect(service.findMyOrders).toHaveBeenCalledWith('u1', 'BUYER', 'PAID');
     });
   });
@@ -51,8 +62,15 @@ describe('OrdersController', () => {
 
   describe('updateStatus', () => {
     it('should update order status', async () => {
-      service.updateStatus.mockResolvedValue({ id: 'order-1', status: 'SHIPPED' });
-      const result = await controller.updateStatus('order-1', { user: { userId: 's1', role: 'SELLER' } }, { status: 'SHIPPED' });
+      service.updateStatus.mockResolvedValue({
+        id: 'order-1',
+        status: 'SHIPPED',
+      });
+      const result = await controller.updateStatus(
+        'order-1',
+        { user: { userId: 's1', role: 'SELLER' } },
+        { status: 'SHIPPED' },
+      );
       expect(result.status).toBe('SHIPPED');
     });
   });

@@ -56,4 +56,5 @@ frontend/public/OneSignalSDKUpdaterWorker.js
 .parcel-cache/
 
 # Локальные настройки
-*.local
+*.localfrontend/dist*/
+frontend/dist*/

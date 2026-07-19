@@ -1,33 +1,59 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 
+jest.mock('crypto', () => ({
+  createHmac: jest.fn().mockReturnValue({
+    update: jest.fn().mockReturnValue({
+      digest: jest.fn().mockReturnValue('mock-sig'),
+    }),
+  }),
+}));
+
 describe('ChatController', () => {
   let controller: ChatController;
-  let service: any;
-  const mockService = {
-    moderateMessage: jest.fn(),
-  };
+  let svc: any;
+  let cfg: any;
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    svc = { moderateMessage: jest.fn() };
+    cfg = { get: jest.fn().mockReturnValue('secret') };
+    const mod: TestingModule = await Test.createTestingModule({
       controllers: [ChatController],
-      providers: [{ provide: ChatService, useValue: mockService }],
+      providers: [
+        { provide: ChatService, useValue: svc },
+        { provide: ConfigService, useValue: cfg },
+      ],
     }).compile();
-    controller = module.get<ChatController>(ChatController);
-    service = mockService;
+    controller = mod.get<ChatController>(ChatController);
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(controller).toBeDefined(); });
+  it('defined', () => expect(controller).toBeDefined());
 
-  describe('handleWebhook', () => {
-    it('should moderate message', async () => {
-      service.moderateMessage.mockResolvedValue({ action: 'allowed' });
-      const msg = { id: 'msg-1', text: 'Hello' } as any;
-      const result = await controller.handleWebhook(msg);
-      expect(result.action).toBe('allowed');
-      expect(service.moderateMessage).toHaveBeenCalledWith(msg);
-    });
+  it('accepts valid sig', async () => {
+    svc.moderateMessage.mockResolvedValue({ action: 'allowed' });
+    const r = await controller.handleWebhook(
+      { id: '1', text: 'hi' } as any,
+      'mock-sig',
+    );
+    expect(r.action).toBe('allowed');
+  });
+
+  it('rejects missing sig', async () => {
+    await expect(
+      controller.handleWebhook(
+        { id: '1', text: 'hi' } as any,
+        undefined as any,
+      ),
+    ).rejects.toThrow('Missing webhook signature');
+  });
+
+  it('rejects missing secret', async () => {
+    cfg.get.mockReturnValue(undefined);
+    await expect(
+      controller.handleWebhook({ id: '1', text: 'hi' } as any, 'x'),
+    ).rejects.toThrow('Webhook secret not configured');
   });
 });

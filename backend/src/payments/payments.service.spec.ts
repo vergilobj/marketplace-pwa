@@ -7,12 +7,17 @@ import { StubPaymentProvider } from './stub-payment.provider';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
-  let prisma: any;
+  let _prisma: any;
 
   const mockOrder = {
-    id: 'order-1', amount: 1000, status: 'PENDING',
-    productId: 'prod-1', platformFee: 0, referralBonus: 0,
-    referralUserId: null, transactionId: null,
+    id: 'order-1',
+    amount: 1000,
+    status: 'PENDING',
+    productId: 'prod-1',
+    platformFee: 0,
+    referralBonus: 0,
+    referralUserId: null,
+    transactionId: null,
     buyer: { id: 'buyer-1', name: 'Buyer' },
     seller: { id: 'seller-1', name: 'Seller' },
     referralUser: null,
@@ -59,17 +64,26 @@ describe('PaymentsService', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(service).toBeDefined(); });
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
 
   describe('createPaymentForOrder', () => {
     it('should throw if order not found', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
-      await expect(service.createPaymentForOrder('bad-id')).rejects.toThrow('Order not found');
+      await expect(service.createPaymentForOrder('bad-id')).rejects.toThrow(
+        'Order not found',
+      );
     });
 
     it('should throw if order already paid', async () => {
-      mockPrisma.order.findUnique.mockResolvedValue({ ...mockOrder, status: 'PAID' });
-      await expect(service.createPaymentForOrder('order-1')).rejects.toThrow('Order already paid or cancelled');
+      mockPrisma.order.findUnique.mockResolvedValue({
+        ...mockOrder,
+        status: 'PAID',
+      });
+      await expect(service.createPaymentForOrder('order-1')).rejects.toThrow(
+        'Order already paid or cancelled',
+      );
     });
 
     it('should calculate platform fees for product orders', async () => {
@@ -78,7 +92,12 @@ describe('PaymentsService', () => {
       mockPrisma.transaction.create.mockResolvedValue({});
       await service.createPaymentForOrder('order-1');
       expect(mockPrisma.order.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ platformFee: 100, referralBonus: 50 }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({
+            platformFee: 100,
+            referralBonus: 50,
+          }),
+        }),
       );
     });
 
@@ -100,30 +119,45 @@ describe('PaymentsService', () => {
     });
 
     it('should do nothing if order not PENDING', async () => {
-      mockPrisma.order.findUnique.mockResolvedValue({ ...mockOrder, status: 'PAID' });
+      mockPrisma.order.findUnique.mockResolvedValue({
+        ...mockOrder,
+        status: 'PAID',
+      });
       await service.processSuccessfulPayment('order-1');
       expect(mockPrisma.order.update).not.toHaveBeenCalled();
     });
 
     it('should update order status to PAID and create split transactions', async () => {
       mockPrisma.order.findUnique.mockResolvedValue({
-        ...mockOrder, platformFee: 100, referralBonus: 50,
-        referralUserId: 'ref-1', buyer: { id: 'buyer-1' }, seller: { id: 'seller-1' }, referralUser: { id: 'ref-1' },
+        ...mockOrder,
+        platformFee: 100,
+        referralBonus: 50,
+        referralUserId: 'ref-1',
+        buyer: { id: 'buyer-1' },
+        seller: { id: 'seller-1' },
+        referralUser: { id: 'ref-1' },
       });
       mockPrisma.order.update.mockResolvedValue({});
       mockPrisma.transaction.createMany.mockResolvedValue({});
       mockPrisma.user.update.mockResolvedValue({});
       await service.processSuccessfulPayment('order-1');
       expect(mockPrisma.order.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ status: 'PAID' }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'PAID' }),
+        }),
       );
       expect(mockPrisma.transaction.createMany).toHaveBeenCalled();
     });
 
     it('should credit referral bonus', async () => {
       mockPrisma.order.findUnique.mockResolvedValue({
-        ...mockOrder, platformFee: 100, referralBonus: 50,
-        referralUserId: 'ref-1', buyer: { id: 'buyer-1' }, seller: { id: 'seller-1' }, referralUser: { id: 'ref-1' },
+        ...mockOrder,
+        platformFee: 100,
+        referralBonus: 50,
+        referralUserId: 'ref-1',
+        buyer: { id: 'buyer-1' },
+        seller: { id: 'seller-1' },
+        referralUser: { id: 'ref-1' },
       });
       mockPrisma.order.update.mockResolvedValue({});
       mockPrisma.transaction.createMany.mockResolvedValue({});
@@ -139,7 +173,9 @@ describe('PaymentsService', () => {
 
   describe('getAllTransactions', () => {
     it('should return paginated transactions', async () => {
-      mockPrisma.transaction.findMany.mockResolvedValue([{ id: 'tx-1', amount: 1000 }]);
+      mockPrisma.transaction.findMany.mockResolvedValue([
+        { id: 'tx-1', amount: 1000 },
+      ]);
       mockPrisma.transaction.count.mockResolvedValue(1);
       const result = await service.getAllTransactions();
       expect(result.items).toHaveLength(1);

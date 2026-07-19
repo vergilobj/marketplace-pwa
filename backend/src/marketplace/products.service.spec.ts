@@ -5,7 +5,7 @@ import { NotFoundException, ForbiddenException } from '@nestjs/common';
 
 describe('ProductsService', () => {
   let service: ProductsService;
-  let prisma: any;
+  let _prisma: any;
 
   const mockProduct = {
     id: 'prod-1',
@@ -88,7 +88,9 @@ describe('ProductsService', () => {
   describe('findById', () => {
     it('should throw NotFoundException if product not found', async () => {
       mockPrisma.product.findUnique.mockResolvedValue(null);
-      await expect(service.findById('bad-id')).rejects.toThrow(NotFoundException);
+      await expect(service.findById('bad-id')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should return product with seller info', async () => {
@@ -104,17 +106,24 @@ describe('ProductsService', () => {
 
     it('should throw NotFoundException if product not found', async () => {
       mockPrisma.product.findUnique.mockResolvedValue(null);
-      await expect(service.update('bad-id', 'seller-1', updateDto)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.update('bad-id', 'seller-1', updateDto),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException if not owner', async () => {
       mockPrisma.product.findUnique.mockResolvedValue(mockProduct);
-      await expect(service.update('prod-1', 'other-seller', updateDto)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.update('prod-1', 'other-seller', updateDto),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should update product if owner', async () => {
       mockPrisma.product.findUnique.mockResolvedValue(mockProduct);
-      mockPrisma.product.update.mockResolvedValue({ ...mockProduct, title: 'Updated Title' });
+      mockPrisma.product.update.mockResolvedValue({
+        ...mockProduct,
+        title: 'Updated Title',
+      });
       const result = await service.update('prod-1', 'seller-1', updateDto);
       expect(result.title).toBe('Updated Title');
     });
@@ -123,12 +132,17 @@ describe('ProductsService', () => {
   describe('remove', () => {
     it('should throw ForbiddenException if not owner', async () => {
       mockPrisma.product.findUnique.mockResolvedValue(mockProduct);
-      await expect(service.remove('prod-1', 'other-seller')).rejects.toThrow(ForbiddenException);
+      await expect(service.remove('prod-1', 'other-seller')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should soft-delete (set isActive=false) if owner', async () => {
       mockPrisma.product.findUnique.mockResolvedValue(mockProduct);
-      mockPrisma.product.update.mockResolvedValue({ ...mockProduct, isActive: false });
+      mockPrisma.product.update.mockResolvedValue({
+        ...mockProduct,
+        isActive: false,
+      });
       const result = await service.remove('prod-1', 'seller-1');
       expect(result.isActive).toBe(false);
     });
@@ -165,7 +179,10 @@ describe('ProductsService', () => {
   describe('toggleActive', () => {
     it('should toggle product active status', async () => {
       mockPrisma.product.findUnique.mockResolvedValue(mockProduct);
-      mockPrisma.product.update.mockResolvedValue({ ...mockProduct, isActive: false });
+      mockPrisma.product.update.mockResolvedValue({
+        ...mockProduct,
+        isActive: false,
+      });
       const result = await service.toggleActive('prod-1');
       expect(result.isActive).toBe(false);
     });

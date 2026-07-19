@@ -79,4 +79,55 @@ export class AdminService {
 
     return stats;
   }
+
+  async exportUsers(): Promise<string> {
+    const users = await this.prisma.user.findMany({
+      select: {
+        id: true,
+        phone: true,
+        name: true,
+        role: true,
+        bonusBalance: true,
+        isApproved: true,
+        createdAt: true,
+        invitedById: true,
+        referralCode: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const header =
+      'id,phone,name,role,bonusBalance,isApproved,createdAt,invitedById,referralCode';
+    const rows = users.map((u) =>
+      [
+        u.id,
+        u.phone,
+        u.name || '',
+        u.role,
+        u.bonusBalance,
+        u.isApproved,
+        u.createdAt.toISOString(),
+        u.invitedById || '',
+        u.referralCode,
+      ].join(','),
+    );
+    return header + '\n' + rows.join('\n');
+  }
+
+  async backupDatabase(): Promise<{ success: boolean; file?: string }> {
+    const { execSync } = await import('child_process');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `backup-${timestamp}.sql`;
+    const filepath = `./backups/${filename}`;
+
+    try {
+      execSync(`mkdir -p ./backups && pg_dump $DATABASE_URL > ${filepath}`, {
+        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+        stdio: 'pipe',
+      });
+      return { success: true, file: filename };
+    } catch {
+      return { success: false };
+    }
+  }
 }

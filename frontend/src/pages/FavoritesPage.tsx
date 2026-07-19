@@ -25,7 +25,7 @@ export default function FavoritesPage() {
       </motion.div>
 
       {products.length === 0 ? (
-        <div className="text-center py-24"><div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center"><Heart size={32} className="text-white/10" /></div><p className="text-white/60">Нет избранных товаров</p></div>
+        <div className="flex items-center justify-center py-24 w-full"><div className="text-center"><div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center"><Heart size={32} className="text-white/10" /></div><p className="text-white/60 mb-4">Нет избранных товаров</p><button onClick={() => navigate('/products')} className="px-6 py-3 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 shadow-lg shadow-indigo-500/25 transition-all">В каталог</button></div></div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {products.map((product, i) => {

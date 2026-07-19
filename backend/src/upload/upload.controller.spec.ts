@@ -17,10 +17,12 @@ describe('UploadController', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(controller).toBeDefined(); });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
 
   describe('uploadFile', () => {
-    it('should return file URL', async () => {
+    it('should return file URL', () => {
       service.getFileUrl.mockReturnValue('https://cdn/uploads/file.png');
       const result = controller.uploadFile({ filename: 'file.png' } as any);
       expect(result.url).toBe('https://cdn/uploads/file.png');

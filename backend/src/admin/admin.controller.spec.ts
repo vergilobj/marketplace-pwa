@@ -21,7 +21,9 @@ describe('AdminController', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(controller).toBeDefined(); });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
 
   describe('getDashboard', () => {
     it('should return dashboard', async () => {

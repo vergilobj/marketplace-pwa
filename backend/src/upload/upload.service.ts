@@ -6,7 +6,7 @@ export class UploadService {
   constructor(private config: ConfigService) {}
 
   getFileUrl(filename: string): string {
-    const base = this.config.get('UPLOAD_BASE_URL') || 'http://localhost:3000';
+    const base = this.config.get('UPLOAD_BASE_URL') || '';
     return `${base}/uploads/${filename}`;
   }
 }

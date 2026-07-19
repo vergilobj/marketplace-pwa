@@ -25,7 +25,9 @@ describe('AdminService', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(service).toBeDefined(); });
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
 
   describe('getDashboard', () => {
     it('should return dashboard stats', async () => {
@@ -34,7 +36,9 @@ describe('AdminService', () => {
       mockPrisma.product.count.mockResolvedValue(30);
       mockPrisma.post.count.mockResolvedValue(20);
       mockPrisma.withdrawalRequest.count.mockResolvedValue(5);
-      mockPrisma.order.aggregate.mockResolvedValue({ _sum: { platformFee: 15000 } });
+      mockPrisma.order.aggregate.mockResolvedValue({
+        _sum: { platformFee: 15000 },
+      });
       const result = await service.getDashboard();
       expect(result.usersCount).toBe(100);
       expect(result.ordersCount).toBe(50);
@@ -50,7 +54,9 @@ describe('AdminService', () => {
       mockPrisma.product.count.mockResolvedValue(0);
       mockPrisma.post.count.mockResolvedValue(0);
       mockPrisma.withdrawalRequest.count.mockResolvedValue(0);
-      mockPrisma.order.aggregate.mockResolvedValue({ _sum: { platformFee: null } });
+      mockPrisma.order.aggregate.mockResolvedValue({
+        _sum: { platformFee: null },
+      });
       const result = await service.getDashboard();
       expect(result.totalRevenue).toBe(0);
     });
@@ -69,9 +75,17 @@ describe('AdminService', () => {
   describe('getSellerStats', () => {
     it('should return seller statistics', async () => {
       mockPrisma.user.findMany.mockResolvedValue([
-        { id: 's1', name: 'Seller 1', phone: '+7999', _count: { products: 10 } },
+        {
+          id: 's1',
+          name: 'Seller 1',
+          phone: '+7999',
+          _count: { products: 10 },
+        },
       ]);
-      mockPrisma.order.aggregate.mockResolvedValue({ _count: { id: 5 }, _sum: { amount: 50000 } });
+      mockPrisma.order.aggregate.mockResolvedValue({
+        _count: { id: 5 },
+        _sum: { amount: 50000 },
+      });
       const result = await service.getSellerStats();
       expect(result).toHaveLength(1);
       expect(result[0].productsCount).toBe(10);

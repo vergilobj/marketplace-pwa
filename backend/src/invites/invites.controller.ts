@@ -20,7 +20,10 @@ export class InvitesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'MODERATOR')
   @Post()
-  async create(@Request() req, @Body('code') code?: string) {
+  async create(
+    @Request() req: AuthenticatedRequest,
+    @Body('code') code?: string,
+  ) {
     return this.invitesService.createInvite(req.user.userId, code);
   }
 

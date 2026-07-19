@@ -27,12 +27,16 @@ describe('NotificationsController', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(controller).toBeDefined(); });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
 
   describe('getNotifications', () => {
     it('should return notifications', async () => {
       service.getNotifications.mockResolvedValue([]);
-      expect(await controller.getNotifications({ user: { userId: 'u1' } })).toEqual([]);
+      expect(
+        await controller.getNotifications({ user: { userId: 'u1' } }),
+      ).toEqual([]);
     });
   });
 
@@ -54,7 +58,9 @@ describe('NotificationsController', () => {
   describe('getUnreadCount', () => {
     it('should return unread count', async () => {
       service.getUnreadCount.mockResolvedValue(5);
-      expect(await controller.getUnreadCount({ user: { userId: 'u1' } })).toEqual({ count: 5 });
+      expect(
+        await controller.getUnreadCount({ user: { userId: 'u1' } }),
+      ).toEqual({ count: 5 });
     });
   });
 });

@@ -24,21 +24,27 @@ export class PostsController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get('feed')
-  async feed(@Request() req) {
+  async feed(@Request() req: AuthenticatedRequest) {
     return this.postsService.getFeed(req.user?.userId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Post()
-  async create(@Request() req, @Body() dto: CreatePostDto) {
+  async create(
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: CreatePostDto,
+  ) {
     return this.postsService.create(req.user.userId, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SELLER')
+  @Roles('SELLER', 'ADMIN')
   @Post('ad')
-  async createAd(@Request() req, @Body() dto: CreateAdDto) {
+  async createAd(
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: CreateAdDto,
+  ) {
     return this.postsService.createAd(req.user.userId, dto);
   }
 
@@ -88,7 +94,7 @@ export class PostsController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
     @Body() dto: CreatePostDto,
   ) {
     return this.postsService.update(id, req.user.userId, req.user.role, dto);

@@ -24,7 +24,7 @@ export default function PostDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const handleLike = async () => { try { if (liked) { await unlikePost(id!); setLikes((c:number)=>c-1); } else { await likePost(id!); setLikes((c:number)=>c+1); } setLiked(!liked); } catch {} };
+  const handleLike = async () => { try { if (liked) { await unlikePost(id!); setLikes((c:number)=>c-1); } else { await likePost(id!); setLikes((c:number)=>c+1); } setLiked(!liked); } catch { /* ignore */ } };
   const handleComment = async () => { if (!commentText.trim()) return; try { const c = await addComment(id!, commentText); setComments(p => [...p, c]); setCommentText(''); } catch { toast.error('Ошибка'); } };
   const delComment = async (cid: string) => { try { await deleteComment(cid); setComments(p => p.filter(c => c.id !== cid)); } catch { toast.error('Ошибка'); } };
 

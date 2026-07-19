@@ -20,7 +20,9 @@ describe('SettingsController', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(controller).toBeDefined(); });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
 
   describe('getAll', () => {
     it('should return all settings', async () => {

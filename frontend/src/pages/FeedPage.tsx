@@ -28,13 +28,12 @@ export default function FeedPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all'|'posts'|'products'|'ads'>('all');
-  const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortType>('newest');
   const [viewMode, setViewMode] = useState<'grid'|'list'>('grid');
 
+  const [search, setSearch] = useState(() => sp.get('search') || '');
+
   useEffect(() => { Promise.all([getFeed(), getProducts()]).then(([p, pr]) => { setPosts(Array.isArray(p)?p:[]); setProducts(Array.isArray(pr)?pr:[]); }).finally(() => setLoading(false)); }, []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { const q = sp.get('search'); if (q) setSearch(q); }, [sp]);
 
   const delPost = async (id: string) => { if (!confirm('Удалить?')) return; try { await api.delete('/posts/'+id); setPosts(p => p.filter(x => x.id !== id)); toast.success('Удалён'); } catch { toast.error('Ошибка'); } };
 
@@ -55,7 +54,7 @@ export default function FeedPage() {
         <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-purple-400/20 rounded-full blur-3xl" />
         <div className="relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white/90 text-sm font-medium mb-6"><Zap size={14} className="text-yellow-300" /> Закрытый маркетплейс</div>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-3 tracking-tight leading-[1.1]">Покупайте и продавайте<br/>в надёжном сообществе</h1>
+          <h1 className="text-xl xs:text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-3 tracking-tight leading-[1.15]">Покупайте и продавайте в надёжном сообществе</h1>
           <p className="text-white/70 text-base max-w-lg mb-5">Закрытая площадка для проверенных участников. Товары, чат, реферальная программа — всё в одном месте.</p>
           <div className="flex flex-wrap gap-3">
             {isSeller && <button onClick={() => navigate('/products/new')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-slate-900 font-semibold text-sm hover:bg-white/90 transition-all shadow-xl"><Sparkles size={16} /> Выставить товар</button>}
@@ -72,9 +71,9 @@ export default function FeedPage() {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по ленте..." className="w-full pl-11 pr-10 py-3 rounded-2xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder:text-white/25 outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all" />
           {search && <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/35 hover:text-white/70 transition-colors"><X size={16} /></button>}
         </div>
-        <div className="flex items-center gap-1.5 p-1 bg-white/[0.04] rounded-2xl shrink-0">
+        <div className="flex items-center gap-1.5 p-1 bg-white/[0.04] rounded-2xl overflow-x-auto flex-nowrap max-w-full">
           {sortOptions.map(opt => (
-            <button key={opt.value} onClick={() => setSort(opt.value)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${sort === opt.value ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{opt.icon}{opt.label}</button>
+            <button key={opt.value} onClick={() => setSort(opt.value)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold transition-all whitespace-nowrap ${sort === opt.value ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{opt.icon}{opt.label}</button>
           ))}
         </div>
         <div className="flex items-center gap-1 p-1 bg-white/[0.04] rounded-2xl shrink-0">
@@ -84,9 +83,9 @@ export default function FeedPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 mb-8">
+      <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1 -mx-1 px-1">
         {[{ key: 'all', label: 'Всё', icon: <Sparkles size={13} /> }, { key: 'products', label: 'Товары', icon: <Grid3X3 size={13} /> }, { key: 'posts', label: 'Посты', icon: <FileText size={13} /> }, { key: 'ads', label: 'Реклама', icon: <Megaphone size={13} /> }].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key as any)} className={`flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeTab === tab.key ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{tab.icon}{tab.label}</button>
+          <button key={tab.key} onClick={() => setActiveTab(tab.key as any)} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.key ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{tab.icon}{tab.label}</button>
         ))}
       </div>
 

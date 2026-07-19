@@ -19,9 +19,9 @@ export default function ProductCard({ product }: { product: any }) {
       onClick={() => navigate(`/products/${product.id}`)}
       className="group bg-[#1a1a24] border border-white/[0.06] rounded-2xl overflow-hidden hover:border-white/[0.15] hover:shadow-2xl hover:shadow-black/40 transition-all duration-300 cursor-pointer flex flex-col h-full"
     >
-      <div className="relative overflow-hidden aspect-square bg-[#111115] shrink-0">
+      <div className="relative overflow-hidden h-48 bg-[#111115] shrink-0">
         {product.media?.[0] ? (
-          <img src={product.media[0]} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+          <img src={product.media[0]} alt={product.title} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center"><ShoppingCart size={32} className="text-white/10" /></div>
         )}

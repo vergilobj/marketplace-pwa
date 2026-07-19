@@ -33,11 +33,9 @@ export default function AdminPage() {
   const [search, setSearch] = useState('');
   const [copied, setCopied] = useState('');
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { api.get('/admin/dashboard').then(r => setDashboard(r.data)).catch(() => {}); }, []);
 
   useEffect(() => {
-    setLoading(true);
     const q = search ? `?search=${search}` : '';
     switch (activeTab) {
       case 'users': api.get(`/users${q}`).then(r => setUsers(r.data.items || [])).finally(() => setLoading(false)); break;
@@ -47,7 +45,7 @@ export default function AdminPage() {
       case 'transactions': api.get(`/payments/transactions`).then(r => setTransactions(r.data.items || [])).finally(() => setLoading(false)); break;
       case 'withdrawals': api.get('/users/admin/withdrawals').then(r => setWithdrawals(r.data || [])).finally(() => setLoading(false)); break;
       case 'settings': api.get('/settings').then(r => setSettings(r.data || {})).finally(() => setLoading(false)); break;
-      default: setLoading(false);
+      default: queueMicrotask(() => setLoading(false));
     }
   }, [activeTab, search]);
 

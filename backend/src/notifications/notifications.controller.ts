@@ -24,19 +24,22 @@ export class NotificationsController {
   // Внутренние уведомления
   @UseGuards(JwtAuthGuard)
   @Get()
-  async getNotifications(@Request() req) {
+  async getNotifications(@Request() req: AuthenticatedRequest) {
     return this.notificationsService.getNotifications(req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id/read')
-  async markAsRead(@Param('id') id: string, @Request() req) {
+  async markAsRead(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
     return this.notificationsService.markAsRead(id, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('unread-count')
-  async getUnreadCount(@Request() req) {
+  async getUnreadCount(@Request() req: AuthenticatedRequest) {
     const count = await this.notificationsService.getUnreadCount(
       req.user.userId,
     );
@@ -66,7 +69,7 @@ export class NotificationsController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('read-all')
-  async markAllAsRead(@Request() req) {
+  async markAllAsRead(@Request() req: AuthenticatedRequest) {
     await this.notificationsService.markAllAsRead(req.user.userId);
     return { message: 'All notifications marked as read' };
   }

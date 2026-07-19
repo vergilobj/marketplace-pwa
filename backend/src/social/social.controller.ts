@@ -18,13 +18,19 @@ export class SocialController {
 
   @UseGuards(JwtAuthGuard)
   @Post(':postId/like')
-  async like(@Request() req, @Param('postId') postId: string) {
+  async like(
+    @Request() req: AuthenticatedRequest,
+    @Param('postId') postId: string,
+  ) {
     return this.socialService.likePost(req.user.userId, postId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Delete(':postId/like')
-  async unlike(@Request() req, @Param('postId') postId: string) {
+  async unlike(
+    @Request() req: AuthenticatedRequest,
+    @Param('postId') postId: string,
+  ) {
     return this.socialService.unlikePost(req.user.userId, postId);
   }
 
@@ -36,7 +42,7 @@ export class SocialController {
   @UseGuards(JwtAuthGuard)
   @Post(':postId/comments')
   async addComment(
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
     @Param('postId') postId: string,
     @Body('text') text: string,
   ) {
@@ -51,7 +57,7 @@ export class SocialController {
   @UseGuards(JwtAuthGuard)
   @Patch('comments/:commentId')
   async updateComment(
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
     @Param('commentId') commentId: string,
     @Body('text') text: string,
   ) {
@@ -65,7 +71,10 @@ export class SocialController {
 
   @UseGuards(JwtAuthGuard)
   @Delete('comments/:commentId')
-  async deleteComment(@Request() req, @Param('commentId') commentId: string) {
+  async deleteComment(
+    @Request() req: AuthenticatedRequest,
+    @Param('commentId') commentId: string,
+  ) {
     return this.socialService.deleteComment(
       commentId,
       req.user.userId,

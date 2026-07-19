@@ -29,14 +29,22 @@ describe('ProductsController', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(controller).toBeDefined(); });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
 
   describe('create', () => {
     it('should create product', async () => {
       service.create.mockResolvedValue({ id: 'p1' });
-      const result = await controller.create({ user: { userId: 'seller-1' } }, { title: 'T', description: 'D', price: 100 });
+      const result = await controller.create(
+        { user: { userId: 'seller-1' } },
+        { title: 'T', description: 'D', price: 100 },
+      );
       expect(result.id).toBe('p1');
-      expect(service.create).toHaveBeenCalledWith('seller-1', expect.any(Object));
+      expect(service.create).toHaveBeenCalledWith(
+        'seller-1',
+        expect.any(Object),
+      );
     });
   });
 
@@ -57,7 +65,11 @@ describe('ProductsController', () => {
   describe('update', () => {
     it('should update product', async () => {
       service.update.mockResolvedValue({ id: 'p1', title: 'Updated' });
-      const result = await controller.update('p1', { user: { userId: 's1' } }, { title: 'Updated' });
+      const result = await controller.update(
+        'p1',
+        { user: { userId: 's1' } },
+        { title: 'Updated' },
+      );
       expect(result.title).toBe('Updated');
     });
   });
@@ -74,7 +86,12 @@ describe('ProductsController', () => {
     it('should return admin product list', async () => {
       service.findAllAdmin.mockResolvedValue({ items: [], total: 0 });
       await controller.findAllAdmin('1', '10', '', 'active');
-      expect(service.findAllAdmin).toHaveBeenCalledWith({ page: 1, limit: 10, search: '', status: 'active' });
+      expect(service.findAllAdmin).toHaveBeenCalledWith({
+        page: 1,
+        limit: 10,
+        search: '',
+        status: 'active',
+      });
     });
   });
 
@@ -89,7 +106,9 @@ describe('ProductsController', () => {
   describe('findMyProducts', () => {
     it('should return seller products', async () => {
       service.findBySeller.mockResolvedValue([{ id: 'p1' }]);
-      const result = await controller.findMyProducts({ user: { userId: 's1' } });
+      const result = await controller.findMyProducts({
+        user: { userId: 's1' },
+      });
       expect(result).toHaveLength(1);
     });
   });
@@ -106,7 +125,10 @@ describe('ProductsController', () => {
     it('should update product as admin', async () => {
       service.adminUpdate.mockResolvedValue({ id: 'p1' });
       await controller.adminUpdate('p1', { title: 'Admin Edit' });
-      expect(service.adminUpdate).toHaveBeenCalledWith('p1', expect.any(Object));
+      expect(service.adminUpdate).toHaveBeenCalledWith(
+        'p1',
+        expect.any(Object),
+      );
     });
   });
 });

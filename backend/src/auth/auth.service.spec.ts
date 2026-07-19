@@ -13,8 +13,8 @@ import * as bcrypt from 'bcryptjs';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prisma: any;
-  let jwtService: JwtService;
+  let _prisma: any;
+  let _jwtService: JwtService;
 
   const mockPrisma = {
     user: {
@@ -93,7 +93,9 @@ describe('AuthService', () => {
         isUsed: true,
         expiresAt: null,
       });
-      await expect(service.register({ ...dto, inviteCode: 'USEDCODE' })).rejects.toThrow(BadRequestException);
+      await expect(
+        service.register({ ...dto, inviteCode: 'USEDCODE' }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException if invite is expired', async () => {
@@ -103,7 +105,9 @@ describe('AuthService', () => {
         isUsed: false,
         expiresAt: new Date('2020-01-01'),
       });
-      await expect(service.register({ ...dto, inviteCode: 'EXPIRED' })).rejects.toThrow(BadRequestException);
+      await expect(
+        service.register({ ...dto, inviteCode: 'EXPIRED' }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should register user successfully with valid invite', async () => {
@@ -114,7 +118,7 @@ describe('AuthService', () => {
         expiresAt: null,
         ownerId: 'owner-1',
       });
-      mockPrisma.$transaction.mockImplementation(async (fn: any) => {
+      mockPrisma.$transaction.mockImplementation((fn: any) => {
         const tx = {
           user: {
             create: jest.fn().mockResolvedValue({
@@ -144,7 +148,7 @@ describe('AuthService', () => {
         expiresAt: null,
         ownerId: 'owner-1',
       });
-      mockPrisma.$transaction.mockImplementation(async (fn: any) => {
+      mockPrisma.$transaction.mockImplementation((fn: any) => {
         const tx = {
           user: {
             create: jest.fn().mockResolvedValue({
@@ -175,23 +179,35 @@ describe('AuthService', () => {
     });
 
     it('should throw UnauthorizedException if user has no password', async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce({ id: '1', phone: dto.phone, passwordHash: null });
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        id: '1',
+        phone: dto.phone,
+        passwordHash: null,
+      });
       await expect(service.login(dto)).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException if password is wrong', async () => {
       const hash = await bcrypt.hash('correct', 10);
       mockPrisma.user.findUnique.mockResolvedValueOnce({
-        id: '1', phone: dto.phone, passwordHash: hash, role: 'BUYER',
+        id: '1',
+        phone: dto.phone,
+        passwordHash: hash,
+        role: 'BUYER',
       });
       mockPrisma.user.findMany.mockResolvedValueOnce([]);
-      await expect(service.login({ ...dto, password: 'wrong' })).rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.login({ ...dto, password: 'wrong' }),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('should return tokens on successful login', async () => {
       const hash = await bcrypt.hash('correct', 10);
       mockPrisma.user.findUnique.mockResolvedValueOnce({
-        id: '1', phone: dto.phone, passwordHash: hash, role: 'BUYER',
+        id: '1',
+        phone: dto.phone,
+        passwordHash: hash,
+        role: 'BUYER',
       });
       mockPrisma.user.findMany.mockResolvedValueOnce([]);
       const result = await service.login(dto);
@@ -203,17 +219,29 @@ describe('AuthService', () => {
   describe('refreshToken', () => {
     it('should throw UnauthorizedException if user not found', async () => {
       mockPrisma.user.findUnique.mockResolvedValueOnce(null);
-      await expect(service.refreshToken('bad-id', 'token')).rejects.toThrow(UnauthorizedException);
+      await expect(service.refreshToken('bad-id', 'token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should throw UnauthorizedException if refresh token is invalid', async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce({ id: '1', role: 'BUYER' });
-      mockJwtService.verify.mockImplementationOnce(() => { throw new Error('invalid'); });
-      await expect(service.refreshToken('1', 'bad-token')).rejects.toThrow(UnauthorizedException);
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        id: '1',
+        role: 'BUYER',
+      });
+      mockJwtService.verify.mockImplementationOnce(() => {
+        throw new Error('invalid');
+      });
+      await expect(service.refreshToken('1', 'bad-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should return new tokens on valid refresh', async () => {
-      mockPrisma.user.findUnique.mockResolvedValueOnce({ id: '1', role: 'BUYER' });
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        id: '1',
+        role: 'BUYER',
+      });
       const result = await service.refreshToken('1', 'valid-token');
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');

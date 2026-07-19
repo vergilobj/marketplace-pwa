@@ -1,4 +1,11 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -22,12 +29,13 @@ export class AuthController {
   }
 
   @Post('refresh')
-  refresh(@Body('refreshToken') refreshToken: string) {
-    void refreshToken; // will be implemented with proper token extraction
-    // нужно извлечь userId из токена, но для простоты пока так
-    // лучше передавать userId вместе с токеном, но пока опустим
-    // На практике нужно декодировать refreshToken и извлечь sub
-    // Здесь упрощённый вариант для старта
-    return { message: 'Not implemented fully yet' };
+  async refresh(@Body('refreshToken') refreshToken: string) {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token required');
+    }
+    const decoded = JSON.parse(
+      Buffer.from(refreshToken.split('.')[1], 'base64').toString(),
+    );
+    return this.authService.refreshToken(decoded.sub, refreshToken);
   }
 }

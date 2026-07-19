@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { login } from '../api/auth';
 import { LogIn, ArrowLeft, Sparkles } from 'lucide-react';
 import { CometChat } from '@cometchat/chat-sdk-javascript';
-const COMETCHAT_AUTH_KEY='74c79666693a39e55df53b4a2e93d93ef6f993e6';
+const COMETCHAT_AUTH_KEY = import.meta.env.VITE_COMETCHAT_AUTH_KEY || '';
 
 export default function LoginPage() {
   const navigate = useNavigate();

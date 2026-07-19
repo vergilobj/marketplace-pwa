@@ -3,23 +3,37 @@ import { PostsService } from './posts.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { PaymentsService } from '../payments/payments.service';
-import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 
 describe('PostsService', () => {
   let service: PostsService;
-  let prisma: any;
+  let _prisma: any;
 
   const mockPost = {
-    id: 'post-1', title: 'Test Post', content: 'Content', isAd: false,
-    isHidden: false, isPinned: false, adExpireDate: null,
-    authorId: 'author-1', author: { id: 'author-1', name: 'Author' },
+    id: 'post-1',
+    title: 'Test Post',
+    content: 'Content',
+    isAd: false,
+    isHidden: false,
+    isPinned: false,
+    adExpireDate: null,
+    authorId: 'author-1',
+    author: { id: 'author-1', name: 'Author' },
     createdAt: new Date(),
   };
 
   const mockPrisma = {
     post: {
-      create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(),
-      update: jest.fn(), delete: jest.fn(), count: jest.fn(),
+      create: jest.fn(),
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn(),
     },
     user: { findFirst: jest.fn() },
     order: { create: jest.fn(), findUnique: jest.fn() },
@@ -48,7 +62,9 @@ describe('PostsService', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(service).toBeDefined(); });
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
 
   describe('create', () => {
     it('should create a post', async () => {
@@ -63,17 +79,38 @@ describe('PostsService', () => {
     it('should throw if no admin found', async () => {
       mockPrisma.post.create.mockResolvedValue(mockPost);
       mockPrisma.user.findFirst.mockResolvedValue(null);
-      await expect(service.createAd('seller-1', { title: 'Ad', content: '', link: '', days: 7 }))
-        .rejects.toThrow(BadRequestException);
+      await expect(
+        service.createAd('seller-1', {
+          title: 'Ad',
+          content: '',
+          link: '',
+          days: 7,
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should create ad order and activate', async () => {
       mockPrisma.post.create.mockResolvedValue({ ...mockPost, isAd: true });
-      mockPrisma.user.findFirst.mockResolvedValue({ id: 'admin-1', role: 'ADMIN' });
-      mockPrisma.order.create.mockResolvedValue({ id: 'order-1', amount: 35000 });
+      mockPrisma.user.findFirst.mockResolvedValue({
+        id: 'admin-1',
+        role: 'ADMIN',
+      });
+      mockPrisma.order.create.mockResolvedValue({
+        id: 'order-1',
+        amount: 35000,
+      });
       mockPrisma.post.update.mockResolvedValue({});
-      mockPrisma.post.findUnique.mockResolvedValue({ ...mockPost, isAd: true, order: { id: 'order-1' } });
-      const result = await service.createAd('seller-1', { title: 'Ad', content: '', link: '', days: 7 });
+      mockPrisma.post.findUnique.mockResolvedValue({
+        ...mockPost,
+        isAd: true,
+        order: { id: 'order-1' },
+      });
+      const result = await service.createAd('seller-1', {
+        title: 'Ad',
+        content: '',
+        link: '',
+        days: 7,
+      });
       expect(result).toBeDefined();
       expect(mockPayments.createPaymentForOrder).toHaveBeenCalled();
     });
@@ -90,7 +127,9 @@ describe('PostsService', () => {
   describe('findById', () => {
     it('should throw NotFoundException', async () => {
       mockPrisma.post.findUnique.mockResolvedValue(null);
-      await expect(service.findById('bad-id')).rejects.toThrow(NotFoundException);
+      await expect(service.findById('bad-id')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -107,14 +146,18 @@ describe('PostsService', () => {
 
   describe('getFeed', () => {
     it('should return feed with like counts', async () => {
-      mockPrisma.post.findMany.mockResolvedValue([{ ...mockPost, _count: { likes: 5, comments: 3 }, likes: [] }]);
+      mockPrisma.post.findMany.mockResolvedValue([
+        { ...mockPost, _count: { likes: 5, comments: 3 }, likes: [] },
+      ]);
       const result = await service.getFeed('user-1');
       expect(result[0].likeCount).toBe(5);
       expect(result[0].commentCount).toBe(3);
     });
 
     it('should return feed without userId', async () => {
-      mockPrisma.post.findMany.mockResolvedValue([{ ...mockPost, _count: { likes: 0, comments: 0 }, likes: false }]);
+      mockPrisma.post.findMany.mockResolvedValue([
+        { ...mockPost, _count: { likes: 0, comments: 0 }, likes: false },
+      ]);
       const result = await service.getFeed();
       expect(result[0].likeCount).toBe(0);
     });
@@ -132,14 +175,20 @@ describe('PostsService', () => {
   describe('update', () => {
     it('should throw ForbiddenException if not owner and not admin', async () => {
       mockPrisma.post.findUnique.mockResolvedValue(mockPost);
-      await expect(service.update('post-1', 'other-user', 'BUYER', { title: 'Hacked' }))
-        .rejects.toThrow(ForbiddenException);
+      await expect(
+        service.update('post-1', 'other-user', 'BUYER', { title: 'Hacked' }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should allow admin to edit', async () => {
       mockPrisma.post.findUnique.mockResolvedValue(mockPost);
-      mockPrisma.post.update.mockResolvedValue({ ...mockPost, title: 'Edited' });
-      const result = await service.update('post-1', 'admin-1', 'ADMIN', { title: 'Edited' });
+      mockPrisma.post.update.mockResolvedValue({
+        ...mockPost,
+        title: 'Edited',
+      });
+      const result = await service.update('post-1', 'admin-1', 'ADMIN', {
+        title: 'Edited',
+      });
       expect(result.title).toBe('Edited');
     });
   });

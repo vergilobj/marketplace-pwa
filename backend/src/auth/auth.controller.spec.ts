@@ -21,12 +21,22 @@ describe('AuthController', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(controller).toBeDefined(); });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
 
   describe('register', () => {
     it('should call authService.register', async () => {
-      const dto = { phone: '+7999', name: 'Test', password: 'pass', inviteCode: 'CODE' };
-      service.register.mockResolvedValue({ accessToken: 't', refreshToken: 'r' });
+      const dto = {
+        phone: '+7999',
+        name: 'Test',
+        password: 'pass',
+        inviteCode: 'CODE',
+      };
+      service.register.mockResolvedValue({
+        accessToken: 't',
+        refreshToken: 'r',
+      });
       const result = await controller.register(dto);
       expect(result).toHaveProperty('accessToken');
       expect(service.register).toHaveBeenCalledWith(dto);

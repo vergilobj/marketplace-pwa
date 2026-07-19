@@ -28,7 +28,9 @@ describe('PostsController', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(controller).toBeDefined(); });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
 
   describe('feed', () => {
     it('should return feed with userId', async () => {
@@ -47,7 +49,10 @@ describe('PostsController', () => {
   describe('create', () => {
     it('should create post', async () => {
       service.create.mockResolvedValue({ id: 'post-1' });
-      const result = await controller.create({ user: { userId: 'admin-1' } }, { title: 'T', content: 'C' });
+      const result = await controller.create(
+        { user: { userId: 'admin-1' } },
+        { title: 'T', content: 'C' },
+      );
       expect(result.id).toBe('post-1');
     });
   });
@@ -55,7 +60,10 @@ describe('PostsController', () => {
   describe('createAd', () => {
     it('should create ad', async () => {
       service.createAd.mockResolvedValue({ id: 'ad-1', isAd: true });
-      const result = await controller.createAd({ user: { userId: 'seller-1' } }, { title: 'Ad', content: '', link: '', days: 7 });
+      const result = await controller.createAd(
+        { user: { userId: 'seller-1' } },
+        { title: 'Ad', content: '', link: '', days: 7 },
+      );
       expect(result.isAd).toBe(true);
     });
   });
@@ -86,13 +94,21 @@ describe('PostsController', () => {
     it('should return admin list', async () => {
       service.findAllAdmin.mockResolvedValue({ items: [], total: 0 });
       await controller.findAllAdmin('1', '10', '', 'visible');
-      expect(service.findAllAdmin).toHaveBeenCalledWith({ page: 1, limit: 10, search: '', status: 'visible' });
+      expect(service.findAllAdmin).toHaveBeenCalledWith({
+        page: 1,
+        limit: 10,
+        search: '',
+        status: 'visible',
+      });
     });
   });
 
   describe('toggleVisibility', () => {
     it('should toggle visibility', async () => {
-      service.toggleVisibility.mockResolvedValue({ id: 'post-1', isHidden: true });
+      service.toggleVisibility.mockResolvedValue({
+        id: 'post-1',
+        isHidden: true,
+      });
       const result = await controller.toggleVisibility('post-1');
       expect(result.isHidden).toBe(true);
     });
@@ -101,7 +117,11 @@ describe('PostsController', () => {
   describe('update', () => {
     it('should update post', async () => {
       service.update.mockResolvedValue({ id: 'post-1', title: 'Edited' });
-      const result = await controller.update('post-1', { user: { userId: 'u1', role: 'ADMIN' } }, { title: 'Edited' });
+      const result = await controller.update(
+        'post-1',
+        { user: { userId: 'u1', role: 'ADMIN' } },
+        { title: 'Edited' },
+      );
       expect(result.title).toBe('Edited');
     });
   });

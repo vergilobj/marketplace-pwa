@@ -22,22 +22,28 @@ describe('UploadService', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(service).toBeDefined(); });
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
 
   describe('getFileUrl', () => {
     it('should use configured base URL', () => {
       config.get.mockReturnValue('https://cdn.example.com');
-      expect(service.getFileUrl('photo.png')).toBe('https://cdn.example.com/uploads/photo.png');
+      expect(service.getFileUrl('photo.png')).toBe(
+        'https://cdn.example.com/uploads/photo.png',
+      );
     });
 
-    it('should fall back to localhost', () => {
+    it('should fall back to relative path', () => {
       config.get.mockReturnValue(undefined);
-      expect(service.getFileUrl('photo.png')).toBe('http://localhost:3000/uploads/photo.png');
+      expect(service.getFileUrl('photo.png')).toBe('/uploads/photo.png');
     });
 
     it('should handle filenames with special characters', () => {
       config.get.mockReturnValue('https://cdn.example.com');
-      expect(service.getFileUrl('photo (1).png')).toBe('https://cdn.example.com/uploads/photo (1).png');
+      expect(service.getFileUrl('photo (1).png')).toBe(
+        'https://cdn.example.com/uploads/photo (1).png',
+      );
     });
   });
 });

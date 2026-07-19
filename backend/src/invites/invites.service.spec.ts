@@ -5,9 +5,14 @@ import { BadRequestException } from '@nestjs/common';
 
 describe('InvitesService', () => {
   let service: InvitesService;
-  let prisma: any;
+  let _prisma: any;
 
-  const mockInvite = { code: 'ABC123', ownerId: 'owner-1', isUsed: false, createdAt: new Date() };
+  const mockInvite = {
+    code: 'ABC123',
+    ownerId: 'owner-1',
+    isUsed: false,
+    createdAt: new Date(),
+  };
 
   const mockPrisma = {
     invite: {
@@ -30,12 +35,17 @@ describe('InvitesService', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(service).toBeDefined(); });
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
 
   describe('createInvite', () => {
     it('should create invite with custom code', async () => {
       mockPrisma.invite.findUnique.mockResolvedValue(null);
-      mockPrisma.invite.create.mockResolvedValue({ ...mockInvite, code: 'MYCODE' });
+      mockPrisma.invite.create.mockResolvedValue({
+        ...mockInvite,
+        code: 'MYCODE',
+      });
       const result = await service.createInvite('owner-1', 'MYCODE');
       expect(result.code).toBe('MYCODE');
       expect(mockPrisma.invite.create).toHaveBeenCalledWith({
@@ -45,12 +55,17 @@ describe('InvitesService', () => {
 
     it('should throw if custom code already exists', async () => {
       mockPrisma.invite.findUnique.mockResolvedValue(mockInvite);
-      await expect(service.createInvite('owner-1', 'ABC123')).rejects.toThrow(BadRequestException);
+      await expect(service.createInvite('owner-1', 'ABC123')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should auto-generate unique code', async () => {
       mockPrisma.invite.findUnique.mockResolvedValueOnce(null);
-      mockPrisma.invite.create.mockResolvedValue({ ...mockInvite, code: 'XYZ789' });
+      mockPrisma.invite.create.mockResolvedValue({
+        ...mockInvite,
+        code: 'XYZ789',
+      });
       const result = await service.createInvite('owner-1');
       expect(result.code).toBeDefined();
       expect(result.ownerId).toBe('owner-1');
@@ -61,7 +76,10 @@ describe('InvitesService', () => {
         .mockResolvedValueOnce({ code: 'TAKEN' })
         .mockResolvedValueOnce({ code: 'TAKEN' })
         .mockResolvedValueOnce(null);
-      mockPrisma.invite.create.mockResolvedValue({ ...mockInvite, code: 'FRESH' });
+      mockPrisma.invite.create.mockResolvedValue({
+        ...mockInvite,
+        code: 'FRESH',
+      });
       const result = await service.createInvite('owner-1');
       expect(result.code).toBe('FRESH');
       expect(mockPrisma.invite.findUnique).toHaveBeenCalledTimes(3);

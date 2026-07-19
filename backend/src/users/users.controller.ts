@@ -24,7 +24,7 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async getProfile(@Request() req) {
+  async getProfile(@Request() req: AuthenticatedRequest) {
     const user = await this.usersService.findById(req.user.userId);
     if (!user) throw new NotFoundException('User not found');
 
@@ -49,13 +49,16 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Patch('me')
-  async updateProfile(@Request() req, @Body() dto: UpdateUserDto) {
+  async updateProfile(
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: UpdateUserDto,
+  ) {
     return this.usersService.updateProfile(req.user.userId, dto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me/referrals')
-  async getMyReferrals(@Request() req) {
+  async getMyReferrals(@Request() req: AuthenticatedRequest) {
     return this.usersService.getReferrals(req.user.userId);
   }
 
@@ -79,19 +82,22 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me/balance')
-  async getBalance(@Request() req) {
+  async getBalance(@Request() req: AuthenticatedRequest) {
     return this.usersService.getBalance(req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('me/withdrawal')
-  async requestWithdrawal(@Request() req, @Body('amount') amount: number) {
+  async requestWithdrawal(
+    @Request() req: AuthenticatedRequest,
+    @Body('amount') amount: number,
+  ) {
     return this.usersService.requestWithdrawal(req.user.userId, amount);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me/withdrawals')
-  async getMyWithdrawals(@Request() req) {
+  async getMyWithdrawals(@Request() req: AuthenticatedRequest) {
     return this.usersService.getMyWithdrawalRequests(req.user.userId);
   }
 
@@ -126,7 +132,7 @@ export class UsersController {
   // Эндпоинт статистики
   @UseGuards(JwtAuthGuard)
   @Get('me/stats')
-  async getStats(@Request() req) {
+  async getStats(@Request() req: AuthenticatedRequest) {
     return this.usersService.getStats(req.user.userId);
   }
 

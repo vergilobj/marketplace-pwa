@@ -4,7 +4,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 
 describe('UsersService', () => {
   let service: UsersService;
-  let prisma: any;
+  let _prisma: any;
 
   const mockUser = {
     id: 'user-1',
@@ -105,15 +105,22 @@ describe('UsersService', () => {
 
   describe('updateProfile', () => {
     it('should update user profile', async () => {
-      mockPrisma.user.update.mockResolvedValue({ ...mockUser, name: 'New Name' });
-      const result = await service.updateProfile('user-1', { name: 'New Name' });
+      mockPrisma.user.update.mockResolvedValue({
+        ...mockUser,
+        name: 'New Name',
+      });
+      const result = await service.updateProfile('user-1', {
+        name: 'New Name',
+      });
       expect(result.name).toBe('New Name');
     });
   });
 
   describe('getReferrals', () => {
     it('should return referral orders', async () => {
-      mockPrisma.order.findMany.mockResolvedValue([{ id: 'order-1', referralUserId: 'user-1' }]);
+      mockPrisma.order.findMany.mockResolvedValue([
+        { id: 'order-1', referralUserId: 'user-1' },
+      ]);
       const result = await service.getReferrals('user-1');
       expect(result).toHaveLength(1);
     });
@@ -129,7 +136,9 @@ describe('UsersService', () => {
   describe('getStats', () => {
     it('should return user stats', async () => {
       mockPrisma.order.count.mockResolvedValueOnce(5).mockResolvedValueOnce(3);
-      mockPrisma.order.aggregate.mockResolvedValue({ _sum: { referralBonus: 150 } });
+      mockPrisma.order.aggregate.mockResolvedValue({
+        _sum: { referralBonus: 150 },
+      });
       mockPrisma.user.findUnique.mockResolvedValue({ bonusBalance: 500 });
       const result = await service.getStats('user-1');
       expect(result.boughtCount).toBe(5);
@@ -140,7 +149,9 @@ describe('UsersService', () => {
 
     it('should handle null aggregation', async () => {
       mockPrisma.order.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
-      mockPrisma.order.aggregate.mockResolvedValue({ _sum: { referralBonus: null } });
+      mockPrisma.order.aggregate.mockResolvedValue({
+        _sum: { referralBonus: null },
+      });
       mockPrisma.user.findUnique.mockResolvedValue({ bonusBalance: 0 });
       const result = await service.getStats('user-1');
       expect(result.referralEarned).toBe(0);
@@ -162,25 +173,37 @@ describe('UsersService', () => {
   describe('requestWithdrawal', () => {
     it('should throw if user not found', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
-      await expect(service.requestWithdrawal('bad-id', 100)).rejects.toThrow('User not found');
+      await expect(service.requestWithdrawal('bad-id', 100)).rejects.toThrow(
+        'User not found',
+      );
     });
 
     it('should throw if amount is not positive', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      await expect(service.requestWithdrawal('user-1', 0)).rejects.toThrow('Amount must be positive');
-      await expect(service.requestWithdrawal('user-1', -10)).rejects.toThrow('Amount must be positive');
+      await expect(service.requestWithdrawal('user-1', 0)).rejects.toThrow(
+        'Amount must be positive',
+      );
+      await expect(service.requestWithdrawal('user-1', -10)).rejects.toThrow(
+        'Amount must be positive',
+      );
     });
 
     it('should throw if insufficient balance', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       mockPrisma.withdrawalRequest.findMany.mockResolvedValue([]);
-      await expect(service.requestWithdrawal('user-1', 1000)).rejects.toThrow('Insufficient bonus balance');
+      await expect(service.requestWithdrawal('user-1', 1000)).rejects.toThrow(
+        'Insufficient bonus balance',
+      );
     });
 
     it('should create withdrawal request', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       mockPrisma.withdrawalRequest.findMany.mockResolvedValue([]);
-      mockPrisma.withdrawalRequest.create.mockResolvedValue({ id: 'wr-1', amount: 100, status: 'pending' });
+      mockPrisma.withdrawalRequest.create.mockResolvedValue({
+        id: 'wr-1',
+        amount: 100,
+        status: 'pending',
+      });
       const result = await service.requestWithdrawal('user-1', 100);
       expect(result.status).toBe('pending');
       expect(result.amount).toBe(100);
@@ -191,26 +214,45 @@ describe('UsersService', () => {
       mockPrisma.withdrawalRequest.findMany.mockResolvedValue([
         { amount: 450, status: 'pending' },
       ]);
-      await expect(service.requestWithdrawal('user-1', 100)).rejects.toThrow('Insufficient bonus balance');
+      await expect(service.requestWithdrawal('user-1', 100)).rejects.toThrow(
+        'Insufficient bonus balance',
+      );
     });
   });
 
   describe('approveWithdrawal', () => {
     it('should throw if request not found', async () => {
       mockPrisma.withdrawalRequest.findUnique.mockResolvedValue(null);
-      await expect(service.approveWithdrawal('bad-id')).rejects.toThrow('Invalid request');
+      await expect(service.approveWithdrawal('bad-id')).rejects.toThrow(
+        'Invalid request',
+      );
     });
 
     it('should throw if request not pending', async () => {
-      mockPrisma.withdrawalRequest.findUnique.mockResolvedValue({ id: 'wr-1', userId: 'user-1', amount: 100, status: 'approved' });
-      await expect(service.approveWithdrawal('wr-1')).rejects.toThrow('Invalid request');
+      mockPrisma.withdrawalRequest.findUnique.mockResolvedValue({
+        id: 'wr-1',
+        userId: 'user-1',
+        amount: 100,
+        status: 'approved',
+      });
+      await expect(service.approveWithdrawal('wr-1')).rejects.toThrow(
+        'Invalid request',
+      );
     });
 
     it('should approve and decrement balance', async () => {
-      mockPrisma.withdrawalRequest.findUnique.mockResolvedValue({ id: 'wr-1', userId: 'user-1', amount: 100, status: 'pending' });
+      mockPrisma.withdrawalRequest.findUnique.mockResolvedValue({
+        id: 'wr-1',
+        userId: 'user-1',
+        amount: 100,
+        status: 'pending',
+      });
       mockPrisma.user.findUnique.mockResolvedValue({ bonusBalance: 500 });
       mockPrisma.user.update.mockResolvedValue({});
-      mockPrisma.withdrawalRequest.update.mockResolvedValue({ id: 'wr-1', status: 'approved' });
+      mockPrisma.withdrawalRequest.update.mockResolvedValue({
+        id: 'wr-1',
+        status: 'approved',
+      });
       const result = await service.approveWithdrawal('wr-1');
       expect(result.status).toBe('approved');
       expect(mockPrisma.user.update).toHaveBeenCalledWith({
@@ -222,8 +264,16 @@ describe('UsersService', () => {
 
   describe('rejectWithdrawal', () => {
     it('should reject pending request', async () => {
-      mockPrisma.withdrawalRequest.findUnique.mockResolvedValue({ id: 'wr-1', userId: 'user-1', amount: 100, status: 'pending' });
-      mockPrisma.withdrawalRequest.update.mockResolvedValue({ id: 'wr-1', status: 'rejected' });
+      mockPrisma.withdrawalRequest.findUnique.mockResolvedValue({
+        id: 'wr-1',
+        userId: 'user-1',
+        amount: 100,
+        status: 'pending',
+      });
+      mockPrisma.withdrawalRequest.update.mockResolvedValue({
+        id: 'wr-1',
+        status: 'rejected',
+      });
       const result = await service.rejectWithdrawal('wr-1');
       expect(result.status).toBe('rejected');
     });

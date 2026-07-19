@@ -4,7 +4,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 
 describe('SettingsService', () => {
   let service: SettingsService;
-  let prisma: any;
+  let _prisma: any;
 
   const mockPrisma = {
     setting: {
@@ -26,11 +26,16 @@ describe('SettingsService', () => {
     jest.clearAllMocks();
   });
 
-  it('should be defined', () => { expect(service).toBeDefined(); });
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
 
   describe('get', () => {
     it('should return setting value', async () => {
-      mockPrisma.setting.findUnique.mockResolvedValue({ key: 'test', value: '42' });
+      mockPrisma.setting.findUnique.mockResolvedValue({
+        key: 'test',
+        value: '42',
+      });
       expect(await service.get('test')).toBe('42');
     });
 
@@ -42,7 +47,10 @@ describe('SettingsService', () => {
 
   describe('getFloat', () => {
     it('should return parsed float', async () => {
-      mockPrisma.setting.findUnique.mockResolvedValue({ key: 'fee', value: '12.5' });
+      mockPrisma.setting.findUnique.mockResolvedValue({
+        key: 'fee',
+        value: '12.5',
+      });
       expect(await service.getFloat('fee')).toBe(12.5);
     });
 
@@ -54,7 +62,10 @@ describe('SettingsService', () => {
 
   describe('set', () => {
     it('should upsert setting', async () => {
-      mockPrisma.setting.upsert.mockResolvedValue({ key: 'key1', value: 'val1' });
+      mockPrisma.setting.upsert.mockResolvedValue({
+        key: 'key1',
+        value: 'val1',
+      });
       const result = await service.set('key1', 'val1');
       expect(result).toEqual({ key: 'key1', value: 'val1' });
     });
@@ -62,7 +73,9 @@ describe('SettingsService', () => {
 
   describe('getAll', () => {
     it('should return all settings', async () => {
-      mockPrisma.setting.findMany.mockResolvedValue([{ key: 'k1', value: 'v1' }]);
+      mockPrisma.setting.findMany.mockResolvedValue([
+        { key: 'k1', value: 'v1' },
+      ]);
       expect(await service.getAll()).toHaveLength(1);
     });
   });

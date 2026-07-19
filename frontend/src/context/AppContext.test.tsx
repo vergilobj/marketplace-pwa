@@ -17,7 +17,7 @@ Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });
 // Reset store and mock implementations before each test suite
 beforeEach(() => {
   localStorageMock.clear();
-  localStorageMock.getItem.mockImplementation((key: string) => null);
+  localStorageMock.getItem.mockImplementation((_key: string) => null as unknown as string);
   vi.clearAllMocks();
 });
 

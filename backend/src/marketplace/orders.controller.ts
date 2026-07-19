@@ -23,13 +23,19 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('BUYER')
   @Post()
-  async create(@Request() req, @Body() dto: CreateOrderDto) {
+  async create(
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: CreateOrderDto,
+  ) {
     return this.ordersService.create(req.user.userId, dto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('my')
-  async findMyOrders(@Request() req, @Query('status') status?: string) {
+  async findMyOrders(
+    @Request() req: AuthenticatedRequest,
+    @Query('status') status?: string,
+  ) {
     return this.ordersService.findMyOrders(
       req.user.userId,
       req.user.role,
@@ -47,7 +53,7 @@ export class OrdersController {
   @Patch(':id/status')
   async updateStatus(
     @Param('id') id: string,
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
     @Body() dto: UpdateOrderStatusDto,
   ) {
     return this.ordersService.updateStatus(
