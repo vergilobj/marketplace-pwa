@@ -53,7 +53,7 @@ export default function App() {
           <Route path="/products/:id" element={<Lazy><ProductDetailPage /></Lazy>} />
           <Route path="/posts/:id" element={<Lazy><PostDetailPage /></Lazy>} />
           <Route path="/favorites" element={<Lazy><FavoritesPage /></Lazy>} />
-          <Route path="/cart" element={<Lazy><CartPage /></Lazy>} />
+          <Route path="/cart" element={<ProtectedRoute><Lazy><CartPage /></Lazy></ProtectedRoute>} />
           <Route path="/checkout" element={<ProtectedRoute><Lazy><CheckoutPage /></Lazy></ProtectedRoute>} />
           <Route path="/chat" element={<ProtectedRoute><Lazy><ChatPage /></Lazy></ProtectedRoute>} />
           <Route path="/orders" element={<ProtectedRoute><Lazy><OrdersPage /></Lazy></ProtectedRoute>} />
