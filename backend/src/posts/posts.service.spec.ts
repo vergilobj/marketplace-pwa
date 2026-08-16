@@ -3,6 +3,7 @@ import { PostsService } from './posts.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { PaymentsService } from '../payments/payments.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   NotFoundException,
   BadRequestException,
@@ -47,6 +48,9 @@ describe('PostsService', () => {
     createPaymentForOrder: jest.fn().mockResolvedValue({}),
     processSuccessfulPayment: jest.fn().mockResolvedValue({}),
   };
+  const mockNotifications = {
+    createNotification: jest.fn().mockResolvedValue({}),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -55,6 +59,7 @@ describe('PostsService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: SettingsService, useValue: mockSettings },
         { provide: PaymentsService, useValue: mockPayments },
+        { provide: NotificationsService, useValue: mockNotifications },
       ],
     }).compile();
     service = module.get<PostsService>(PostsService);

@@ -1,16 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getFeed } from '../api/posts';
 import { getProducts } from '../api/products';
 import PostCard from '../components/PostCard';
 import ProductCard from '../components/ProductCard';
-import { Search, X, Sparkles, FileText, Grid3X3, Megaphone, Clock, Flame, TrendingUp, List, ArrowRight, Zap } from 'lucide-react';
+import { Search, X, Sparkles, FileText, Grid3X3, Megaphone, Clock, Flame, TrendingUp, List, ArrowRight, Zap, Loader2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
+type TabType = 'all' | 'posts' | 'products' | 'ads';
 
 const sortOptions: { value: SortType; label: string; icon: React.ReactNode }[] = [
   { value: 'newest', label: 'Новые', icon: <Clock size={13} /> },
@@ -19,7 +20,8 @@ const sortOptions: { value: SortType; label: string; icon: React.ReactNode }[] =
   { value: 'price_desc', label: 'Дороже', icon: <TrendingUp size={13} className="rotate-180" /> },
 ];
 
- 
+const PAGE_SIZE = 20;
+
 export default function FeedPage() {
   const navigate = useNavigate();
   const [sp] = useSearchParams();
@@ -27,23 +29,115 @@ export default function FeedPage() {
   const [posts, setPosts] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'all'|'posts'|'products'|'ads'>('all');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('all');
   const [sort, setSort] = useState<SortType>('newest');
-  const [viewMode, setViewMode] = useState<'grid'|'list'>('grid');
-
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [search, setSearch] = useState(() => sp.get('search') || '');
+  
+  // Pagination state
+  const [postsPage, setPostsPage] = useState(1);
+  const [productsPage, setProductsPage] = useState(1);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const loaderRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { Promise.all([getFeed(), getProducts()]).then(([p, pr]) => { setPosts(Array.isArray(p)?p:[]); setProducts(Array.isArray(pr)?pr:[]); }).finally(() => setLoading(false)); }, []);
+  // Reset on sort/tab change
+  useEffect(() => {
+    setPosts([]);
+    setProducts([]);
+    setPostsPage(1);
+    setProductsPage(1);
+    setHasMorePosts(true);
+    setHasMoreProducts(true);
+    setLoading(true);
+    loadInitial();
+  }, [sort, activeTab]);
 
-  const delPost = async (id: string) => { if (!confirm('Удалить?')) return; try { await api.delete('/posts/'+id); setPosts(p => p.filter(x => x.id !== id)); toast.success('Удалён'); } catch { toast.error('Ошибка'); } };
+  const loadInitial = async () => {
+    try {
+      const [postRes, prodRes] = await Promise.all([
+        getFeed({ page: 1, limit: PAGE_SIZE, sort }),
+        getProducts({ page: 1, limit: PAGE_SIZE, sort: sort === 'price_asc' ? 'price_asc' : sort === 'price_desc' ? 'price_desc' : sort === 'popular' ? 'popular' : 'newest' }),
+      ]);
+      setPosts(postRes.items || []);
+      setProducts(prodRes.items || []);
+      setHasMorePosts(postRes.page < postRes.pages);
+      setHasMoreProducts(prodRes.page < prodRes.pages);
+      setPostsPage(2);
+      setProductsPage(2);
+    } catch (e) {
+      console.error('Failed to load feed', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const loadMore = useCallback(async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const isPostTab = activeTab === 'posts' || activeTab === 'ads';
+      const isProductTab = activeTab === 'products';
+      
+      if ((isPostTab || activeTab === 'all') && hasMorePosts) {
+        const res = await getFeed({ page: postsPage, limit: PAGE_SIZE, sort });
+        setPosts(prev => [...prev, ...(res.items || [])]);
+        setHasMorePosts(res.page < res.pages);
+        setPostsPage(p => p + 1);
+      }
+      if ((isProductTab || activeTab === 'all') && hasMoreProducts) {
+        const res = await getProducts({ page: productsPage, limit: PAGE_SIZE, sort: sort === 'price_asc' ? 'price_asc' : sort === 'price_desc' ? 'price_desc' : sort === 'popular' ? 'popular' : 'newest' });
+        setProducts(prev => [...prev, ...(res.items || [])]);
+        setHasMoreProducts(res.page < res.pages);
+        setProductsPage(p => p + 1);
+      }
+    } catch (e) {
+      console.error('Failed to load more', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, activeTab, sort, postsPage, productsPage, hasMorePosts, hasMoreProducts]);
+
+  // Intersection Observer
+  useEffect(() => {
+    const el = loaderRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !loading && !loadingMore) {
+          const canLoadMore = activeTab === 'all' ? (hasMorePosts || hasMoreProducts) : activeTab === 'products' ? hasMoreProducts : hasMorePosts;
+          if (canLoadMore) loadMore();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [loading, loadingMore, hasMorePosts, hasMoreProducts, activeTab, loadMore]);
+
+  const delPost = async (id: string) => {
+    if (!confirm('Удалить?')) return;
+    try { await api.delete('/posts/' + id); setPosts(p => p.filter(x => x.id !== id)); toast.success('Удалён'); } catch { toast.error('Ошибка'); }
+  };
+
+  // Client-side search filter (fast, no API call)
   const fp = posts.filter(p => p.title?.toLowerCase().includes(search.toLowerCase()) || p.content?.toLowerCase().includes(search.toLowerCase()));
   const fpr = products.filter(p => p.title?.toLowerCase().includes(search.toLowerCase()));
-  const sf = (a:any,b:any) => { switch(sort) { case 'popular': return (b.likeCount||0)-(a.likeCount||0); case 'price_asc': return (a.price||0)-(b.price||0); case 'price_desc': return (b.price||0)-(a.price||0); default: return new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime(); } };
-  const sposts = [...fp].sort(sf); const sproducts = [...fpr].sort(sf);
-  const ads = sposts.filter(p=>p.isAd); const regular = sposts.filter(p=>!p.isAd);
+  
+  const ads = fp.filter(p => p.isAd);
+  const regular = fp.filter(p => !p.isAd);
 
-  const items = (() => { switch(activeTab) { case 'posts': return regular.map(p=>({...p,type:'post'})); case 'products': return sproducts.map(p=>({...p,type:'product'})); case 'ads': return ads.map(p=>({...p,type:'post'})); default: return [...ads.map(p=>({...p,type:'post'})),...regular.map(p=>({...p,type:'post'})),...sproducts.map(p=>({...p,type:'product'}))]; } })();
+  const items = (() => {
+    switch (activeTab) {
+      case 'posts': return regular.map(p => ({ ...p, type: 'post' }));
+      case 'products': return fpr.map(p => ({ ...p, type: 'product' }));
+      case 'ads': return ads.map(p => ({ ...p, type: 'post' }));
+      default: return [...ads.map(p => ({ ...p, type: 'post' })), ...regular.map(p => ({ ...p, type: 'post' })), ...fpr.map(p => ({ ...p, type: 'product' }))];
+    }
+  })();
+
+  const showLoader = activeTab === 'all' ? (hasMorePosts || hasMoreProducts) : activeTab === 'products' ? hasMoreProducts : hasMorePosts;
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
@@ -85,17 +179,49 @@ export default function FeedPage() {
       {/* Tabs */}
       <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1 -mx-1 px-1">
         {[{ key: 'all', label: 'Всё', icon: <Sparkles size={13} /> }, { key: 'products', label: 'Товары', icon: <Grid3X3 size={13} /> }, { key: 'posts', label: 'Посты', icon: <FileText size={13} /> }, { key: 'ads', label: 'Реклама', icon: <Megaphone size={13} /> }].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key as any)} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.key ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{tab.icon}{tab.label}</button>
+          <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.key ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{tab.icon}{tab.label}</button>
         ))}
       </div>
 
       {/* Content */}
       {loading ? (
-        <div className={viewMode==='grid'?'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5':'space-y-5'}>{Array.from({length:6}).map((_, idx)=><div key={idx} className="rounded-2xl overflow-hidden"><div className="skeleton h-52 rounded-2xl mb-3"/><div className="skeleton h-4 w-3/4 rounded-lg mb-2"/><div className="skeleton h-3 w-1/2 rounded-lg"/></div>)}</div>
+        <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5' : 'space-y-5'}>
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <div key={idx} className="rounded-2xl overflow-hidden">
+              <div className="skeleton h-52 rounded-2xl mb-3" />
+              <div className="skeleton h-4 w-3/4 rounded-lg mb-2" />
+              <div className="skeleton h-3 w-1/2 rounded-lg" />
+            </div>
+          ))}
+        </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-24"><div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/[0.04] flex items-center justify-center"><Search size={24} className="text-white/25"/></div><p className="text-white/50 text-sm">Ничего не найдено</p></div>
+        <div className="text-center py-24">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/[0.04] flex items-center justify-center"><Search size={24} className="text-white/25" /></div>
+          <p className="text-white/50 text-sm">Ничего не найдено</p>
+        </div>
       ) : (
-        <motion.div className={viewMode==='grid'?'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5':'space-y-5'} initial="hidden" animate="show" variants={{hidden:{},show:{transition:{staggerChildren:0.04}}}}>{items.map((item, _i)=><motion.div key={item.type+'-'+item.id} variants={{hidden:{opacity:0,y:20},show:{opacity:1,y:0}}}>{item.type==='post'?<PostCard post={item} onDelete={isAdmin?delPost:undefined}/>:<ProductCard product={item}/>}</motion.div>)}</motion.div>
+        <>
+          <motion.div
+            className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5' : 'space-y-5'}
+            initial="hidden"
+            animate="show"
+            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
+          >
+            {items.map((item) => (
+              <motion.div key={item.type + '-' + item.id} variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}>
+                {item.type === 'post' ? <PostCard post={item} onDelete={isAdmin ? delPost : undefined} /> : <ProductCard product={item} />}
+              </motion.div>
+            ))}
+          </motion.div>
+          
+          {/* Infinite scroll loader */}
+          <div ref={loaderRef} className="py-10 flex justify-center">
+            {loadingMore && <Loader2 size={24} className="animate-spin text-indigo-400" />}
+            {!showLoader && !loadingMore && items.length > 0 && (
+              <p className="text-white/30 text-sm">Все загружены</p>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

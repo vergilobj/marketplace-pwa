@@ -8,9 +8,7 @@ export default function PostsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getPosts()
-      .then(setPosts)
-      .finally(() => setLoading(false));
+    getPosts().then(res => setPosts(res.items || [])).finally(() => setLoading(false));
   }, []);
 
   return (

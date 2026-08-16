@@ -1,21 +1,34 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
+import { NowPaymentsProvider } from './nowpayments.provider';
 
 describe('PaymentsController', () => {
   let controller: PaymentsController;
   let service: any;
 
   const mockService = {
-    createPaymentForOrder: jest.fn(),
+    createPaymentForOrder: jest.fn().mockResolvedValue({
+      invoiceUrl: 'https://nowpayments.io/invoice/123',
+      transactionId: 'tx-1',
+      status: 'pending',
+    }),
     processSuccessfulPayment: jest.fn(),
     getAllTransactions: jest.fn(),
+  };
+
+  const mockNowPayments = {
+    verifyIpnSignature: jest.fn().mockReturnValue(true),
+    extractOrderId: jest.fn().mockReturnValue('order-1'),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PaymentsController],
-      providers: [{ provide: PaymentsService, useValue: mockService }],
+      providers: [
+        { provide: PaymentsService, useValue: mockService },
+        { provide: NowPaymentsProvider, useValue: mockNowPayments },
+      ],
     }).compile();
     controller = module.get<PaymentsController>(PaymentsController);
     service = mockService;
@@ -26,12 +39,11 @@ describe('PaymentsController', () => {
     expect(controller).toBeDefined();
   });
 
-  describe('processPayment', () => {
-    it('should process payment', async () => {
-      const result = await controller.processPayment('order-1');
-      expect(result.message).toBe('Payment processed');
+  describe('createInvoice', () => {
+    it('should create invoice for order', async () => {
+      const result = await controller.createInvoice('order-1');
+      expect(result).toHaveProperty('invoiceUrl');
       expect(service.createPaymentForOrder).toHaveBeenCalledWith('order-1');
-      expect(service.processSuccessfulPayment).toHaveBeenCalledWith('order-1');
     });
   });
 
@@ -56,6 +68,21 @@ describe('PaymentsController', () => {
         page: 1,
         limit: 20,
       });
+    });
+  });
+
+  describe('handleIpn', () => {
+    it('should reject invalid signature', async () => {
+      mockNowPayments.verifyIpnSignature.mockReturnValue(false);
+      const result = await controller.handleIpn({}, 'bad-sig');
+      expect(result).toEqual({ status: 'rejected', reason: 'invalid_signature' });
+    });
+
+    it('should process payment on finished status', async () => {
+      mockNowPayments.verifyIpnSignature.mockReturnValue(true);
+      const body = { order_id: 'order-1', payment_status: 'finished' };
+      await controller.handleIpn(body, 'valid-sig');
+      expect(service.processSuccessfulPayment).toHaveBeenCalledWith('order-1');
     });
   });
 });

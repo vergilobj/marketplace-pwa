@@ -2,14 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
-
-jest.mock('crypto', () => ({
-  createHmac: jest.fn().mockReturnValue({
-    update: jest.fn().mockReturnValue({
-      digest: jest.fn().mockReturnValue('mock-sig'),
-    }),
-  }),
-}));
+import { PrismaService } from '../common/prisma/prisma.service';
 
 describe('ChatController', () => {
   let controller: ChatController;
@@ -18,10 +11,11 @@ describe('ChatController', () => {
 
   beforeEach(async () => {
     svc = { moderateMessage: jest.fn() };
-    cfg = { get: jest.fn().mockReturnValue('secret') };
+    cfg = { getOrThrow: jest.fn().mockReturnValue('webhook-secret') };
     const mod: TestingModule = await Test.createTestingModule({
       controllers: [ChatController],
       providers: [
+        { provide: PrismaService, useValue: {} },
         { provide: ChatService, useValue: svc },
         { provide: ConfigService, useValue: cfg },
       ],
@@ -36,24 +30,24 @@ describe('ChatController', () => {
     svc.moderateMessage.mockResolvedValue({ action: 'allowed' });
     const r = await controller.handleWebhook(
       { id: '1', text: 'hi' } as any,
-      'mock-sig',
+      'webhook-secret',
     );
-    expect(r.action).toBe('allowed');
+    expect(r).toEqual({ action: 'allowed' });
+  });
+
+  it('rejects invalid sig', async () => {
+    const r = await controller.handleWebhook(
+      { id: '1', text: 'hi' } as any,
+      'wrong-secret',
+    );
+    expect(r).toEqual({ status: 'rejected', reason: 'invalid_signature' });
   });
 
   it('rejects missing sig', async () => {
-    await expect(
-      controller.handleWebhook(
-        { id: '1', text: 'hi' } as any,
-        undefined as any,
-      ),
-    ).rejects.toThrow('Missing webhook signature');
-  });
-
-  it('rejects missing secret', async () => {
-    cfg.get.mockReturnValue(undefined);
-    await expect(
-      controller.handleWebhook({ id: '1', text: 'hi' } as any, 'x'),
-    ).rejects.toThrow('Webhook secret not configured');
+    const r = await controller.handleWebhook(
+      { id: '1', text: 'hi' } as any,
+      undefined as any,
+    );
+    expect(r).toEqual({ status: 'rejected', reason: 'invalid_signature' });
   });
 });

@@ -20,8 +20,8 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      if (liked) { await api.post(`/social/posts/${post.id}/unlike`); setLikes((c: number) => c - 1); }
-      else { await api.post(`/social/posts/${post.id}/like`); setLikes((c: number) => c + 1); }
+      if (liked) { await api.delete(`/social/${post.id}/like`); setLikes((c: number) => c - 1); }
+      else { await api.post(`/social/${post.id}/like`); setLikes((c: number) => c + 1); }
       setLiked(!liked);
     } catch { toast.error('Не удалось'); }
   };

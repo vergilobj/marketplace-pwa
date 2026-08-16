@@ -44,6 +44,10 @@ cd frontend && npm ci && npm run build
 
 Цель: развернуть копию на новом домене за 1-2 часа.
 
+**Автоматический способ:** запустить `bash mirror-deploy.sh user@new-server new-domain.ru`
+
+### Ручной способ (если скрипт не подходит)
+
 ### Шаг 1: Клонировать код
 ```bash
 rsync -avz /opt/marketplace/ user@new-server:/opt/marketplace/

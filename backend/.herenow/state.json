@@ -1,0 +1,10 @@
+{
+  "publishes": {
+    "hearty-pumice-jsw3": {
+      "siteUrl": "https://hearty-pumice-jsw3.here.now/",
+      "claimToken": "5f279c6e4dd71cdaaa7be32ecb01b847881960313a82c95edb93dce38d89cbd1",
+      "claimUrl": "https://here.now/claim?slug=hearty-pumice-jsw3&token=5f279c6e4dd71cdaaa7be32ecb01b847881960313a82c95edb93dce38d89cbd1",
+      "expiresAt": "2026-07-20T16:11:37.614Z"
+    }
+  }
+}

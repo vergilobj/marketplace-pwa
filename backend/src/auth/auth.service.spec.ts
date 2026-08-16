@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CometChatService } from '../cometchat/cometchat.service';
+import { AuditService } from '../common/audit/audit.service';
 import {
   ConflictException,
   BadRequestException,
@@ -54,6 +55,7 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfig },
         { provide: CometChatService, useValue: mockCometChat },
+        { provide: AuditService, useValue: { log: jest.fn().mockResolvedValue({}) } },
       ],
     }).compile();
 

@@ -17,12 +17,46 @@ export class ProductsService {
     });
   }
 
-  async findAll(onlyActive = true) {
-    return this.prisma.product.findMany({
-      where: onlyActive ? { isActive: true } : {},
-      include: { seller: { select: { id: true, name: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(params: {
+    page?: number;
+    limit?: number;
+    sort?: string;
+    onlyActive?: boolean;
+  }) {
+    const page = params.page || 1;
+    const limit = params.limit || 20;
+    const skip = (page - 1) * limit;
+    const onlyActive = params.onlyActive !== false;
+
+    const orderBy: any[] = [];
+    switch (params.sort) {
+      case 'price_asc':
+        orderBy.push({ price: 'asc' });
+        break;
+      case 'price_desc':
+        orderBy.push({ price: 'desc' });
+        break;
+      case 'popular':
+        orderBy.push({ orders: { _count: 'desc' } });
+        break;
+      default:
+        orderBy.push({ createdAt: 'desc' });
+        break;
+    }
+
+    const where = onlyActive ? { isActive: true } : {};
+
+    const [items, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        include: { seller: { select: { id: true, name: true } } },
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+    return { items, total, page, pages: Math.ceil(total / limit) };
   }
 
   async findById(id: string) {

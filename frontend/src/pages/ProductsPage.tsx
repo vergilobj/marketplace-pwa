@@ -1,47 +1,116 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, ShoppingBag } from 'lucide-react';
+import { Plus, Loader2, Clock, Flame, TrendingUp } from 'lucide-react';
 import { getProducts } from '../api/products';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
+import ProductCard from '../components/ProductCard';
+import { useAuth } from '../hooks/useAuth';
+
+type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
+const PAGE_SIZE = 20;
+
+const sortOptions: { value: SortType; label: string; icon: React.ReactNode }[] = [
+  { value: 'newest', label: 'Новые', icon: <Clock size={14} /> },
+  { value: 'popular', label: 'Популярные', icon: <Flame size={14} /> },
+  { value: 'price_asc', label: 'Дешевле', icon: <TrendingUp size={14} /> },
+  { value: 'price_desc', label: 'Дороже', icon: <TrendingUp size={14} className="rotate-180" /> },
+];
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [sort, setSort] = useState<SortType>('newest');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const loaderRef = useRef<HTMLDivElement>(null);
+  const { isSeller } = useAuth();
+
+  const loadProducts = useCallback(async (pageNum: number, reset: boolean) => {
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
+    try {
+      const res = await getProducts({ page: pageNum, limit: PAGE_SIZE, sort });
+      if (reset) setProducts(res.items || []);
+      else setProducts(prev => [...prev, ...(res.items || [])]);
+      setHasMore(res.page < res.pages);
+      setPage(pageNum + 1);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [sort]);
 
   useEffect(() => {
-    getProducts()
-      .then(setProducts)
-      .finally(() => setLoading(false));
-  }, []);
+    setProducts([]);
+    setPage(1);
+    setHasMore(true);
+    loadProducts(1, true);
+  }, [sort, loadProducts]);
+
+  useEffect(() => {
+    const el = loaderRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !loading && !loadingMore && hasMore) {
+          loadProducts(page, false);
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [loading, loadingMore, hasMore, page, loadProducts]);
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Товары</h1>
-        <Link to="/products/new">
-          <Button variant="primary">
-            <Plus size={18} className="mr-2" /> Создать
-          </Button>
-        </Link>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <h1 className="text-2xl font-bold text-white">Товары</h1>
+        <div className="flex items-center gap-2">
+          {isSeller && (
+            <Link to="/products/new" className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 transition-all shadow-lg shadow-indigo-500/25">
+              <Plus size={16} /> Создать
+            </Link>
+          )}
+          <div className="flex items-center gap-1 p-1 bg-white/[0.04] rounded-2xl">
+            {sortOptions.map(opt => (
+              <button key={opt.value} onClick={() => setSort(opt.value)} className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${sort === opt.value ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{opt.icon}{opt.label}</button>
+            ))}
+          </div>
+        </div>
       </div>
-      {loading && <p className="text-center text-gray-500">Загрузка...</p>}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {products.map((p: any) => (
-          <Link to={`/products/${p.id}`} key={p.id}>
-            <Card className="hover:shadow-xl transition-shadow">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold text-lg">{p.title}</h3>
-                  <p className="text-gray-500 text-sm mt-1">{p.description}</p>
-                  <p className="mt-3 font-bold text-blue-600">{p.price.toLocaleString()} ₽</p>
-                </div>
-                <ShoppingBag className="w-5 h-5 text-gray-300" />
+
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="rounded-2xl bg-[#1a1a24] border border-white/[0.06] overflow-hidden">
+              <div className="skeleton h-40 w-full" />
+              <div className="p-3 space-y-2">
+                <div className="skeleton h-4 w-3/4 rounded-lg" />
+                <div className="skeleton h-3 w-1/2 rounded-lg" />
               </div>
-            </Card>
-          </Link>
-        ))}
-      </div>
+            </div>
+          ))}
+        </div>
+      ) : products.length === 0 ? (
+        <div className="text-center py-24">
+          <p className="text-white/40 text-sm">Товары не найдены</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {products.map(p => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+          <div ref={loaderRef} className="py-10 flex justify-center">
+            {loadingMore && <Loader2 size={24} className="animate-spin text-indigo-400" />}
+            {!hasMore && !loadingMore && products.length > 0 && (
+              <p className="text-white/30 text-sm">Все товары загружены</p>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

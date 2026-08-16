@@ -3,11 +3,11 @@ import { PaymentsService } from './payments.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { StubPaymentProvider } from './stub-payment.provider';
+import { NowPaymentsProvider } from './nowpayments.provider';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
-  let _prisma: any;
+  let prisma: any;
 
   const mockOrder = {
     id: 'order-1',
@@ -49,13 +49,22 @@ describe('PaymentsService', () => {
     createNotification: jest.fn().mockResolvedValue({}),
   };
 
+  const mockNowPayments = {
+    createPayment: jest.fn().mockResolvedValue({
+      success: true,
+      transactionId: 'np-tx-1',
+      status: 'pending',
+      raw: { invoice_url: 'https://nowpayments.io/invoice/123' },
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: SettingsService, useValue: mockSettings },
-        { provide: 'PAYMENT_PROVIDER', useClass: StubPaymentProvider },
+        { provide: NowPaymentsProvider, useValue: mockNowPayments },
         { provide: NotificationsService, useValue: mockNotifications },
       ],
     }).compile();
@@ -101,11 +110,12 @@ describe('PaymentsService', () => {
       );
     });
 
-    it('should create transaction record', async () => {
+    it('should create transaction and return invoice url', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(mockOrder);
       mockPrisma.order.update.mockResolvedValue({});
       mockPrisma.transaction.create.mockResolvedValue({});
       const result = await service.createPaymentForOrder('order-1');
+      expect(result).toHaveProperty('invoiceUrl');
       expect(result).toHaveProperty('transactionId');
       expect(mockPrisma.transaction.create).toHaveBeenCalled();
     });

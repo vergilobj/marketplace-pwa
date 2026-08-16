@@ -35,7 +35,10 @@ model User {
   comments       Comment[]
   notifications  Notification[]
   withdrawalRequests WithdrawalRequest[]
+  sentMessages     ChatMessage[]    @relation("Sender")
+  receivedMessages ChatMessage[]    @relation("Receiver")
   avatar        String?
+  auditLogs     AuditLog[]
 }
 
 enum UserRole {
@@ -185,4 +188,32 @@ model WithdrawalRequest {
   status    String   @default("pending") // pending, approved, rejected
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  senderId  String
+  sender    User     @relation("Sender", fields: [senderId], references: [id])
+  receiverId String
+  receiver  User     @relation("Receiver", fields: [receiverId], references: [id])
+  text      String?
+  fileUrl   String?
+  fileName  String?
+  fileType  String?
+  fileSize  Int?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String   // 'login', 'register', 'create_order', 'delete_post', etc.
+  entity    String?  // 'user', 'order', 'post', 'product'
+  entityId  String?
+  ip        String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
 }

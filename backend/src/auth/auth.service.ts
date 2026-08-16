@@ -11,6 +11,7 @@ import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CometChatService } from '../cometchat/cometchat.service';
+import { AuditService } from '../common/audit/audit.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -23,6 +24,7 @@ export class AuthService {
     private jwtService: JwtService,
     private config: ConfigService,
     private cometChatService: CometChatService,
+    private auditService: AuditService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -75,6 +77,13 @@ export class AuthService {
       );
     }
 
+    await this.auditService.log({
+      userId: user.id,
+      action: 'register',
+      entity: 'user',
+      entityId: user.id,
+    });
+
     return this.generateTokens(user);
   }
 
@@ -82,14 +91,28 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { phone: dto.phone },
     });
-    if (!user || !user.passwordHash)
-      throw new UnauthorizedException('Invalid credentials');
 
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    // Constant-time check to prevent user enumeration
+    const dummyHash =
+      '$2b$10$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const hash = user?.passwordHash || dummyHash;
+    const valid = await bcrypt.compare(dto.password, hash);
 
-    // Синхронизировать всех отсутствующих пользователей с CometChat
-    await this.syncAllUsersWithCometChat();
+    if (!user || !valid) {
+      throw new UnauthorizedException('Invalid phone or password');
+    }
+
+    await this.auditService.log({
+      userId: user.id,
+      action: 'login',
+      entity: 'user',
+      entityId: user.id,
+    });
+
+    // Sync missing users with CometChat (fire-and-forget — don't block login)
+    this.syncAllUsersWithCometChat().catch((err) =>
+      this.logger.warn('Background sync failed', err),
+    );
 
     return this.generateTokens(user);
   }

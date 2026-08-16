@@ -4,9 +4,10 @@ import { PostsService } from './posts.service';
 import { SettingsModule } from '../settings/settings.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [SettingsModule, PaymentsModule, AuthModule],
+  imports: [SettingsModule, PaymentsModule, AuthModule, NotificationsModule],
   controllers: [PostsController],
   providers: [PostsService],
 })

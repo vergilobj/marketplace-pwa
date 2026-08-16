@@ -35,14 +35,18 @@ describe('PostsController', () => {
   describe('feed', () => {
     it('should return feed with userId', async () => {
       service.getFeed.mockResolvedValue([]);
-      await controller.feed({ user: { userId: 'user-1' } });
-      expect(service.getFeed).toHaveBeenCalledWith('user-1');
+      await controller.feed(undefined, { user: { userId: 'user-1' } });
+      expect(service.getFeed).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1' }),
+      );
     });
 
     it('should return feed without user', async () => {
       service.getFeed.mockResolvedValue([]);
-      await controller.feed({ user: undefined });
-      expect(service.getFeed).toHaveBeenCalledWith(undefined);
+      await controller.feed(undefined, { user: undefined });
+      expect(service.getFeed).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: undefined }),
+      );
     });
   });
 

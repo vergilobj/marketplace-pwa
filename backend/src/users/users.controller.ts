@@ -12,6 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { AuthenticatedRequest } from '../common/types/authenticated-request.interface';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UsersService } from './users.service';
@@ -21,6 +22,12 @@ import { UserRole } from '@prisma/client';
 @Controller('users')
 export class UsersController {
   constructor(private usersService: UsersService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Get('search')
+  async searchByPhone(@Query('phone') phone: string) {
+    return this.usersService.findByPhone(phone);
+  }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
@@ -150,5 +157,14 @@ export class UsersController {
   async batchApprove(@Body() body: { userIds: string[] }) {
     await this.usersService.batchApprove(body.userIds);
     return { message: 'Users approved' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  async getUserById(@Param('id') id: string) {
+    const user = await this.usersService.findById(id);
+    if (!user) throw new NotFoundException('User not found');
+    const { passwordHash: _ph, ...result } = user;
+    return result;
   }
 }

@@ -12,7 +12,7 @@ export default function FavoritesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getProducts().then(all => setProducts(all.filter((p: any) => favorites.includes(p.id)))).finally(() => setLoading(false));
+    getProducts({ limit: 2000 }).then(res => setProducts((res.items || []).filter((p: any) => favorites.includes(p.id)))).finally(() => setLoading(false));
   }, [favorites]);
 
   if (loading) return <div className="flex justify-center py-32"><div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 animate-pulse" /></div>;

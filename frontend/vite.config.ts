@@ -48,7 +48,7 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-    // Разрешаем любые поддомены ngrok-free.app
-    allowedHosts: ['.ngrok-free.app'],
+    // Разрешаем любые поддомены туннелей
+    allowedHosts: ['.ngrok-free.app', '.run.pinggy-free.link', '.trycloudflare.com'],
   },
 });

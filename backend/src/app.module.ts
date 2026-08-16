@@ -16,6 +16,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { SettingsModule } from './settings/settings.module';
 import { UploadModule } from './upload/upload.module';
 import { AdminModule } from './admin/admin.module';
+import { AuditModule } from './common/audit/audit.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AdminModule } from './admin/admin.module';
     SettingsModule,
     UploadModule,
     AdminModule,
+    AuditModule,
   ],
   providers: [
     {

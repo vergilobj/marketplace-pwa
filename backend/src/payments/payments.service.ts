@@ -1,8 +1,8 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
-import { PaymentProvider } from './payment.provider';
-import { NotificationsService } from '../notifications/notifications.service'; // добавлено
+import { NowPaymentsProvider } from './nowpayments.provider';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PaymentsService {
@@ -11,8 +11,8 @@ export class PaymentsService {
   constructor(
     private prisma: PrismaService,
     private settingsService: SettingsService,
-    @Inject('PAYMENT_PROVIDER') private paymentProvider: PaymentProvider,
-    private notificationsService: NotificationsService, // добавлено
+    private nowPayments: NowPaymentsProvider,
+    private notificationsService: NotificationsService,
   ) {}
 
   async createPaymentForOrder(orderId: string) {
@@ -23,6 +23,7 @@ export class PaymentsService {
     if (order.status !== 'PENDING')
       throw new Error('Order already paid or cancelled');
 
+    // Calculate split fees if not already set
     if (
       order.productId !== null &&
       order.platformFee === 0 &&
@@ -40,26 +41,28 @@ export class PaymentsService {
       });
     }
 
-    const result = await this.paymentProvider.createPayment(
-      order.amount,
-      order.id,
-    );
-    await this.prisma.order.update({
-      where: { id: order.id },
-      data: { transactionId: result.transactionId },
+    // Create invoice via NowPayments
+    const result = await this.nowPayments.createPayment(order.amount, order.id, {
+      currency: 'usd',
+      description: `Order ${order.id}`,
     });
 
+    // Store transaction
     await this.prisma.transaction.create({
       data: {
         orderId: order.id,
         type: 'payment',
         amount: order.amount,
-        status: result.status,
+        status: 'pending',
         payload: result.raw,
       },
     });
 
-    return { transactionId: result.transactionId, status: result.status };
+    return {
+      invoiceUrl: result.raw?.invoice_url,
+      transactionId: result.transactionId,
+      status: result.status,
+    };
   }
 
   async processSuccessfulPayment(orderId: string) {
@@ -69,13 +72,13 @@ export class PaymentsService {
     });
     if (!order || order.status !== 'PENDING') return;
 
-    // Обновляем статус заказа
+    // Update order status
     await this.prisma.order.update({
       where: { id: orderId },
       data: { status: 'PAID', paidAt: new Date() },
     });
 
-    // Создаём транзакции сплитования
+    // Create split transactions
     await this.prisma.transaction.createMany({
       data: [
         {
@@ -103,13 +106,12 @@ export class PaymentsService {
       ],
     });
 
-    // Начисление реферальных бонусов на баланс
+    // Credit referral bonus
     if (order.referralUserId && order.referralBonus > 0) {
       await this.prisma.user.update({
         where: { id: order.referralUserId },
         data: { bonusBalance: { increment: order.referralBonus } },
       });
-      // Уведомление рефералу
       await this.notificationsService.createNotification(
         order.referralUserId,
         'referral',

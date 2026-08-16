@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { AuthenticatedRequest } from '../common/types/authenticated-request.interface';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -24,8 +25,18 @@ export class PostsController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get('feed')
-  async feed(@Request() req: AuthenticatedRequest) {
-    return this.postsService.getFeed(req.user?.userId);
+  async feed(
+    @Request() req: AuthenticatedRequest,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sort') sort?: string,
+  ) {
+    return this.postsService.getFeed({
+      userId: req.user?.userId,
+      page: Number(page) || 1,
+      limit: Number(limit) || 20,
+      sort: sort || 'newest',
+    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -49,8 +60,16 @@ export class PostsController {
   }
 
   @Get()
-  async findAll() {
-    return this.postsService.findAll();
+  async findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sort') sort?: string,
+  ) {
+    return this.postsService.findAll({
+      page: Number(page) || 1,
+      limit: Number(limit) || 20,
+      sort: sort || 'newest',
+    });
   }
 
   @Get(':id')
