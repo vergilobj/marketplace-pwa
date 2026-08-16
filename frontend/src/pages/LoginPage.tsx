@@ -3,8 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { login } from '../api/auth';
 import { LogIn, ArrowLeft, Sparkles } from 'lucide-react';
-import { CometChat } from '@cometchat/chat-sdk-javascript';
-const COMETCHAT_AUTH_KEY = import.meta.env.VITE_COMETCHAT_AUTH_KEY || '';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -18,7 +16,6 @@ export default function LoginPage() {
       const { accessToken, refreshToken } = await login(form.phone, form.password);
       localStorage.setItem('accessToken', accessToken); localStorage.setItem('refreshToken', refreshToken);
       const payload = JSON.parse(atob(accessToken.split('.')[1])); localStorage.setItem('userId', payload.sub);
-      try { await CometChat.login(payload.sub, COMETCHAT_AUTH_KEY); } catch { /* CometChat login failed, non-blocking */ }
       navigate('/');
     } catch (err: any) { setError(err.response?.data?.message || 'Ошибка входа'); } finally { setLoading(false); }
   };

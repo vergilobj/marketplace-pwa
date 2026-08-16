@@ -4,15 +4,6 @@ import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id: string) {
-          if (id.includes('@cometchat')) return 'cometchat';
-        },
-      },
-    },
-  },
   plugins: [
     react(),
     tailwindcss(),
@@ -45,6 +36,11 @@ export default defineConfig({
       },
       '/uploads': {
         target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/socket.io': {
+        target: 'http://localhost:3000',
+        ws: true,
         changeOrigin: true,
       },
     },

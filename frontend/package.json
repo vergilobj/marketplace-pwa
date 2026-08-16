@@ -12,7 +12,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@cometchat/chat-uikit-react": "^6.4.3",
     "axios": "^1.16.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.38.0",

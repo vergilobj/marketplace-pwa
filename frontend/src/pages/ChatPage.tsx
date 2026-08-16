@@ -1,9 +1,17 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
-import { Search, Send, ArrowLeft, Paperclip, Plus, X, UserPlus } from 'lucide-react';
+import { Search, Send, ArrowLeft, Paperclip, Plus, X, UserPlus, Flag } from 'lucide-react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
+import {
+  getOrCreateIdentityKey,
+  exportPublicKeyRaw,
+  importPeerPublicKey,
+  deriveSharedKey,
+  encryptMessage,
+  decryptMessage,
+} from '../utils/crypto';
 
 interface Conversation {
   userId: string;
@@ -18,6 +26,7 @@ interface Message {
   senderId: string;
   receiverId: string;
   text?: string;
+  ciphertext?: string;
   fileUrl?: string;
   fileName?: string;
   fileType?: string;
@@ -25,6 +34,8 @@ interface Message {
   createdAt: string;
   sender?: { id: string; name: string };
 }
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 
 export default function ChatPage() {
   const navigate = useNavigate();
@@ -49,8 +60,11 @@ export default function ChatPage() {
   const [uploading, setUploading] = useState(false);
   const [newChatPhone, setNewChatPhone] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
+  const [stopWords, setStopWords] = useState<string[]>([]);
+  const [detectContacts, setDetectContacts] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sharedKeyCache = useRef<Map<string, CryptoKey>>(new Map());
 
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
@@ -63,35 +77,73 @@ export default function ChatPage() {
     if (!userId) { navigate('/login'); return; }
   }, [userId]);
 
+  // Publish identity public key + load moderation rules on mount
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      try {
+        const kp = await getOrCreateIdentityKey();
+        const pub = await exportPublicKeyRaw(kp.publicKey);
+        await api.post('/chat/keys', { publicKey: pub });
+      } catch (err) {
+        console.error('Failed to publish chat public key', err);
+      }
+      try {
+        const { data } = await api.get('/chat/moderation-rules');
+        setStopWords(data.stopWords || []);
+        setDetectContacts(data.detectContacts !== false);
+      } catch (err) {
+        console.error('Failed to load moderation rules', err);
+      }
+    })();
+  }, [userId]);
+
+  const loadConversations = useCallback(async () => {
+    try {
+      const { data } = await api.get('/chat/conversations');
+      setConversations(data);
+      setLoading(false);
+      return data;
+    } catch { setLoading(false); return []; }
+  }, []);
+
   // Socket connection
   useEffect(() => {
     if (!userId) return;
-    const s = io('http://localhost:3000', { query: { userId } });
+    const s = io(SOCKET_URL, {
+      path: '/socket.io',
+      auth: { token: localStorage.getItem('accessToken') },
+      transports: ['websocket', 'polling'],
+    });
     setSocket(s);
 
     s.on('connect', () => console.log('Socket connected'));
 
     s.on('newMessage', (msg: Message) => {
       const partnerId = msg.senderId === userId ? msg.receiverId : msg.senderId;
-      if (selectedUser && selectedUser.userId === partnerId) {
-        setMessages(prev => [...prev, msg]);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-        s.emit('markRead', { senderId: msg.senderId });
-      }
-      loadConversations();
+      decryptIncoming(msg).then((decrypted) => {
+        if (selectedUser && selectedUser.userId === partnerId) {
+          setMessages(prev => [...prev, decrypted]);
+          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+          s.emit('markRead', { senderId: msg.senderId });
+        }
+        loadConversations();
+      });
     });
 
     s.on('messageSent', (msg: Message) => {
-      if (selectedUser && (msg.receiverId === selectedUser.userId || msg.senderId === selectedUser.userId)) {
-        setMessages(prev => [...prev, msg]);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-      }
-      loadConversations();
+      decryptIncoming(msg).then((decrypted) => {
+        if (selectedUser && (msg.receiverId === selectedUser.userId || msg.senderId === selectedUser.userId)) {
+          setMessages(prev => [...prev, decrypted]);
+          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        }
+        loadConversations();
+      });
     });
 
     loadConversations();
     return () => { s.disconnect(); };
-  }, [userId, selectedUser?.userId]);
+  }, [userId, selectedUser?.userId, loadConversations]);
 
   // Auto-open chat from product page
   useEffect(() => {
@@ -108,13 +160,50 @@ export default function ChatPage() {
     navigate('/chat', { replace: true });
   }, [targetUid]);
 
-  const loadConversations = async () => {
+  const ensureSharedKey = async (peerId: string): Promise<CryptoKey | null> => {
+    const cached = sharedKeyCache.current.get(peerId);
+    if (cached) return cached;
     try {
-      const { data } = await api.get('/chat/conversations');
-      setConversations(data);
-      setLoading(false);
-      return data;
-    } catch { setLoading(false); return []; }
+      const kp = await getOrCreateIdentityKey();
+      const { data } = await api.get(`/chat/keys/${peerId}`);
+      if (!data.publicKey) {
+        toast.error('Собеседник ещё не активировал шифрование');
+        return null;
+      }
+      const peerPub = await importPeerPublicKey(data.publicKey);
+      const key = await deriveSharedKey(kp.privateKey, peerPub);
+      sharedKeyCache.current.set(peerId, key);
+      return key;
+    } catch {
+      toast.error('Не удалось получить ключ собеседника');
+      return null;
+    }
+  };
+
+  const hasStopWord = (text: string): boolean => {
+    const lower = text.toLowerCase();
+    return stopWords.some((word: string) => lower.includes(word.toLowerCase()));
+  };
+
+  const hasContact = (text: string): boolean => {
+    const contactRegex =
+      /(?:\+?\d{10,})|(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})|(?:https?:\/\/\S+)/gi;
+    return contactRegex.test(text);
+  };
+
+  const decryptIncoming = async (msg: Message): Promise<Message> => {
+    if (!msg.ciphertext) {
+      // legacy plaintext message
+      return msg;
+    }
+    const peerId = msg.senderId === userId ? msg.receiverId : msg.senderId;
+    const key = await ensureSharedKey(peerId);
+    if (!key) return { ...msg, text: '[Не удалось расшифровать]' };
+    try {
+      return { ...msg, text: await decryptMessage(msg.ciphertext, key) };
+    } catch {
+      return { ...msg, text: '[Ошибка расшифровки]' };
+    }
   };
 
   const startNewChat = async () => {
@@ -138,8 +227,9 @@ export default function ChatPage() {
     setSelectedUser(user);
     try {
       const { data } = await api.get(`/chat/messages/${user.userId}?limit=50`);
-      const msgs = data.items || [];
-      setMessages(msgs);
+      const msgs: Message[] = data.items || [];
+      const decrypted = await Promise.all(msgs.map(decryptIncoming));
+      setMessages(decrypted);
     } catch {
       setMessages([]);
     }
@@ -147,11 +237,33 @@ export default function ChatPage() {
 
   const sendMessage = async () => {
     if (!messageText.trim() || !selectedUser || !socket) return;
+
+    const text = messageText.trim();
+
+    // Клиентская модерация ДО шифрования
+    if (hasStopWord(text) || (detectContacts && hasContact(text))) {
+      toast.error('Сообщение содержит запрещённый контент');
+      return;
+    }
+
+    const key = await ensureSharedKey(selectedUser.userId);
+    if (!key) return;
+
+    const ciphertext = await encryptMessage(text, key);
     socket.emit('sendMessage', {
       receiverId: selectedUser.userId,
-      text: messageText.trim(),
+      ciphertext,
     });
     setMessageText('');
+  };
+
+  const reportMessage = async (msg: Message) => {
+    try {
+      await api.post('/chat/report', { messageId: msg.id });
+      toast.success('Жалоба отправлена');
+    } catch {
+      toast.error('Не удалось отправить жалобу');
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -216,7 +328,7 @@ export default function ChatPage() {
                   value={newChatPhone}
                   onChange={e => setNewChatPhone(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && startNewChat()}
-                  placeholder="+79000000000"
+                  placeholder="+790****0000"
                   className="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-indigo-500/40"
                 />
                 <button
@@ -315,6 +427,7 @@ export default function ChatPage() {
             {messages.map((msg) => {
               const isMine = msg.senderId === userId;
               const time = formatTime(msg.createdAt);
+              const isLegacy = !msg.ciphertext && !!msg.text;
               return (
                 <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[72%] group`}>
@@ -329,6 +442,11 @@ export default function ChatPage() {
                       }`}>
                         {msg.text}
                       </div>
+                    )}
+                    {isLegacy && (
+                      <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400/80 text-[10px] font-medium">
+                        незашифрованное (история)
+                      </span>
                     )}
                     {msg.fileUrl && (
                       <div className={`px-4 py-2.5 rounded-2xl ${isMine ? 'bg-indigo-500 text-white rounded-br-md' : 'bg-[#1e1e2a] text-white/90 rounded-bl-md'}`}>
@@ -350,7 +468,18 @@ export default function ChatPage() {
                         )}
                       </div>
                     )}
-                    <p className={`text-[10px] text-white/20 mt-0.5 px-1 ${isMine ? 'text-right' : 'text-left'}`}>{time}</p>
+                    <div className={`flex items-center gap-1.5 mt-0.5 px-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                      {!isMine && (
+                        <button
+                          onClick={() => reportMessage(msg)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-white/25 hover:text-red-400"
+                          title="Пожаловаться"
+                        >
+                          <Flag size={11} />
+                        </button>
+                      )}
+                      <p className="text-[10px] text-white/20">{time}</p>
+                    </div>
                   </div>
                 </div>
               );
