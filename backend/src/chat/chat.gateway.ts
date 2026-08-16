@@ -12,6 +12,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { ChatService } from './chat.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 @WebSocketGateway({ cors: { origin: '*' } })
@@ -24,6 +26,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private chatService: ChatService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -47,6 +51,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userId = payload.sub;
     client.data.userId = userId;
     this.onlineUsers.set(userId, client.id);
+    this.chatService.setOnline(userId, true);
+    this.server.emit('userStatus', { userId, online: true });
     this.logger.log(`User ${userId} connected (socket ${client.id})`);
   }
 
@@ -54,6 +60,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     for (const [uid, sid] of this.onlineUsers) {
       if (sid === client.id) {
         this.onlineUsers.delete(uid);
+        this.chatService.setOnline(uid, false);
+        this.server.emit('userStatus', { userId: uid, online: false });
         this.logger.log(`User ${uid} disconnected`);
         break;
       }
@@ -66,6 +74,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody()
     data: {
       receiverId: string;
+      text?: string;
       ciphertext?: string;
       file?: { url: string; name: string; type: string; size: number };
     },
@@ -73,13 +82,28 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userId = client.data.userId as string;
     if (!userId) return;
 
+    const text = data.text?.trim();
+    if (!text) {
+      return { error: 'text_required', reason: 'Текст обязателен' };
+    }
+
+    // Серверная модерация ДО сохранения
+    const moderation = await this.chatService.moderate(text);
+    if (moderation.blocked) {
+      client.emit('messageError', {
+        error: 'moderated',
+        reason: moderation.reason,
+      });
+      return { error: 'moderated', reason: moderation.reason };
+    }
+
     // Save to DB
     const msg = await this.prisma.chatMessage.create({
       data: {
         senderId: userId,
         receiverId: data.receiverId,
+        text,
         ciphertext: data.ciphertext ?? null,
-        text: null,
         fileUrl: data.file?.url || null,
         fileName: data.file?.name || null,
         fileType: data.file?.type || null,
@@ -94,6 +118,32 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const receiverSocketId = this.onlineUsers.get(data.receiverId);
     if (receiverSocketId) {
       this.server.to(receiverSocketId).emit('newMessage', msg);
+    } else {
+      // Офлайн — push + внутреннее уведомление
+      try {
+        await this.notificationsService.createNotification(
+          data.receiverId,
+          'chat',
+          text,
+          msg.id,
+        );
+        try {
+          await this.notificationsService.sendToUser(
+            data.receiverId,
+            { en: 'Новое сообщение' },
+            { en: `${msg.sender?.name || userId}: ${text}` },
+            { screen: 'chat', senderId: userId },
+          );
+        } catch (err) {
+          this.logger.warn(
+            `Push failed for user ${data.receiverId}: ${err.message}`,
+          );
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Offline chat notification failed: ${err.message}`,
+        );
+      }
     }
 
     // Send back to sender for confirmation

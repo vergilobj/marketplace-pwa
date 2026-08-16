@@ -47,6 +47,7 @@ describe('PaymentsService', () => {
   };
   const mockNotifications = {
     createNotification: jest.fn().mockResolvedValue({}),
+    sendToUser: jest.fn().mockResolvedValue(null),
   };
 
   const mockNowPayments = {

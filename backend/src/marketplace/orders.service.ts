@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
@@ -13,6 +14,8 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
@@ -55,13 +58,40 @@ export class OrdersService {
     await this.paymentsService.createPaymentForOrder(order.id);
     await this.paymentsService.processSuccessfulPayment(order.id);
 
-    // Уведомление продавцу
+    // Уведомления покупателю и продавцу + push
+    const heading = { en: 'Новый заказ' };
+    const buyerContents = { en: `Ваш заказ на сумму ${amount} ₽ создан` };
+    const sellerContents = { en: `Новый заказ на сумму ${amount} ₽` };
+
     await this.notificationsService.createNotification(
       product.sellerId,
       'order',
-      `Новый заказ на сумму ${amount} ₽`,
+      sellerContents.en,
       order.id,
     );
+    await this.notificationsService.createNotification(
+      buyerId,
+      'order',
+      buyerContents.en,
+      order.id,
+    );
+
+    try {
+      await this.notificationsService.sendToUser(
+        product.sellerId,
+        heading,
+        sellerContents,
+        { screen: 'orders', orderId: order.id },
+      );
+      await this.notificationsService.sendToUser(
+        buyerId,
+        heading,
+        buyerContents,
+        { screen: 'orders', orderId: order.id },
+      );
+    } catch (err) {
+      this.logger.warn(`Push for order ${order.id} failed: ${err.message}`);
+    }
 
     await this.auditService.log({
       userId: buyerId,

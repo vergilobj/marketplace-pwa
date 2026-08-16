@@ -71,6 +71,12 @@ export class ChatController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('status/:userId')
+  async getStatus(@Param('userId') userId: string) {
+    return { online: this.chatService.getOnlineStatus(userId) };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('messages/:userId')
   async getMessages(
     @Request() req: AuthenticatedRequest,

@@ -5,18 +5,20 @@ import { PrismaService } from '../common/prisma/prisma.service';
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
-  private readonly appId: string;
-  private readonly apiKey: string;
+  private readonly appId: string | undefined;
+  private readonly apiKey: string | undefined;
   private readonly baseUrl = 'https://onesignal.com/api/v1';
 
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
   ) {
-    this.appId = this.configService.getOrThrow<string>('ONESIGNAL_APP_ID');
-    this.apiKey = this.configService.getOrThrow<string>(
-      'ONESIGNAL_REST_API_KEY',
-    );
+    this.appId = this.configService.get<string>('ONESIGNAL_APP_ID');
+    this.apiKey = this.configService.get<string>('ONESIGNAL_REST_API_KEY');
+  }
+
+  private get hasKeys(): boolean {
+    return Boolean(this.appId && this.apiKey);
   }
 
   // ================== Внутренние уведомления ==================
@@ -67,6 +69,10 @@ export class NotificationsService {
     contents: Record<string, string>,
     data?: any,
   ) {
+    if (!this.hasKeys) {
+      this.logger.warn('OneSignal keys missing — push skipped');
+      return null;
+    }
     const body = {
       app_id: this.appId,
       included_segments: ['All'],
@@ -83,6 +89,10 @@ export class NotificationsService {
     contents: Record<string, string>,
     data?: any,
   ) {
+    if (!this.hasKeys) {
+      this.logger.warn('OneSignal keys missing — push skipped');
+      return null;
+    }
     const body = {
       app_id: this.appId,
       include_external_user_ids: [userId],

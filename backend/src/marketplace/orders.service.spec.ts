@@ -56,6 +56,7 @@ describe('OrdersService', () => {
   };
   const mockNotifications = {
     createNotification: jest.fn().mockResolvedValue({}),
+    sendToUser: jest.fn().mockResolvedValue(null),
   };
   const mockAudit = { log: jest.fn().mockResolvedValue({}) };
 

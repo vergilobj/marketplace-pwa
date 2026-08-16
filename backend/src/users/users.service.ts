@@ -1,14 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserRole } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async findById(id: string) {
@@ -85,6 +89,36 @@ export class UsersService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /**
+   * Начисление реферального бонуса + внутренняя Notification + push (graceful).
+   */
+  async creditReferralBonus(userId: string, amount: number, orderId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { bonusBalance: { increment: amount } },
+    });
+
+    await this.notificationsService.createNotification(
+      userId,
+      'referral',
+      `Начислен реферальный бонус: ${amount} ₽`,
+      orderId,
+    );
+
+    try {
+      await this.notificationsService.sendToUser(
+        userId,
+        { en: 'Реферальный бонус' },
+        { en: `Начислен реферальный бонус: ${amount} ₽` },
+        { screen: 'balance' },
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Referral push for ${userId} failed: ${err.message}`,
+      );
+    }
   }
 
   // ====== Статистика ======

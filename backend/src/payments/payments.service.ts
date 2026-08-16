@@ -118,6 +118,18 @@ export class PaymentsService {
         `Начислен реферальный бонус: ${order.referralBonus} ₽`,
         orderId,
       );
+      try {
+        await this.notificationsService.sendToUser(
+          order.referralUserId,
+          { en: 'Реферальный бонус' },
+          { en: `Начислен реферальный бонус: ${order.referralBonus} ₽` },
+          { screen: 'balance' },
+        );
+      } catch (err) {
+        this.logger.warn(
+          `Referral push for ${order.referralUserId} failed: ${err.message}`,
+        );
+      }
     }
 
     this.logger.log(`Order ${orderId} processed successfully with splits.`);
