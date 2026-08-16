@@ -24,6 +24,7 @@ export class SettingsService {
   }
 
   async getAll() {
-    return this.prisma.setting.findMany();
+    const rows = await this.prisma.setting.findMany();
+    return Object.fromEntries(rows.map((r) => [r.key, r.value]));
   }
 }

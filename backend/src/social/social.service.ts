@@ -5,12 +5,14 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { AuditService } from '../common/audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SocialService {
   constructor(
     private prisma: PrismaService,
+    private auditService: AuditService,
     private notificationsService: NotificationsService,
   ) {}
 
@@ -68,6 +70,12 @@ export class SocialService {
         postId,
       );
     }
+    await this.auditService.log({
+      userId,
+      action: 'comment_created',
+      entity: 'comment',
+      entityId: comment.id,
+    });
     return comment;
   }
 
@@ -92,11 +100,18 @@ export class SocialService {
     if (comment.userId !== userId && userRole !== 'ADMIN') {
       throw new ForbiddenException('You can only edit your own comments');
     }
-    return this.prisma.comment.update({
+    const updated = await this.prisma.comment.update({
       where: { id: commentId },
       data: { text },
       include: { user: { select: { id: true, name: true } } },
     });
+    await this.auditService.log({
+      userId,
+      action: 'comment_updated',
+      entity: 'comment',
+      entityId: commentId,
+    });
+    return updated;
   }
 
   async deleteComment(commentId: string, userId: string, userRole: string) {
@@ -108,6 +123,12 @@ export class SocialService {
       throw new ForbiddenException('You can only delete your own comments');
     }
     await this.prisma.comment.delete({ where: { id: commentId } });
+    await this.auditService.log({
+      userId,
+      action: 'comment_deleted',
+      entity: 'comment',
+      entityId: commentId,
+    });
     return { deleted: true };
   }
 }

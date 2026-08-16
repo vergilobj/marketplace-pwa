@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { AuditService } from '../common/audit/audit.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserRole } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditService: AuditService,
+  ) {}
 
   async findById(id: string) {
     return this.prisma.user.findUnique({ where: { id } });
@@ -46,7 +50,14 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, dto: UpdateUserDto) {
-    return this.prisma.user.update({ where: { id: userId }, data: dto });
+    const updated = await this.prisma.user.update({ where: { id: userId }, data: dto });
+    await this.auditService.log({
+      userId,
+      action: 'profile_updated',
+      entity: 'user',
+      entityId: userId,
+    });
+    return updated;
   }
 
   async getReferrals(userId: string) {
@@ -167,23 +178,41 @@ export class UsersService {
   }
 
   async changeRole(userId: string, newRole: UserRole) {
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id: userId },
       data: { role: newRole },
     });
+    await this.auditService.log({
+      action: 'role_changed',
+      entity: 'user',
+      entityId: userId,
+    });
+    return updated;
   }
 
   async batchChangeRole(userIds: string[], newRole: UserRole) {
-    await this.prisma.user.updateMany({
+    const result = await this.prisma.user.updateMany({
       where: { id: { in: userIds } },
       data: { role: newRole },
     });
+    await this.auditService.log({
+      action: 'batch_role',
+      entity: 'user',
+      metadata: { userIds, newRole, count: result.count },
+    });
+    return result;
   }
 
   async batchApprove(userIds: string[]) {
-    await this.prisma.user.updateMany({
+    const result = await this.prisma.user.updateMany({
       where: { id: { in: userIds }, isApproved: false },
       data: { isApproved: true },
     });
+    await this.auditService.log({
+      action: 'batch_approve',
+      entity: 'user',
+      metadata: { userIds, count: result.count },
+    });
+    return result;
   }
 }

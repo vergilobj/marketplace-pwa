@@ -76,7 +76,7 @@ describe('SettingsService', () => {
       mockPrisma.setting.findMany.mockResolvedValue([
         { key: 'k1', value: 'v1' },
       ]);
-      expect(await service.getAll()).toHaveLength(1);
+      expect(await service.getAll()).toEqual({ k1: 'v1' });
     });
   });
 });

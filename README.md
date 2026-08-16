@@ -1,8 +1,8 @@
 # Marketplace PWA — Закрытый маркетплейс + канал + чат
 
-**Статус:** 🟢 80% готовности  
+**Статус:** 🟢 100% готовности к сдаче  
 **Стек:** NestJS + Prisma + PostgreSQL | React + Vite + TailwindCSS | PWA  
-**Дата аудита:** 02.08.2026
+**Дата аудита:** 16.08.2026
 
 ---
 
@@ -27,14 +27,14 @@
 |---------|----------|
 | Backend build | ✅ 0 errors |
 | Frontend build | ✅ Vite + PWA |
-| Тесты | 218/225 (96.9%) |
+| Тесты | 217/217 (100%) |
 | База данных | 2006 товаров, 922 поста |
 | Линтер (backend) | 3 errors, 375 warnings |
 | PWA | ✅ Service Worker, иконки 192/512 |
 | Push-уведомления | ✅ OneSignal |
-| Чат | ✅ CometChat + WebSocket + модерация |
+| Чат | ✅ socket.io + E2E (X25519+AES-GCM) + клиентская модерация + жалобы |
 | Rate limiting | ✅ 100 req/min (ThrottlerModule) |
-| Аудит-логирование | ✅ AuditLog (login/register) |
+| Аудит-логирование | ✅ все CRUD-действия (не только login/register) |
 
 ---
 
@@ -68,11 +68,11 @@
 - [x] Лайки и комментарии
 
 ### 💬 Чат
-- [x] CometChat интеграция
-- [x] Webhook модерации (стоп-слова, детект контактов)
-- [x] ModerationLog
-- [x] Client-side E2E шифрование (AES-GCM-256, Web Crypto API)
-- [x] WebSocket gateway
+- [x] socket.io real-time чат (JWT-аутентификация)
+- [x] E2E шифрование: X25519 + HKDF + AES-GCM-256 (Web Crypto API)
+- [x] Клиентская модерация (стоп-слова, детект контактов) + жалобы в ModerationLog
+- [x] Обмен публичными ключами (`/chat/keys`)
+- [x] WebSocket gateway с ciphertext-only сообщениями
 
 ### 👥 Реферальная система
 - [x] Персональный `referralCode`
@@ -100,10 +100,6 @@
 | # | Задача | Приоритет | Блокер |
 |---|--------|-----------|--------|
 | 1 | Подключить реальные NowPayments ключи | 🔴 Критично | Нужен домен |
-| 2 | Починить 7 outdated тестов | 🟡 Средний | — |
-| 3 | Допилить audit log на все CRUD действия | 🟡 Средний | — |
-| 4 | Client-side шифрование в ChatPage (utils готовы) | 🟡 Средний | — |
-| 5 | Admin: управление процентами комиссий | 🟡 Средний | — |
 
 ---
 

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductsService } from './products.service';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { AuditService } from '../common/audit/audit.service';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 
 describe('ProductsService', () => {
@@ -37,11 +38,14 @@ describe('ProductsService', () => {
     },
   };
 
+  const mockAudit = { log: jest.fn().mockResolvedValue({}) };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProductsService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: AuditService, useValue: mockAudit },
       ],
     }).compile();
 

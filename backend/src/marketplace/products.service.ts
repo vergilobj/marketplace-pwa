@@ -4,17 +4,28 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { AuditService } from '../common/audit/audit.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditService: AuditService,
+  ) {}
 
   async create(sellerId: string, dto: CreateProductDto) {
-    return this.prisma.product.create({
+    const product = await this.prisma.product.create({
       data: { ...dto, sellerId },
     });
+    await this.auditService.log({
+      userId: sellerId,
+      action: 'product_created',
+      entity: 'product',
+      entityId: product.id,
+    });
+    return product;
   }
 
   async findAll(params: {
@@ -73,7 +84,14 @@ export class ProductsService {
     if (product.sellerId !== sellerId) {
       throw new ForbiddenException('You can only edit your own products');
     }
-    return this.prisma.product.update({ where: { id }, data: dto });
+    const updated = await this.prisma.product.update({ where: { id }, data: dto });
+    await this.auditService.log({
+      userId: sellerId,
+      action: 'product_updated',
+      entity: 'product',
+      entityId: id,
+    });
+    return updated;
   }
 
   async remove(id: string, sellerId: string) {
@@ -81,10 +99,17 @@ export class ProductsService {
     if (product.sellerId !== sellerId) {
       throw new ForbiddenException('You can only deactivate your own products');
     }
-    return this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id },
       data: { isActive: false },
     });
+    await this.auditService.log({
+      userId: sellerId,
+      action: 'product_deleted',
+      entity: 'product',
+      entityId: id,
+    });
+    return updated;
   }
 
   // Админские методы
@@ -122,10 +147,16 @@ export class ProductsService {
 
   async toggleActive(id: string) {
     const product = await this.findById(id);
-    return this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id },
       data: { isActive: !product.isActive },
     });
+    await this.auditService.log({
+      action: 'product_toggled',
+      entity: 'product',
+      entityId: id,
+    });
+    return updated;
   }
 
   async deleteProduct(id: string) {
@@ -140,7 +171,13 @@ export class ProductsService {
       });
       await this.prisma.order.deleteMany({ where: { productId: id } });
     }
-    return this.prisma.product.delete({ where: { id } });
+    const deleted = await this.prisma.product.delete({ where: { id } });
+    await this.auditService.log({
+      action: 'product_deleted',
+      entity: 'product',
+      entityId: id,
+    });
+    return deleted;
   }
 
   async adminUpdate(id: string, dto: UpdateProductDto) {

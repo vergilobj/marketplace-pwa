@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { AuditService } from '../common/audit/audit.service';
 import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -14,6 +15,7 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 export class OrdersService {
   constructor(
     private prisma: PrismaService,
+    private auditService: AuditService,
     private paymentsService: PaymentsService,
     private notificationsService: NotificationsService,
   ) {}
@@ -60,6 +62,13 @@ export class OrdersService {
       `Новый заказ на сумму ${amount} ₽`,
       order.id,
     );
+
+    await this.auditService.log({
+      userId: buyerId,
+      action: 'order_created',
+      entity: 'order',
+      entityId: order.id,
+    });
 
     return this.findById(order.id);
   }
@@ -130,6 +139,13 @@ export class OrdersService {
         status: dto.status,
         paidAt: order.paidAt,
       },
+    });
+
+    await this.auditService.log({
+      userId,
+      action: 'order_status_changed',
+      entity: 'order',
+      entityId: orderId,
     });
 
     return updated;

@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { AuditService } from '../common/audit/audit.service';
 import { SettingsService } from '../settings/settings.service';
 import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -17,6 +18,7 @@ export class PostsService {
   private readonly logger = new Logger(PostsService.name);
   constructor(
     private prisma: PrismaService,
+    private auditService: AuditService,
     private settingsService: SettingsService,
     private paymentsService: PaymentsService,
     private notificationsService: NotificationsService,
@@ -46,6 +48,13 @@ export class PostsService {
     } catch (e) {
       this.logger.warn('Failed to send post notifications', e);
     }
+
+    await this.auditService.log({
+      userId: authorId,
+      action: 'post_created',
+      entity: 'post',
+      entityId: post.id,
+    });
 
     return post;
   }
@@ -89,6 +98,12 @@ export class PostsService {
     await this.paymentsService.createPaymentForOrder(order.id);
     await this.paymentsService.processSuccessfulPayment(order.id);
     await this.activatePost(order.id, dto.days);
+    await this.auditService.log({
+      userId: sellerId,
+      action: 'ad_created',
+      entity: 'post',
+      entityId: post.id,
+    });
     return this.prisma.post.findUnique({
       where: { id: post.id },
       include: { order: true },
@@ -158,7 +173,13 @@ export class PostsService {
   async delete(id: string) {
     await this.prisma.like.deleteMany({ where: { postId: id } });
     await this.prisma.comment.deleteMany({ where: { postId: id } });
-    return this.prisma.post.delete({ where: { id } });
+    const deleted = await this.prisma.post.delete({ where: { id } });
+    await this.auditService.log({
+      action: 'post_deleted',
+      entity: 'post',
+      entityId: id,
+    });
+    return deleted;
   }
 
   async activatePost(orderId: string, days: number = 7) {
@@ -278,10 +299,16 @@ export class PostsService {
   async toggleVisibility(id: string) {
     const post = await this.prisma.post.findUnique({ where: { id } });
     if (!post) throw new NotFoundException('Post not found');
-    return this.prisma.post.update({
+    const updated = await this.prisma.post.update({
       where: { id },
       data: { isHidden: !post.isHidden },
     });
+    await this.auditService.log({
+      action: 'post_toggled',
+      entity: 'post',
+      entityId: id,
+    });
+    return updated;
   }
 
   async update(
@@ -304,9 +331,16 @@ export class PostsService {
       throw new ForbiddenException('You can only edit your own posts');
     }
 
-    return this.prisma.post.update({
+    const updated = await this.prisma.post.update({
       where: { id },
       data,
     });
+    await this.auditService.log({
+      userId,
+      action: 'post_updated',
+      entity: 'post',
+      entityId: id,
+    });
+    return updated;
   }
 }

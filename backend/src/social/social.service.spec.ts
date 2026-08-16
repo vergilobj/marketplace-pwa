@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SocialService } from './social.service';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { AuditService } from '../common/audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   NotFoundException,
@@ -31,6 +32,7 @@ describe('SocialService', () => {
   const mockNotifications = {
     createNotification: jest.fn().mockResolvedValue({}),
   };
+  const mockAudit = { log: jest.fn().mockResolvedValue({}) };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -38,6 +40,7 @@ describe('SocialService', () => {
         SocialService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: NotificationsService, useValue: mockNotifications },
+        { provide: AuditService, useValue: mockAudit },
       ],
     }).compile();
     service = module.get<SocialService>(SocialService);

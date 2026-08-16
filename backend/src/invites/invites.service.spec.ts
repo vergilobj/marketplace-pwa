@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { InvitesService } from './invites.service';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { AuditService } from '../common/audit/audit.service';
 import { BadRequestException } from '@nestjs/common';
 
 describe('InvitesService', () => {
@@ -23,11 +24,14 @@ describe('InvitesService', () => {
     },
   };
 
+  const mockAudit = { log: jest.fn().mockResolvedValue({}) };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InvitesService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: AuditService, useValue: mockAudit },
       ],
     }).compile();
     service = module.get<InvitesService>(InvitesService);
