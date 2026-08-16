@@ -79,6 +79,25 @@ export class ProductsService {
     return product;
   }
 
+  async findSimilar(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      select: { sellerId: true, title: true },
+    });
+    if (!product) return [];
+
+    const firstWord = product.title.trim().split(/\s+/)[0];
+    return this.prisma.product.findMany({
+      where: {
+        id: { not: id },
+        isActive: true,
+        OR: [{ sellerId: product.sellerId }, { title: { contains: firstWord } }],
+      },
+      include: { seller: { select: { id: true, name: true } } },
+      take: 4,
+    });
+  }
+
   async update(id: string, sellerId: string, dto: UpdateProductDto) {
     const product = await this.findById(id);
     if (product.sellerId !== sellerId) {

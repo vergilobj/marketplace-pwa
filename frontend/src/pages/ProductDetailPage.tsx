@@ -23,17 +23,25 @@ export default function ProductDetailPage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (id) {
-      getProductById(id)
-        .then(data => {
-          setProduct(data);
-          // Загружаем похожие товары
-          return getSimilarProducts(id);
-        })
-        .then(similarData => setSimilar(similarData))
-        .catch(() => setError('Товар не найден'))
-        .finally(() => setLoading(false));
-    }
+    if (!id) return;
+    const productId = id;
+    const loadProduct = async () => {
+      try {
+        const data = await getProductById(productId);
+        setProduct(data);
+        try {
+          const sim = await getSimilarProducts(productId);
+          setSimilar(sim || []);
+        } catch {
+          setSimilar([]);
+        }
+      } catch {
+        setError('Товар не найден');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProduct();
   }, [id]);
 
   const handleBuy = async () => {

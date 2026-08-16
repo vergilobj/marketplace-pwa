@@ -91,6 +91,11 @@ export class ProductsController {
     return this.productsService.toggleActive(id);
   }
 
+  @Get(':id/similar')
+  async findSimilar(@Param('id') id: string) {
+    return this.productsService.findSimilar(id);
+  }
+
   @Get(':id')
   async findById(@Param('id') id: string) {
     return this.productsService.findById(id);

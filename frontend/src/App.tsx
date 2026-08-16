@@ -36,7 +36,7 @@ function Lazy({ children }: { children: React.ReactNode }) {
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) {
   const { isAuthenticated, user } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (requiredRole && user?.role !== requiredRole) return <Navigate to="/" replace />;
+  if (requiredRole && user?.role !== requiredRole && user?.role !== 'ADMIN') return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
