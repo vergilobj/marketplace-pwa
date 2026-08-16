@@ -63,7 +63,7 @@ describe('PostsService', () => {
       ],
     }).compile();
     service = module.get<PostsService>(PostsService);
-    prisma = mockPrisma;
+    _prisma = mockPrisma;
     jest.clearAllMocks();
   });
 
@@ -124,8 +124,8 @@ describe('PostsService', () => {
   describe('findAll', () => {
     it('should return visible posts', async () => {
       mockPrisma.post.findMany.mockResolvedValue([mockPost]);
-      const result = await service.findAll();
-      expect(result).toHaveLength(1);
+      const result = await service.findAll({});
+      expect(result.items).toHaveLength(1);
     });
   });
 
@@ -154,17 +154,17 @@ describe('PostsService', () => {
       mockPrisma.post.findMany.mockResolvedValue([
         { ...mockPost, _count: { likes: 5, comments: 3 }, likes: [] },
       ]);
-      const result = await service.getFeed('user-1');
-      expect(result[0].likeCount).toBe(5);
-      expect(result[0].commentCount).toBe(3);
+      const result = await service.getFeed({ userId: 'user-1' });
+      expect(result.items[0].likeCount).toBe(5);
+      expect(result.items[0].commentCount).toBe(3);
     });
 
     it('should return feed without userId', async () => {
       mockPrisma.post.findMany.mockResolvedValue([
         { ...mockPost, _count: { likes: 0, comments: 0 }, likes: false },
       ]);
-      const result = await service.getFeed();
-      expect(result[0].likeCount).toBe(0);
+      const result = await service.getFeed({});
+      expect(result.items[0].likeCount).toBe(0);
     });
   });
 

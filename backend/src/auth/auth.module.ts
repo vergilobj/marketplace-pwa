@@ -8,7 +8,6 @@ import { JwtStrategy } from './jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { InvitesModule } from '../invites/invites.module';
 import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
-import { CometChatModule } from '../cometchat/cometchat.module';
 
 @Module({
   imports: [
@@ -23,7 +22,6 @@ import { CometChatModule } from '../cometchat/cometchat.module';
     }),
     UsersModule,
     InvitesModule,
-    CometChatModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, OptionalJwtAuthGuard],

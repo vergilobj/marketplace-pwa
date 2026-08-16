@@ -22,7 +22,7 @@ describe('SettingsService', () => {
       ],
     }).compile();
     service = module.get<SettingsService>(SettingsService);
-    prisma = mockPrisma;
+    _prisma = mockPrisma;
     jest.clearAllMocks();
   });
 

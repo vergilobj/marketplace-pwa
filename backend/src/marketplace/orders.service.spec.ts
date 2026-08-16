@@ -67,7 +67,7 @@ describe('OrdersService', () => {
       ],
     }).compile();
     service = module.get<OrdersService>(OrdersService);
-    prisma = mockPrisma;
+    _prisma = mockPrisma;
     jest.clearAllMocks();
   });
 
@@ -79,7 +79,7 @@ describe('OrdersService', () => {
     it('should throw if product not found', async () => {
       mockPrisma.product.findUnique.mockResolvedValue(null);
       await expect(
-        service.create('buyer-1', { productId: 'bad-id' }),
+        service.create('buyer-1', { productId: 'bad-id', amount: 100 }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -90,7 +90,7 @@ describe('OrdersService', () => {
         seller: mockProduct.seller,
       });
       await expect(
-        service.create('buyer-1', { productId: 'prod-1' }),
+        service.create('buyer-1', { productId: 'prod-1', amount: 100 }),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -102,7 +102,7 @@ describe('OrdersService', () => {
       mockPrisma.user.findUnique.mockResolvedValue({ invitedById: 'ref-1' });
       mockPrisma.order.create.mockResolvedValue(mockOrder);
       mockPrisma.order.findUnique.mockResolvedValue(mockOrder);
-      const result = await service.create('buyer-1', { productId: 'prod-1' });
+      const result = await service.create('buyer-1', { productId: 'prod-1', amount: 100 });
       expect(result).toBeDefined();
       expect(mockPayments.createPaymentForOrder).toHaveBeenCalled();
       expect(mockNotifications.createNotification).toHaveBeenCalled();
@@ -122,7 +122,7 @@ describe('OrdersService', () => {
         ...mockOrder,
         referralUserId: 'ref-1',
       });
-      await service.create('buyer-1', { productId: 'prod-1' });
+      await service.create('buyer-1', { productId: 'prod-1', amount: 100 });
       expect(mockPrisma.order.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ referralUserId: 'ref-1' }),

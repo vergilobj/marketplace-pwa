@@ -37,7 +37,7 @@ describe('ProductsController', () => {
     it('should create product', async () => {
       service.create.mockResolvedValue({ id: 'p1' });
       const result = await controller.create(
-        { user: { userId: 'seller-1' } },
+        { user: { userId: 'seller-1', role: 'SELLER' } },
         { title: 'T', description: 'D', price: 100 },
       );
       expect(result.id).toBe('p1');
@@ -67,7 +67,7 @@ describe('ProductsController', () => {
       service.update.mockResolvedValue({ id: 'p1', title: 'Updated' });
       const result = await controller.update(
         'p1',
-        { user: { userId: 's1' } },
+        { user: { userId: 's1', role: 'SELLER' } },
         { title: 'Updated' },
       );
       expect(result.title).toBe('Updated');
@@ -77,7 +77,7 @@ describe('ProductsController', () => {
   describe('remove', () => {
     it('should soft-delete product', async () => {
       service.remove.mockResolvedValue({ id: 'p1', isActive: false });
-      const result = await controller.remove('p1', { user: { userId: 's1' } });
+      const result = await controller.remove('p1', { user: { userId: 's1', role: 'SELLER' } });
       expect(result.isActive).toBe(false);
     });
   });
@@ -107,7 +107,7 @@ describe('ProductsController', () => {
     it('should return seller products', async () => {
       service.findBySeller.mockResolvedValue([{ id: 'p1' }]);
       const result = await controller.findMyProducts({
-        user: { userId: 's1' },
+        user: { userId: 's1', role: 'SELLER' },
       });
       expect(result).toHaveLength(1);
     });

@@ -9,8 +9,6 @@ import {
   UseInterceptors,
   UploadedFile,
   Body,
-  Headers,
-  HttpCode,
   Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -141,24 +139,39 @@ export class ChatController {
     };
   }
 
-  @Post('webhook')
-  @HttpCode(200)
-  async handleWebhook(
-    @Body() body: any,
-    @Headers('x-cometchat-signature') signature: string,
+  @UseGuards(JwtAuthGuard)
+  @Post('keys')
+  async setPublicKey(
+    @Request() req: AuthenticatedRequest,
+    @Body('publicKey') publicKey: string,
   ) {
-    const secret = this.configService.getOrThrow<string>(
-      'COMETCHAT_WEBHOOK_SECRET',
+    await this.chatService.setPublicKey(req.user.userId, publicKey);
+    return { ok: true };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('keys/:userId')
+  async getPublicKey(@Param('userId') userId: string) {
+    return { publicKey: await this.chatService.getPublicKey(userId) };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('moderation-rules')
+  async getModerationRules() {
+    return await this.chatService.getModerationRules();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('report')
+  async reportMessage(
+    @Request() req: AuthenticatedRequest,
+    @Body() body: { messageId: string; reason?: string },
+  ) {
+    await this.chatService.reportMessage(
+      req.user.userId,
+      body.messageId,
+      body.reason,
     );
-
-    // TODO: verify HMAC signature when CometChat provides the algorithm
-    // For now, accept if signature header matches secret (basic check)
-    if (!signature || signature !== secret) {
-      this.logger.warn('Webhook rejected: invalid signature');
-      return { status: 'rejected', reason: 'invalid_signature' };
-    }
-
-    const result = await this.chatService.moderateMessage(body);
-    return result;
+    return { ok: true };
   }
 }

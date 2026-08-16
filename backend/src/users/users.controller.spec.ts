@@ -54,7 +54,7 @@ describe('UsersController', () => {
     it('should return user without passwordHash', async () => {
       service.findById.mockResolvedValue(mockUser);
       const result = await controller.getProfile({
-        user: { userId: 'user-1' },
+        user: { userId: 'user-1', role: 'ADMIN' },
       });
       expect(result).not.toHaveProperty('passwordHash');
       expect(result.phone).toBe('+7999');
@@ -63,7 +63,7 @@ describe('UsersController', () => {
     it('should throw NotFoundException', async () => {
       service.findById.mockResolvedValue(null);
       await expect(
-        controller.getProfile({ user: { userId: 'bad' } }),
+        controller.getProfile({ user: { userId: 'bad', role: 'ADMIN' } }),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -85,7 +85,7 @@ describe('UsersController', () => {
     it('should update user profile', async () => {
       service.updateProfile.mockResolvedValue(mockUser);
       const result = await controller.updateProfile(
-        { user: { userId: 'user-1' } },
+        { user: { userId: 'user-1', role: 'ADMIN' } },
         { name: 'New' },
       );
       expect(result).toBeDefined();
@@ -96,7 +96,7 @@ describe('UsersController', () => {
     it('should return balance', async () => {
       service.getBalance.mockResolvedValue({ balance: 500 });
       const result = await controller.getBalance({
-        user: { userId: 'user-1' },
+        user: { userId: 'user-1', role: 'ADMIN' },
       });
       expect(result.balance).toBe(500);
     });
@@ -106,7 +106,7 @@ describe('UsersController', () => {
     it('should create withdrawal request', async () => {
       service.requestWithdrawal.mockResolvedValue({ id: 'wr-1', amount: 100 });
       const result = await controller.requestWithdrawal(
-        { user: { userId: 'user-1' } },
+        { user: { userId: 'user-1', role: 'ADMIN' } },
         100,
       );
       expect(result.id).toBe('wr-1');

@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { CometChatService } from '../cometchat/cometchat.service';
+
 import { AuditService } from '../common/audit/audit.service';
 import {
   ConflictException,
@@ -15,7 +15,7 @@ import * as bcrypt from 'bcryptjs';
 describe('AuthService', () => {
   let service: AuthService;
   let _prisma: any;
-  let _jwtService: JwtService;
+  let _jwtService: any;
 
   const mockPrisma = {
     user: {
@@ -43,25 +43,20 @@ describe('AuthService', () => {
     }),
   };
 
-  const mockCometChat = {
-    createUser: jest.fn().mockResolvedValue(undefined),
-  };
-
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: JwtService, useValue: mockJwtService },
+        { provide: JwtService, useValue: mockJwtService as any },
         { provide: ConfigService, useValue: mockConfig },
-        { provide: CometChatService, useValue: mockCometChat },
         { provide: AuditService, useValue: { log: jest.fn().mockResolvedValue({}) } },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    prisma = mockPrisma;
-    jwtService = mockJwtService;
+    _prisma = mockPrisma;
+    _jwtService = mockJwtService;
     jest.clearAllMocks();
   });
 
@@ -139,10 +134,9 @@ describe('AuthService', () => {
       const result = await service.register(dto);
       expect(result).toHaveProperty('accessToken', 'mock-token');
       expect(result).toHaveProperty('refreshToken', 'mock-token');
-      expect(mockCometChat.createUser).toHaveBeenCalled();
     });
 
-    it('should still return tokens even if CometChat creation fails', async () => {
+    it('should return tokens when registration succeeds', async () => {
       mockPrisma.user.findUnique.mockResolvedValueOnce(null);
       mockPrisma.invite.findUnique.mockResolvedValueOnce({
         code: 'VALIDCODE',
@@ -165,7 +159,6 @@ describe('AuthService', () => {
         };
         return fn(tx);
       });
-      mockCometChat.createUser.mockRejectedValueOnce(new Error('API Error'));
 
       const result = await service.register(dto);
       expect(result).toHaveProperty('accessToken', 'mock-token');

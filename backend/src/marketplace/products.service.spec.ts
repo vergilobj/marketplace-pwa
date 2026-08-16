@@ -46,7 +46,7 @@ describe('ProductsService', () => {
     }).compile();
 
     service = module.get<ProductsService>(ProductsService);
-    prisma = mockPrisma;
+    _prisma = mockPrisma;
     jest.clearAllMocks();
   });
 
@@ -69,8 +69,8 @@ describe('ProductsService', () => {
   describe('findAll', () => {
     it('should return only active products by default', async () => {
       mockPrisma.product.findMany.mockResolvedValue([mockProduct]);
-      const result = await service.findAll();
-      expect(result).toEqual([mockProduct]);
+      const result = await service.findAll({});
+      expect(result.items).toEqual([mockProduct]);
       expect(mockPrisma.product.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { isActive: true } }),
       );
@@ -78,7 +78,7 @@ describe('ProductsService', () => {
 
     it('should return all products when onlyActive=false', async () => {
       mockPrisma.product.findMany.mockResolvedValue([mockProduct]);
-      await service.findAll(false);
+      await service.findAll({ onlyActive: false });
       expect(mockPrisma.product.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: {} }),
       );

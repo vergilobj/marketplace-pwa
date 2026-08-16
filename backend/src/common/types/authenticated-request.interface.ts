@@ -1,4 +1,3 @@
-import { Request } from 'express';
 import { UserRole } from '@prisma/client';
 
 export interface AuthenticatedUser {
@@ -6,6 +5,6 @@ export interface AuthenticatedUser {
   role: UserRole;
 }
 
-export interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest {
   user: AuthenticatedUser;
 }

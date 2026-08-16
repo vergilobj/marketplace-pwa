@@ -35,7 +35,7 @@ describe('NotificationsController', () => {
     it('should return notifications', async () => {
       service.getNotifications.mockResolvedValue([]);
       expect(
-        await controller.getNotifications({ user: { userId: 'u1' } }),
+        await controller.getNotifications({ user: { userId: 'u1', role: 'ADMIN' } }),
       ).toEqual([]);
     });
   });
@@ -43,14 +43,14 @@ describe('NotificationsController', () => {
   describe('markAsRead', () => {
     it('should mark as read', async () => {
       service.markAsRead.mockResolvedValue({ count: 1 });
-      await controller.markAsRead('n1', { user: { userId: 'u1' } });
+      await controller.markAsRead('n1', { user: { userId: 'u1', role: 'ADMIN' } });
       expect(service.markAsRead).toHaveBeenCalledWith('n1', 'u1');
     });
   });
 
   describe('markAllAsRead', () => {
     it('should mark all as read', async () => {
-      await controller.markAllAsRead({ user: { userId: 'u1' } });
+      await controller.markAllAsRead({ user: { userId: 'u1', role: 'ADMIN' } });
       expect(service.markAllAsRead).toHaveBeenCalledWith('u1');
     });
   });
@@ -59,7 +59,7 @@ describe('NotificationsController', () => {
     it('should return unread count', async () => {
       service.getUnreadCount.mockResolvedValue(5);
       expect(
-        await controller.getUnreadCount({ user: { userId: 'u1' } }),
+        await controller.getUnreadCount({ user: { userId: 'u1', role: 'ADMIN' } }),
       ).toEqual({ count: 5 });
     });
   });

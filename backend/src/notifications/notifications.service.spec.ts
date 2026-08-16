@@ -33,7 +33,7 @@ describe('NotificationsService', () => {
       ],
     }).compile();
     service = module.get<NotificationsService>(NotificationsService);
-    prisma = mockPrisma;
+    _prisma = mockPrisma;
     jest.clearAllMocks();
   });
 

@@ -10,7 +10,7 @@ import { MarketplaceModule } from './marketplace/marketplace.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PostsModule } from './posts/posts.module';
 import { ChatModule } from './chat/chat.module';
-import { CometChatModule } from './cometchat/cometchat.module';
+
 import { SocialModule } from './social/social.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SettingsModule } from './settings/settings.module';
@@ -35,7 +35,6 @@ import { AuditModule } from './common/audit/audit.module';
     PaymentsModule,
     PostsModule,
     ChatModule,
-    CometChatModule,
     SocialModule,
     NotificationsModule,
     SettingsModule,

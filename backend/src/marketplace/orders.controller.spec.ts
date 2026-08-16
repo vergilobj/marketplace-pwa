@@ -31,8 +31,8 @@ describe('OrdersController', () => {
     it('should create order', async () => {
       service.create.mockResolvedValue({ id: 'order-1' });
       const result = await controller.create(
-        { user: { userId: 'buyer-1' } },
-        { productId: 'prod-1' },
+        { user: { userId: 'buyer-1', role: 'BUYER' } },
+        { productId: 'prod-1', amount: 100 },
       );
       expect(result.id).toBe('order-1');
       expect(service.create).toHaveBeenCalledWith(

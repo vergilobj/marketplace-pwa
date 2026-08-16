@@ -34,7 +34,7 @@ describe('SocialController', () => {
     it('should like post', async () => {
       service.likePost.mockResolvedValue({ liked: true });
       const result = await controller.like(
-        { user: { userId: 'u1' } },
+        { user: { userId: 'u1', role: 'ADMIN' } },
         'post-1',
       );
       expect(result.liked).toBe(true);
@@ -46,7 +46,7 @@ describe('SocialController', () => {
     it('should unlike post', async () => {
       service.unlikePost.mockResolvedValue({ liked: false });
       const result = await controller.unlike(
-        { user: { userId: 'u1' } },
+        { user: { userId: 'u1', role: 'ADMIN' } },
         'post-1',
       );
       expect(result.liked).toBe(false);
@@ -64,7 +64,7 @@ describe('SocialController', () => {
     it('should add comment', async () => {
       service.addComment.mockResolvedValue({ id: 'c1', text: 'Nice!' });
       const result = await controller.addComment(
-        { user: { userId: 'u1' } },
+        { user: { userId: 'u1', role: 'ADMIN' } },
         'post-1',
         'Nice!',
       );

@@ -10,7 +10,6 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { CometChatService } from '../cometchat/cometchat.service';
 import { AuditService } from '../common/audit/audit.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -23,7 +22,6 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private config: ConfigService,
-    private cometChatService: CometChatService,
     private auditService: AuditService,
   ) {}
 
@@ -67,16 +65,6 @@ export class AuthService {
       return newUser;
     });
 
-    // Создать пользователя в CometChat
-    try {
-      await this.cometChatService.createUser(user.id, user.name || user.phone);
-      this.logger.log(`CometChat user created for ${user.id}`);
-    } catch (err) {
-      this.logger.warn(
-        `Could not create CometChat user for ${user.id}: ${err.message}`,
-      );
-    }
-
     await this.auditService.log({
       userId: user.id,
       action: 'register',
@@ -109,11 +97,6 @@ export class AuthService {
       entityId: user.id,
     });
 
-    // Sync missing users with CometChat (fire-and-forget — don't block login)
-    this.syncAllUsersWithCometChat().catch((err) =>
-      this.logger.warn('Background sync failed', err),
-    );
-
     return this.generateTokens(user);
   }
 
@@ -130,38 +113,6 @@ export class AuthService {
     }
 
     return this.generateTokens(user);
-  }
-
-  private async syncAllUsersWithCometChat() {
-    try {
-      const users = await this.prisma.user.findMany({
-        select: { id: true, name: true, phone: true, cometChatUid: true },
-      });
-
-      for (const user of users) {
-        if (!user.cometChatUid) {
-          try {
-            await this.cometChatService.createUser(
-              user.id,
-              user.name || user.phone,
-            );
-            await this.prisma.user.update({
-              where: { id: user.id },
-              data: { cometChatUid: user.id },
-            });
-            this.logger.log(`Synced user ${user.id} with CometChat`);
-          } catch (err) {
-            if (err.code !== 'ERR_UID_ALREADY_EXISTS') {
-              this.logger.warn(
-                `Failed to sync user ${user.id}: ${err.message}`,
-              );
-            }
-          }
-        }
-      }
-    } catch (err) {
-      this.logger.error('Failed to sync users with CometChat', err);
-    }
   }
 
   private generateTokens(user: any) {

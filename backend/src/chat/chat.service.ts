@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
-import { CometChatMessageDto } from './dto/webhook.dto';
 
 @Injectable()
 export class ChatService {
@@ -11,36 +10,36 @@ export class ChatService {
     private settingsService: SettingsService,
   ) {}
 
-  async moderateMessage(message: CometChatMessageDto) {
-    // Получить стоп-слова из настроек
+  async setPublicKey(userId: string, publicKey: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { chatPublicKey: publicKey },
+    });
+  }
+
+  async getPublicKey(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { chatPublicKey: true },
+    });
+    return user?.chatPublicKey ?? null;
+  }
+
+  async getModerationRules() {
     const stopWordsSetting = await this.settingsService.get('stop_words');
     const stopWords: string[] = stopWordsSetting
       ? JSON.parse(stopWordsSetting)
       : [];
+    return { stopWords, detectContacts: true };
+  }
 
-    // Проверка контактов и стоп-слов
-    const contactRegex =
-      /(?:\+?\d{10,})|(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})|(?:https?:\/\/\S+)/gi;
-    const hasContact = contactRegex.test(message.text);
-    const hasStopWord = stopWords.some((word: string) =>
-      message.text.toLowerCase().includes(word.toLowerCase()),
-    );
-
-    if (hasContact || hasStopWord) {
-      const reason = hasContact
-        ? 'Contact info detected'
-        : 'Stop word detected';
-      await this.prisma.moderationLog.create({
-        data: {
-          chatMsgId: message.id,
-          reason,
-          action: 'hidden',
-        },
-      });
-      this.logger.warn(`Message ${message.id} hidden: ${reason}`);
-      return { action: 'hidden', reason };
-    }
-
-    return { action: 'allowed' };
+  async reportMessage(userId: string, messageId: string, reason?: string) {
+    return this.prisma.moderationLog.create({
+      data: {
+        chatMsgId: messageId,
+        reason: reason || '',
+        action: 'reported',
+      },
+    });
   }
 }

@@ -35,7 +35,7 @@ describe('PostsController', () => {
   describe('feed', () => {
     it('should return feed with userId', async () => {
       service.getFeed.mockResolvedValue([]);
-      await controller.feed(undefined, { user: { userId: 'user-1' } });
+      await controller.feed({ user: { userId: 'user-1', role: 'ADMIN' } } as any);
       expect(service.getFeed).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'user-1' }),
       );
@@ -43,7 +43,7 @@ describe('PostsController', () => {
 
     it('should return feed without user', async () => {
       service.getFeed.mockResolvedValue([]);
-      await controller.feed(undefined, { user: undefined });
+      await controller.feed({ user: undefined } as any);
       expect(service.getFeed).toHaveBeenCalledWith(
         expect.objectContaining({ userId: undefined }),
       );
@@ -54,7 +54,7 @@ describe('PostsController', () => {
     it('should create post', async () => {
       service.create.mockResolvedValue({ id: 'post-1' });
       const result = await controller.create(
-        { user: { userId: 'admin-1' } },
+        { user: { userId: 'admin-1', role: 'ADMIN' } },
         { title: 'T', content: 'C' },
       );
       expect(result.id).toBe('post-1');
@@ -65,10 +65,10 @@ describe('PostsController', () => {
     it('should create ad', async () => {
       service.createAd.mockResolvedValue({ id: 'ad-1', isAd: true });
       const result = await controller.createAd(
-        { user: { userId: 'seller-1' } },
+        { user: { userId: 'seller-1', role: 'SELLER' } },
         { title: 'Ad', content: '', link: '', days: 7 },
       );
-      expect(result.isAd).toBe(true);
+      expect(result?.isAd).toBe(true);
     });
   });
 
@@ -124,7 +124,7 @@ describe('PostsController', () => {
       const result = await controller.update(
         'post-1',
         { user: { userId: 'u1', role: 'ADMIN' } },
-        { title: 'Edited' },
+        { title: 'Edited', content: 'Edited content' },
       );
       expect(result.title).toBe('Edited');
     });

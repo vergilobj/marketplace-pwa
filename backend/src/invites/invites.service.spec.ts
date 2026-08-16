@@ -31,7 +31,7 @@ describe('InvitesService', () => {
       ],
     }).compile();
     service = module.get<InvitesService>(InvitesService);
-    prisma = mockPrisma;
+    _prisma = mockPrisma;
     jest.clearAllMocks();
   });
 

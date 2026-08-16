@@ -29,7 +29,7 @@ describe('InvitesController', () => {
     it('should create invite', async () => {
       service.createInvite.mockResolvedValue({ code: 'CODE', ownerId: 'u1' });
       const result = await controller.create(
-        { user: { userId: 'u1' } },
+        { user: { userId: 'u1', role: 'ADMIN' } },
         'MYCODE',
       );
       expect(result.code).toBe('CODE');

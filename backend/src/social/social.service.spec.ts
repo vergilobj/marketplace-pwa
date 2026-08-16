@@ -41,7 +41,7 @@ describe('SocialService', () => {
       ],
     }).compile();
     service = module.get<SocialService>(SocialService);
-    prisma = mockPrisma;
+    _prisma = mockPrisma;
     jest.clearAllMocks();
   });
 
