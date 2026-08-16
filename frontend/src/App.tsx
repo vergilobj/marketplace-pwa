@@ -47,6 +47,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<FeedPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/signup" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/privacy" element={<Lazy><PrivacyPage /></Lazy>} />
           <Route path="/products" element={<Lazy><ProductsPage /></Lazy>} />

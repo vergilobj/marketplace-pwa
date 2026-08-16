@@ -4,14 +4,6 @@ import { io, Socket } from 'socket.io-client';
 import { Search, Send, ArrowLeft, Paperclip, Plus, X, UserPlus, Flag } from 'lucide-react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import {
-  getOrCreateIdentityKey,
-  exportPublicKeyRaw,
-  importPeerPublicKey,
-  deriveSharedKey,
-  encryptMessage,
-  decryptMessage,
-} from '../utils/crypto';
 
 interface Conversation {
   userId: string;
@@ -60,11 +52,9 @@ export default function ChatPage() {
   const [uploading, setUploading] = useState(false);
   const [newChatPhone, setNewChatPhone] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
-  const [stopWords, setStopWords] = useState<string[]>([]);
-  const [detectContacts, setDetectContacts] = useState(true);
+  const [onlineUsers, setOnlineUsers] = useState<Map<string, boolean>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const sharedKeyCache = useRef<Map<string, CryptoKey>>(new Map());
 
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
@@ -75,27 +65,6 @@ export default function ChatPage() {
   // Auth check
   useEffect(() => {
     if (!userId) { navigate('/login'); return; }
-  }, [userId]);
-
-  // Publish identity public key + load moderation rules on mount
-  useEffect(() => {
-    if (!userId) return;
-    (async () => {
-      try {
-        const kp = await getOrCreateIdentityKey();
-        const pub = await exportPublicKeyRaw(kp.publicKey);
-        await api.post('/chat/keys', { publicKey: pub });
-      } catch (err) {
-        console.error('Failed to publish chat public key', err);
-      }
-      try {
-        const { data } = await api.get('/chat/moderation-rules');
-        setStopWords(data.stopWords || []);
-        setDetectContacts(data.detectContacts !== false);
-      } catch (err) {
-        console.error('Failed to load moderation rules', err);
-      }
-    })();
   }, [userId]);
 
   const loadConversations = useCallback(async () => {
@@ -119,26 +88,30 @@ export default function ChatPage() {
 
     s.on('connect', () => console.log('Socket connected'));
 
-    s.on('newMessage', (msg: Message) => {
-      const partnerId = msg.senderId === userId ? msg.receiverId : msg.senderId;
-      decryptIncoming(msg).then((decrypted) => {
-        if (selectedUser && selectedUser.userId === partnerId) {
-          setMessages(prev => [...prev, decrypted]);
-          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-          s.emit('markRead', { senderId: msg.senderId });
-        }
-        loadConversations();
+    s.on('userStatus', ({ userId: uid, online }: { userId: string; online: boolean }) => {
+      setOnlineUsers(prev => {
+        const m = new Map(prev);
+        m.set(uid, online);
+        return m;
       });
     });
 
+    s.on('newMessage', (msg: Message) => {
+      const partnerId = msg.senderId === userId ? msg.receiverId : msg.senderId;
+      if (selectedUser && selectedUser.userId === partnerId) {
+        setMessages(prev => [...prev, msg]);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        s.emit('markRead', { senderId: msg.senderId });
+      }
+      loadConversations();
+    });
+
     s.on('messageSent', (msg: Message) => {
-      decryptIncoming(msg).then((decrypted) => {
-        if (selectedUser && (msg.receiverId === selectedUser.userId || msg.senderId === selectedUser.userId)) {
-          setMessages(prev => [...prev, decrypted]);
-          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
-        }
-        loadConversations();
-      });
+      if (selectedUser && (msg.receiverId === selectedUser.userId || msg.senderId === selectedUser.userId)) {
+        setMessages(prev => [...prev, msg]);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      }
+      loadConversations();
     });
 
     loadConversations();
@@ -159,52 +132,6 @@ export default function ChatPage() {
     // Clear uid from URL to prevent re-triggering
     navigate('/chat', { replace: true });
   }, [targetUid]);
-
-  const ensureSharedKey = async (peerId: string): Promise<CryptoKey | null> => {
-    const cached = sharedKeyCache.current.get(peerId);
-    if (cached) return cached;
-    try {
-      const kp = await getOrCreateIdentityKey();
-      const { data } = await api.get(`/chat/keys/${peerId}`);
-      if (!data.publicKey) {
-        toast.error('Собеседник ещё не активировал шифрование');
-        return null;
-      }
-      const peerPub = await importPeerPublicKey(data.publicKey);
-      const key = await deriveSharedKey(kp.privateKey, peerPub);
-      sharedKeyCache.current.set(peerId, key);
-      return key;
-    } catch {
-      toast.error('Не удалось получить ключ собеседника');
-      return null;
-    }
-  };
-
-  const hasStopWord = (text: string): boolean => {
-    const lower = text.toLowerCase();
-    return stopWords.some((word: string) => lower.includes(word.toLowerCase()));
-  };
-
-  const hasContact = (text: string): boolean => {
-    const contactRegex =
-      /(?:\+?\d{10,})|(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})|(?:https?:\/\/\S+)/gi;
-    return contactRegex.test(text);
-  };
-
-  const decryptIncoming = async (msg: Message): Promise<Message> => {
-    if (!msg.ciphertext) {
-      // legacy plaintext message
-      return msg;
-    }
-    const peerId = msg.senderId === userId ? msg.receiverId : msg.senderId;
-    const key = await ensureSharedKey(peerId);
-    if (!key) return { ...msg, text: '[Не удалось расшифровать]' };
-    try {
-      return { ...msg, text: await decryptMessage(msg.ciphertext, key) };
-    } catch {
-      return { ...msg, text: '[Ошибка расшифровки]' };
-    }
-  };
 
   const startNewChat = async () => {
     if (!newChatPhone.trim()) return;
@@ -228,8 +155,7 @@ export default function ChatPage() {
     try {
       const { data } = await api.get(`/chat/messages/${user.userId}?limit=50`);
       const msgs: Message[] = data.items || [];
-      const decrypted = await Promise.all(msgs.map(decryptIncoming));
-      setMessages(decrypted);
+      setMessages(msgs);
     } catch {
       setMessages([]);
     }
@@ -239,22 +165,14 @@ export default function ChatPage() {
     if (!messageText.trim() || !selectedUser || !socket) return;
 
     const text = messageText.trim();
-
-    // Клиентская модерация ДО шифрования
-    if (hasStopWord(text) || (detectContacts && hasContact(text))) {
-      toast.error('Сообщение содержит запрещённый контент');
-      return;
-    }
-
-    const key = await ensureSharedKey(selectedUser.userId);
-    if (!key) return;
-
-    const ciphertext = await encryptMessage(text, key);
-    socket.emit('sendMessage', {
-      receiverId: selectedUser.userId,
-      ciphertext,
-    });
     setMessageText('');
+
+    socket.emit('sendMessage', { receiverId: selectedUser.userId, text }, (res: { error?: string; reason?: string } | null) => {
+      if (res?.error === 'moderated') {
+        toast.error('Сообщение заблокировано модерацией' + (res.reason ? ': ' + res.reason : ''));
+        setMessageText(text);
+      }
+    });
   };
 
   const reportMessage = async (msg: Message) => {
@@ -356,31 +274,37 @@ export default function ChatPage() {
 
         {/* Conversation list */}
         <div className="flex-1 overflow-y-auto">
-          {filteredConversations.map(c => (
-            <button
-              key={c.userId}
-              onClick={() => selectConversation({ userId: c.userId, name: c.name })}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.04] transition-all text-left border-b border-white/[0.02] ${selectedUser?.userId === c.userId ? 'bg-indigo-500/10 border-l-[3px] border-l-indigo-500' : ''}`}
-            >
-              <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-base">
-                  {(c.name || '?')[0].toUpperCase()}
+          {filteredConversations.map(c => {
+            const isOnline = onlineUsers.get(c.userId) === true;
+            return (
+              <button
+                key={c.userId}
+                onClick={() => selectConversation({ userId: c.userId, name: c.name })}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.04] transition-all text-left border-b border-white/[0.02] ${selectedUser?.userId === c.userId ? 'bg-indigo-500/10 border-l-[3px] border-l-indigo-500' : ''}`}
+              >
+                <div className="relative shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-base">
+                    {(c.name || '?')[0].toUpperCase()}
+                  </div>
+                  {isOnline && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#111118]" />
+                  )}
+                  {c.unread > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-[#111118]">{c.unread > 9 ? '9+' : c.unread}</span>
+                  )}
                 </div>
-                {c.unread > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-[#111118]">{c.unread > 9 ? '9+' : c.unread}</span>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <p className="text-white text-sm font-semibold truncate">{c.name}</p>
-                  <span className="text-white/25 text-[10px] shrink-0 ml-2">{formatTime(c.lastMessageTime)}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="text-white text-sm font-semibold truncate">{c.name}</p>
+                    <span className="text-white/25 text-[10px] shrink-0 ml-2">{formatTime(c.lastMessageTime)}</span>
+                  </div>
+                  <p className={`text-xs truncate mt-0.5 ${c.unread > 0 ? 'text-white font-medium' : 'text-white/35'}`}>
+                    {c.lastMessage || 'Нет сообщений'}
+                  </p>
                 </div>
-                <p className={`text-xs truncate mt-0.5 ${c.unread > 0 ? 'text-white font-medium' : 'text-white/35'}`}>
-                  {c.lastMessage || 'Нет сообщений'}
-                </p>
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
           {filteredConversations.length === 0 && conversations.length === 0 && (
             <div className="text-center py-12">
               <p className="text-white/25 text-sm">Нет диалогов</p>
@@ -408,6 +332,9 @@ export default function ChatPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-semibold truncate">{selectedUser.name}</p>
+              <p className={`text-[11px] ${onlineUsers.get(selectedUser.userId) === true ? 'text-emerald-400' : 'text-white/30'}`}>
+                {onlineUsers.get(selectedUser.userId) === true ? 'онлайн' : 'офлайн'}
+              </p>
             </div>
           </div>
 
@@ -427,7 +354,6 @@ export default function ChatPage() {
             {messages.map((msg) => {
               const isMine = msg.senderId === userId;
               const time = formatTime(msg.createdAt);
-              const isLegacy = !msg.ciphertext && !!msg.text;
               return (
                 <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[72%] group`}>
@@ -442,11 +368,6 @@ export default function ChatPage() {
                       }`}>
                         {msg.text}
                       </div>
-                    )}
-                    {isLegacy && (
-                      <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400/80 text-[10px] font-medium">
-                        незашифрованное (история)
-                      </span>
                     )}
                     {msg.fileUrl && (
                       <div className={`px-4 py-2.5 rounded-2xl ${isMine ? 'bg-indigo-500 text-white rounded-br-md' : 'bg-[#1e1e2a] text-white/90 rounded-bl-md'}`}>
