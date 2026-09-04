@@ -165,7 +165,7 @@ export default function ChatPage() {
     }
     // Clear uid from URL to prevent re-triggering
     navigate('/chat', { replace: true });
-  }, [targetUid]);
+  }, [targetUid, loading]);
 
   const startNewChat = async () => {
     if (!newChatPhone.trim()) return;

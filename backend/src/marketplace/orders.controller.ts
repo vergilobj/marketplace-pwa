@@ -22,7 +22,7 @@ export class OrdersController {
   constructor(private ordersService: OrdersService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('BUYER')
+  @Roles('BUYER', 'ADMIN')
   @Post()
   async create(
     @Request() req: AuthenticatedRequest,
