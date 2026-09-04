@@ -4,6 +4,7 @@ import { Heart, ShoppingCart, Trash2, Plus, Minus } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { getProducts } from '../api/products';
+import { formatPrice } from "../utils/format";
 
 export default function FavoritesPage() {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export default function FavoritesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {products.map((product, i) => {
-            const price = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(product.price);
+            const price = formatPrice(product.price);
             const ci = cart.find((item: any) => item.productId === product.id);
             const inC = !!ci;
             const q = ci?.quantity || 1;

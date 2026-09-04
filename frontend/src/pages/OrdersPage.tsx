@@ -5,6 +5,7 @@ import { PackageCheck, Clock, Truck, CheckCircle2, XCircle } from 'lucide-react'
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import toast from 'react-hot-toast';
+import { formatPrice } from "../utils/format";
 
 const GS = { background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 50%, #38bdf8 100%)' } as const;
 
@@ -44,7 +45,7 @@ export default function OrdersPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2"><h3 className="font-semibold text-[var(--color-text)] text-sm truncate">{order.product?.title || `Заказ #${order.id.slice(0, 8)}`}</h3><span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[rgba(255,255,255,0.04)] text-[11px] font-semibold text-[var(--color-muted)]">{cfg.icon}{cfg.label}</span></div>
-                    <div className="flex items-center gap-3 text-xs text-[var(--color-muted)]"><span>{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(order.amount)}</span><span>•</span><span>{order.createdAt ? format(new Date(order.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</span></div>
+                    <div className="flex items-center gap-3 text-xs text-[var(--color-muted)]"><span>{formatPrice(order.amount)}</span><span>•</span><span>{order.createdAt ? format(new Date(order.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</span></div>
                   </div>
                   {order.status === 'PENDING' && <button onClick={() => handleStatus(order.id, 'CANCELLED')} className="text-xs text-red-400 hover:text-red-300 font-medium px-3 py-1.5 rounded-full hover:bg-red-400/5 transition-all">Отменить</button>}
                   {order.status === 'SHIPPED' && <button onClick={() => handleStatus(order.id, 'COMPLETED')} className="text-xs text-emerald-400 hover:text-emerald-300 font-medium px-3 py-1.5 rounded-full hover:bg-emerald-400/5 transition-all">Подтвердить</button>}

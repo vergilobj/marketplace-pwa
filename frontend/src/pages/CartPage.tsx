@@ -2,13 +2,14 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Trash2, ShoppingBag, Heart, Minus, Plus, ArrowLeft, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { formatPrice } from "../utils/format";
 
 export default function CartPage() {
   const navigate = useNavigate();
   const { cart, removeFromCart, updateQuantity, moveToFavorites } = useApp();
 
   const total = cart.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
-  const formatted = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(total);
+  const formatted = formatPrice(total);
 
   if (cart.length === 0) {
     return (
@@ -33,7 +34,7 @@ export default function CartPage() {
               <div className="w-16 h-16 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] shrink-0" />
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold text-[var(--color-text)] truncate">{item.title}</h3>
-                <p className="text-sm text-indigo-400 font-bold">{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(item.price * item.quantity)}</p>
+                <p className="text-sm text-indigo-400 font-bold">{formatPrice(item.price * item.quantity)}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => updateQuantity(item.productId, -1)} className="p-1.5 rounded-lg bg-white/[0.04] text-white/60 hover:text-[var(--color-text)] hover:bg-white/[0.08] transition-all"><Minus size={14} /></button>

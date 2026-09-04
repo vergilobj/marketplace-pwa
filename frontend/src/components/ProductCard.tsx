@@ -2,6 +2,7 @@ import { Heart, ShoppingCart, Plus, Minus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { formatPrice } from "../utils/format";
 
 const GS = { background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 50%, #38bdf8 100%)' } as const;
 
@@ -12,7 +13,7 @@ export default function ProductCard({ product }: { product: any }) {
   const cartItem = cart.find((item: any) => item.productId === product.id);
   const inCart = !!cartItem;
   const quantity = cartItem?.quantity || 1;
-  const price = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(product.price);
+  const price = formatPrice(product.price);
 
   return (
     <motion.div

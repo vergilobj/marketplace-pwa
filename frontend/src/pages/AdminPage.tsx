@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Users, ShoppingBag, Newspaper, Wallet, TrendingUp, Download, Plus, Trash2, Copy, Check, Settings, Search } from 'lucide-react';
 import { formatPhone } from '../utils/phone';
+import { formatPrice } from "../utils/format";
 
 const statusMap: Record<string, string> = { pending: 'На рассмотрении', approved: 'Одобрена', rejected: 'Отклонена' };
 
@@ -109,7 +110,7 @@ export default function AdminPage() {
             <div className="w-12 h-12 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] overflow-hidden shrink-0">{p.media?.[0] && <img src={p.media[0]} alt="" className="w-full h-full object-cover" />}</div>
             <div>
               <p className="text-sm font-semibold text-white">{p.title}</p>
-              <p className="text-xs text-white/35">{p.seller?.name} • {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(p.price)}</p>
+              <p className="text-xs text-white/35">{p.seller?.name} • {formatPrice(p.price)}</p>
             </div>
           </div>
           <button onClick={() => handleToggleProduct(p.id)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${p.isActive ? 'bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20' : 'bg-red-400/10 text-red-400 hover:bg-red-400/20'}`}>{p.isActive ? 'Активен' : 'Скрыт'}</button>
