@@ -51,6 +51,9 @@ class PayoutRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Инициализируем БД paymod (watcher/sweeper требуют схему до старта).
+    import paymod.db as paymod_db
+    await paymod_db.init_db()
     await db.connect()
     # Запускаем watcher + sweeper только если включено (по умолчанию — да).
     if os.environ.get("PAYMOD_BACKGROUND", "1") not in ("0", "false", "no"):
