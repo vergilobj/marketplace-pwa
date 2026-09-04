@@ -35,9 +35,9 @@ export default function FavoritesPage() {
             const q = ci?.quantity || 1;
             return (
               <motion.div key={product.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                className="group bg-[#1a1a24] border border-white/[0.06] rounded-2xl overflow-hidden hover:border-white/[0.12] transition-all cursor-pointer flex flex-col h-full"
+                className="group glass-card rounded-2xl overflow-hidden cursor-pointer flex flex-col h-full p-0"
                 onClick={() => navigate(`/products/${product.id}`)}>
-                <div className="aspect-square bg-[#111115] relative shrink-0">
+                <div className="aspect-square bg-[rgba(255,255,255,0.03)] relative shrink-0">
                   {product.media?.[0] && <img src={product.media[0]} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />}
                   <span className="absolute bottom-3 left-3 px-3 py-1.5 rounded-xl bg-black/70 backdrop-blur-xl text-sm font-bold text-white">{price}</span>
                 </div>

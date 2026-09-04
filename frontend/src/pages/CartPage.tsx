@@ -29,8 +29,8 @@ export default function CartPage() {
       <div className="space-y-3 mb-8">
         <AnimatePresence>
           {cart.map((item: any) => (
-            <motion.div key={item.productId} exit={{ opacity: 0, x: 20 }} className="flex items-center gap-4 p-4 bg-[#1a1a24] border border-white/[0.06] rounded-2xl">
-              <div className="w-16 h-16 rounded-xl bg-[#111115] shrink-0" />
+            <motion.div key={item.productId} exit={{ opacity: 0, x: 20 }} className="flex items-center gap-4 p-4 glass-card rounded-2xl">
+              <div className="w-16 h-16 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] shrink-0" />
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold text-white truncate">{item.title}</h3>
                 <p className="text-sm text-indigo-400 font-bold">{new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(item.price * item.quantity)}</p>
@@ -47,7 +47,7 @@ export default function CartPage() {
         </AnimatePresence>
       </div>
 
-      <div className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-5">
+      <div className="glass-card rounded-2xl p-5">
         <div className="flex justify-between items-center mb-4"><span className="text-white/50 text-sm">Итого</span><span className="text-xl font-bold text-white">{formatted}</span></div>
         <button onClick={() => navigate('/checkout')} className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-semibold text-sm hover:from-indigo-400 transition-all shadow-lg shadow-indigo-500/25"><Sparkles size={16} /> Оформить заказ</button>
       </div>

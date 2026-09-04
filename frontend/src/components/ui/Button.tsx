@@ -5,6 +5,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
 }
 
+const GS = { background: 'linear-gradient(135deg, #FF579B 0%, #9C6AFF 50%, #1DB4FF 100%)' } as const;
+
 const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   loading,
@@ -15,9 +17,9 @@ const Button: React.FC<ButtonProps> = ({
   const base =
     'inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold text-sm transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100';
 
-  const variants = {
+  const variants: Record<string, string> = {
     primary:
-      'text-white bg-[linear-gradient(135deg,#FF579B_0%,#9C6AFF_50%,#1DB4FF_100%)] hover:scale-[1.02] shadow-[0_16px_40px_rgba(255,87,155,0.24)]',
+      'text-white hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(255,87,155,0.38)]',
     secondary:
       'text-[var(--color-text)] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] backdrop-blur hover:border-[rgba(255,87,155,0.5)] hover:text-[#FF579B]',
     ghost:
@@ -27,6 +29,7 @@ const Button: React.FC<ButtonProps> = ({
   return (
     <button
       className={`${base} ${variants[variant]} ${className || ''}`}
+      style={variant === 'primary' ? { ...GS, boxShadow: '0 16px 40px rgba(255,87,155,0.24)' } : undefined}
       disabled={loading || props.disabled}
       {...props}
     >

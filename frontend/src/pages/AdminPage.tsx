@@ -67,7 +67,7 @@ export default function AdminPage() {
         { label: 'Заказы', value: dashboard?.ordersCount || 0, icon: <Wallet size={22} />, color: 'from-amber-500 to-orange-600' },
         { label: 'Доход', value: `${(dashboard?.totalRevenue || 0).toLocaleString('ru-RU')} ₽`, icon: <TrendingUp size={22} />, color: 'from-purple-500 to-pink-600' },
       ].map((s, i) => (
-        <div key={i} className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-5">
+        <div key={i} className="glass-card rounded-2xl p-5">
           <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center text-white mb-3`}>{s.icon}</div>
           <div className="text-2xl font-bold text-white">{s.value}</div>
           <div className="text-sm text-white/50 mt-1">{s.label}</div>
@@ -79,7 +79,7 @@ export default function AdminPage() {
   const renderUsers = () => (
     <div className="space-y-2">
       {users.map((u: any) => (
-        <div key={u.id} className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-4 flex items-center justify-between">
+        <div key={u.id} className="glass-card rounded-2xl p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-bold flex items-center justify-center">{(u.name || '?')[0].toUpperCase()}</div>
             <div>
@@ -103,9 +103,9 @@ export default function AdminPage() {
   const renderProducts = () => (
     <div className="space-y-2">
       {products.map((p: any) => (
-        <div key={p.id} className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-4 flex items-center justify-between">
+        <div key={p.id} className="glass-card rounded-2xl p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[#111115] overflow-hidden shrink-0">{p.media?.[0] && <img src={p.media[0]} alt="" className="w-full h-full object-cover" />}</div>
+            <div className="w-12 h-12 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] overflow-hidden shrink-0">{p.media?.[0] && <img src={p.media[0]} alt="" className="w-full h-full object-cover" />}</div>
             <div>
               <p className="text-sm font-semibold text-white">{p.title}</p>
               <p className="text-xs text-white/35">{p.seller?.name} • {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', minimumFractionDigits: 0 }).format(p.price)}</p>
@@ -120,7 +120,7 @@ export default function AdminPage() {
   const renderPosts = () => (
     <div className="space-y-2">
       {posts.map((p: any) => (
-        <div key={p.id} className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-4 flex items-center justify-between">
+        <div key={p.id} className="glass-card rounded-2xl p-4 flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-white truncate">{p.title}</p>
             <p className="text-xs text-white/35">{p.author?.name} • {p.isAd ? 'Реклама' : 'Пост'} • {p.createdAt ? format(new Date(p.createdAt), 'd MMM', { locale: ru }) : ''}</p>
@@ -136,7 +136,7 @@ export default function AdminPage() {
       <button onClick={handleCreateInvite} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 transition-all shadow-lg mb-4"><Plus size={15} /> Создать инвайт</button>
       <div className="space-y-2">
         {invites.map((inv: any) => (
-          <div key={inv.code} className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-4 flex items-center justify-between">
+          <div key={inv.code} className="glass-card rounded-2xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <code className="text-sm font-mono font-bold text-indigo-400 bg-indigo-400/5 px-3 py-1.5 rounded-lg">{inv.code}</code>
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${inv.isUsed ? 'bg-red-400/10 text-red-400' : 'bg-emerald-400/10 text-emerald-400'}`}>{inv.isUsed ? 'Использован' : 'Свободен'}</span>
@@ -154,7 +154,7 @@ export default function AdminPage() {
   const renderTransactions = () => (
     <div className="space-y-2">
       {transactions.map((t: any) => (
-        <div key={t.id} className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-4 flex items-center justify-between">
+        <div key={t.id} className="glass-card rounded-2xl p-4 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-white">{t.type}</p>
             <p className="text-xs text-white/35">{t.orderId?.slice(0, 8)} • {t.createdAt ? format(new Date(t.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</p>
@@ -171,7 +171,7 @@ export default function AdminPage() {
   const renderWithdrawals = () => (
     <div className="space-y-2">
       {withdrawals.map((w: any) => (
-        <div key={w.id} className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-4 flex items-center justify-between">
+        <div key={w.id} className="glass-card rounded-2xl p-4 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-white">{w.amount?.toLocaleString('ru-RU')} ₽</p>
             <p className="text-xs text-white/35">{w.userId?.slice(0, 8)} • {w.createdAt ? format(new Date(w.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</p>

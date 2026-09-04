@@ -119,7 +119,7 @@ export default function CheckoutPage() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-6"
+        className="glass-card rounded-[26px] p-6"
       >
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
@@ -176,7 +176,7 @@ export default function CheckoutPage() {
 
         {/* Карточка оплаты USDT (BSC) */}
         {payment?.depositAddress && (
-          <div className="mt-6 bg-[#0f0f16] border border-emerald-500/20 rounded-xl p-5">
+          <div className="mt-6 glass border border-emerald-500/20 rounded-2xl p-5">
             <p className="text-sm font-bold text-white mb-1">
               Оплатите USDT (BSC) на адрес:
             </p>

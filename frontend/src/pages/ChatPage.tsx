@@ -309,9 +309,9 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-[#0a0a0f]">
+    <div className="flex h-[calc(100vh-64px)] bg-[transparent]">
       {/* Sidebar */}
-      <div className={`${selectedUser ? 'hidden md:flex' : 'flex'} md:flex flex-col w-full md:w-80 lg:w-96 border-r border-white/[0.06] bg-[#111118] shrink-0`}>
+      <div className={`${selectedUser ? 'hidden md:flex' : 'flex'} md:flex flex-col w-full md:w-80 lg:w-96 border-r border-[rgba(255,255,255,0.07)] glass shrink-0 rounded-l-[26px]`}>
         {/* Header */}
         <div className="p-4 border-b border-white/[0.06]">
           <div className="flex items-center justify-between mb-3">
@@ -374,10 +374,10 @@ export default function ChatPage() {
                     {(c.name || '?')[0].toUpperCase()}
                   </div>
                   {isOnline && (
-                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#111118]" />
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[var(--color-card)]" />
                   )}
                   {c.unread > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-[#111118]">{c.unread > 9 ? '9+' : c.unread}</span>
+                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-[var(--color-card)]">{c.unread > 9 ? '9+' : c.unread}</span>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -410,7 +410,7 @@ export default function ChatPage() {
       {selectedUser ? (
         <div className="flex-1 flex flex-col min-w-0">
           {/* Chat header */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] bg-[#111118] shrink-0">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-[rgba(255,255,255,0.07)] glass-strong shrink-0">
             <button onClick={() => setSelectedUser(null)} className="md:hidden text-white/50 hover:text-white">
               <ArrowLeft size={20} />
             </button>
@@ -448,16 +448,16 @@ export default function ChatPage() {
                       <p className="text-[10px] text-white/30 ml-2 mb-0.5">{msg.sender?.name || 'Пользователь'}</p>
                     )}
                     {msg.text && (
-                      <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
+                      <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words shadow-lg ${
                         isMine
-                          ? 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-br-md shadow-lg shadow-indigo-500/10'
-                          : 'bg-[#1e1e2a] text-white/90 rounded-bl-md'
-                      }`}>
+                          ? 'text-white rounded-br-md shadow-[0_8px_20px_rgba(255,87,155,0.25)]'
+                          : 'glass text-[var(--color-text)] rounded-bl-md'
+                      }`} style={isMine ? { background: 'linear-gradient(135deg, #FF579B 0%, #9C6AFF 100%)' } : undefined}>
                         {msg.text}
                       </div>
                     )}
                     {msg.fileUrl && (
-                      <div className={`px-4 py-2.5 rounded-2xl ${isMine ? 'bg-indigo-500 text-white rounded-br-md' : 'bg-[#1e1e2a] text-white/90 rounded-bl-md'}`}>
+                      <div className={`px-4 py-2.5 rounded-2xl ${isMine ? 'text-white rounded-br-md' : 'glass text-[var(--color-text)] rounded-bl-md'}`} style={isMine ? { background: 'linear-gradient(135deg, #FF579B 0%, #9C6AFF 100%)' } : undefined}>
                         {msg.fileType?.startsWith('image/') ? (
                           <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer">
                             <img src={msg.fileUrl} alt={msg.fileName || 'Image'} className="max-w-[220px] max-h-[220px] rounded-lg object-cover" loading="lazy" />
@@ -496,7 +496,7 @@ export default function ChatPage() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-white/[0.06] bg-[#111118] shrink-0">
+          <div className="border-t border-[rgba(255,255,255,0.07)] glass-strong shrink-0">
             {/* Pending attachments */}
             {pendingFiles.length > 0 && (
               <div className="flex items-center gap-2 px-4 pt-3 overflow-x-auto">
@@ -523,7 +523,7 @@ export default function ChatPage() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="w-10 h-10 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center text-white/50 hover:text-white transition-all shrink-0"
+                className="w-10 h-10 rounded-full bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.08)] flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-text)] transition-all shrink-0"
               >
                 {uploading ? <div className="w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" /> : <Paperclip size={18} />}
               </button>
@@ -533,12 +533,13 @@ export default function ChatPage() {
                 onChange={e => setMessageText(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                 placeholder="Сообщение..."
-                className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-indigo-500/40 transition-all"
+                className="flex-1 px-4 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(255,87,155,0.5)] transition-all"
               />
               <button
                 onClick={sendMessage}
                 disabled={!messageText.trim() && pendingFiles.length === 0}
-                className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center hover:bg-indigo-400 disabled:opacity-20 transition-all shrink-0"
+                className="w-10 h-10 rounded-full text-white flex items-center justify-center disabled:opacity-20 transition-all shrink-0 shadow-[0_6px_20px_rgba(255,87,155,0.3)]"
+                style={{ background: 'linear-gradient(135deg, #FF579B 0%, #9C6AFF 50%, #1DB4FF 100%)' }}
               >
                 <Send size={16} />
               </button>

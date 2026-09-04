@@ -10,32 +10,34 @@ export default function DashboardPage() {
   }, []);
 
   const actions = [
-    { to: '/products', icon: ShoppingBag, label: 'Товары', desc: 'Покупайте и продавайте' },
-    { to: '/posts', icon: Newspaper, label: 'Лента', desc: 'Новости и реклама' },
-    { to: '/chat', icon: MessageCircle, label: 'Чат', desc: 'Общайтесь с продавцами' },
-    { to: '/profile', icon: User, label: 'Профиль', desc: 'Ваши данные и заказы' },
+    { to: '/products', icon: ShoppingBag, label: 'Товары', desc: 'Покупайте и продавайте', grad: 'linear-gradient(135deg, #FF579B, #9C6AFF)' },
+    { to: '/posts', icon: Newspaper, label: 'Лента', desc: 'Новости и реклама', grad: 'linear-gradient(135deg, #9C6AFF, #1DB4FF)' },
+    { to: '/chat', icon: MessageCircle, label: 'Чат', desc: 'Общайтесь с продавцами', grad: 'linear-gradient(135deg, #1DB4FF, #FF579B)' },
+    { to: '/profile', icon: User, label: 'Профиль', desc: 'Ваши данные и заказы', grad: 'linear-gradient(135deg, #FF579B, #1DB4FF)' },
   ];
 
   return (
     <div className="space-y-12">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight">Добро пожаловать, {userName || '...'}</h1>
-        <p className="mt-4 text-lg text-gray-500 dark:text-gray-400">
+      <div className="text-center pt-4">
+        <h1 className="text-4xl font-bold tracking-tight">
+          Добро пожаловать, <span className="text-gradient">{userName || '...'}</span>
+        </h1>
+        <p className="mt-4 text-lg text-[var(--color-muted)]">
           Ваш закрытый маркетплейс с чатом и новостями.
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-        {actions.map(({ to, icon: Icon, label, desc }) => (
+        {actions.map(({ to, icon: Icon, label, desc, grad }) => (
           <Link key={to} to={to} className="group">
-            <Card className="flex items-center gap-5 group-hover:border-blue-500/30 transition-colors cursor-pointer">
-              <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-2xl">
-                <Icon className="w-6 h-6 text-blue-600" />
+            <Card className="flex items-center gap-5 cursor-pointer group-hover:border-[rgba(255,87,155,0.4)]">
+              <div className="p-3 rounded-2xl flex-shrink-0 shadow-lg" style={{ background: grad }}>
+                <Icon className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-lg">{label}</h3>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">{desc}</p>
+                <p className="text-[var(--color-muted)] text-sm">{desc}</p>
               </div>
-              <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors" />
+              <ArrowRight className="w-5 h-5 text-[var(--color-faint)] group-hover:text-[#FF579B] group-hover:translate-x-1 transition-all" />
             </Card>
           </Link>
         ))}

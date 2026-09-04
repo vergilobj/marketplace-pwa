@@ -3,6 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
+  /* ===== SparkEra accent spectrum (через существующие utility-неймспейсы) ===== */
   --color-indigo-300: #ff9dc4;
   --color-indigo-400: #ff7ab0;
   --color-indigo-500: #FF579B;
@@ -14,50 +15,41 @@
   --color-blue-600: #1DB4FF;
   --color-blue-700: #1898d9;
 
+  --color-purple-300: #c8aaff;
+  --color-purple-400: #b493ff;
   --color-purple-500: #9C6AFF;
   --color-purple-600: #8352ea;
-  --color-purple-400: #b493ff;
+  --color-purple-700: #6f40d4;
 
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-heading: 'Manrope', 'Inter', sans-serif;
+
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 26px;
+  --radius-xl: 34px;
 }
 
-/* ===== Темы (unlayered — приоритет выше любого @layer) ===== */
+/* ============================================================
+   SparkEra Design System — глобальные токены
+   ============================================================ */
 :root {
   --pink: #FF579B;
   --lilac: #9C6AFF;
   --azure: #1DB4FF;
 
-  --color-bg: #f8f9fc;
-  --color-surface: #ffffff;
-  --color-card: #ffffff;
-  --color-border: rgba(0,0,0,0.06);
-  --color-text: #0d0e1c;
-  --color-muted: #6060a0;
-  --color-faint: #9898b8;
-  --color-accent: #FF579B;
+  /* Тёмная тема — базовая (приложение по умолчанию тёмное) */
+  --bg: #0e1018;
+  --bg-alt: #12151f;
+  --bg-tint: #101320;
+  --card: #181b28;
+  --ink: #eceef8;
+  --ink-soft: #aeaed0;
+  --muted: #9898c4;
+  --faint: #5858a0;
+  --line: rgba(255,255,255,.07);
+  --line-strong: rgba(255,255,255,.12);
 
-  --spark: linear-gradient(135deg, #FF579B 0%, #9C6AFF 50%, #1DB4FF 100%);
-  --spark-soft: linear-gradient(120deg, rgba(255,87,155,.09), rgba(156,106,255,.07), rgba(29,180,255,.09));
-  --bg-glow:
-    radial-gradient(ellipse 115% 80% at -4% 50%, rgba(255,87,155,.10) 0%, transparent 52%),
-    radial-gradient(ellipse 95% 80% at 104% 50%, rgba(29,180,255,.10) 0%, transparent 52%),
-    linear-gradient(145deg, #ffffff 0%, #f3f4ff 100%);
-
-  --r-sm: 12px;
-  --r-md: 18px;
-  --r-lg: 26px;
-  --r-xl: 34px;
-  --r-full: 999px;
-
-  --shadow-xs: 0 2px 10px rgba(0,0,0,.15);
-  --shadow: 0 14px 40px rgba(20,20,60,.12);
-  --shadow-rose: 0 16px 40px rgba(255,87,155,.18);
-
-  --ease: cubic-bezier(.22,.61,.36,1);
-}
-
-html.dark {
   --color-bg: #0e1018;
   --color-surface: #12151f;
   --color-card: #181b28;
@@ -67,16 +59,70 @@ html.dark {
   --color-faint: #5858a0;
   --color-accent: #FF579B;
 
-  --bg-glow:
-    radial-gradient(ellipse 115% 80% at -4% 50%, rgba(255,87,155,.18) 0%, transparent 52%),
-    radial-gradient(ellipse 95% 80% at 104% 50%, rgba(29,180,255,.15) 0%, transparent 52%),
-    radial-gradient(ellipse 75% 100% at 50% -12%, rgba(156,106,255,.14) 0%, transparent 54%),
+  /* Градиенты */
+  --spark: linear-gradient(135deg, #FF579B 0%, #9C6AFF 50%, #1DB4FF 100%);
+  --spectrum: linear-gradient(135deg, #FF579B, #9C6AFF, #1DB4FF);
+  --spectrum-soft: linear-gradient(120deg, rgba(255,87,155,.10), rgba(156,106,255,.08), rgba(29,180,255,.10));
+  --bg-dark-gradient:
+    radial-gradient(ellipse 115% 80% at -4% 50%, rgba(255,87,155,.44) 0%, transparent 52%),
+    radial-gradient(ellipse 95% 80% at 104% 50%, rgba(29,180,255,.38) 0%, transparent 52%),
+    radial-gradient(ellipse 75% 100% at 50% -12%, rgba(156,106,255,.32) 0%, transparent 54%),
+    radial-gradient(ellipse 55% 60% at 50% 115%, rgba(255,87,155,.16) 0%, transparent 50%),
     linear-gradient(145deg, #050610 0%, #080b1e 100%);
 
+  --bg-glow: var(--bg-dark-gradient);
+
+  /* Радиусы */
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 26px;
+  --r-xl: 34px;
+  --r-full: 999px;
+
+  /* Тени — глубокие, с акцентным свечением */
+  --shadow-xs: 0 2px 10px rgba(0,0,0,.28);
   --shadow: 0 14px 40px rgba(0,0,0,.44);
+  --shadow-lg: 0 30px 80px rgba(0,0,0,.55);
   --shadow-rose: 0 16px 40px rgba(255,87,155,.24);
+  --shadow-amber: 0 16px 40px rgba(255,87,155,.24);
+
+  --ease: cubic-bezier(.22,.61,.36,1);
 }
 
+/* ============================================================
+   Светлая тема (переключатель) — формы и панели
+   ============================================================ */
+html:not(.dark) {
+  --bg: #f8f9fc;
+  --bg-alt: #ffffff;
+  --card: #ffffff;
+  --ink: #0d0e1c;
+  --muted: #6060a0;
+  --faint: #9898b8;
+  --line: rgba(0,0,0,.08);
+
+  --color-bg: #f8f9fc;
+  --color-surface: #ffffff;
+  --color-card: #ffffff;
+  --color-border: rgba(0,0,0,.06);
+  --color-text: #0d0e1c;
+  --color-muted: #6060a0;
+  --color-faint: #9898b8;
+
+  --bg-dark-gradient:
+    radial-gradient(ellipse 115% 80% at -4% 50%, rgba(255,87,155,.14) 0%, transparent 52%),
+    radial-gradient(ellipse 95% 80% at 104% 50%, rgba(29,180,255,.14) 0%, transparent 52%),
+    radial-gradient(ellipse 75% 100% at 50% -12%, rgba(156,106,255,.12) 0%, transparent 54%),
+    linear-gradient(145deg, #ffffff 0%, #f3f4ff 100%);
+  --bg-glow: var(--bg-dark-gradient);
+
+  --shadow: 0 14px 40px rgba(20,20,60,.12);
+  --shadow-rose: 0 16px 40px rgba(255,87,155,.18);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
 @layer base {
   html, body, #root { min-height: 100%; }
 
@@ -87,10 +133,10 @@ html.dark {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    color-scheme: light;
-    transition: background 0.3s var(--ease), color 0.3s var(--ease);
+    color-scheme: dark;
+    transition: background .3s var(--ease), color .3s var(--ease);
   }
-  html.dark body { color-scheme: dark; }
+  html:not(.dark) body { color-scheme: light; }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Manrope', 'Inter', sans-serif;
@@ -104,37 +150,69 @@ html.dark {
     background: linear-gradient(180deg, #FF579B99, #9C6AFF99, #1DB4FF99);
     border-radius: 10px;
   }
-  html.dark ::-webkit-scrollbar-thumb {
+  html:not(.dark) ::-webkit-scrollbar-thumb {
     background: linear-gradient(180deg, #FF579B88, #9C6AFF88, #1DB4FF88);
   }
 
-  ::selection { background: rgba(255,87,155,.25); }
+  ::selection { background: rgba(255,87,155,.28); }
 }
 
+/* ============================================================
+   Apple-glass утилиты
+   ============================================================ */
 @layer utilities {
-  .glass {
-    background: rgba(255,255,255,0.7);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(0,0,0,0.06);
+  /* Стеклянная панель — сайдбары, шапки */
+  .glass,
+  .glass-panel {
+    background: rgba(20, 22, 32, 0.65);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    border: 1px solid rgba(255,255,255,.07);
   }
-  html.dark .glass {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
+  html:not(.dark) .glass,
+  html:not(.dark) .glass-panel {
+    background: rgba(255,255,255,.72);
+    border: 1px solid rgba(0,0,0,.06);
   }
 
+  /* Более плотное стекло — модалки, вложенные панели */
+  .glass-strong {
+    background: rgba(20, 22, 32, 0.82);
+    backdrop-filter: blur(32px) saturate(160%);
+    -webkit-backdrop-filter: blur(32px) saturate(160%);
+    border: 1px solid rgba(255,255,255,.1);
+  }
+  html:not(.dark) .glass-strong {
+    background: rgba(255,255,255,.9);
+    border: 1px solid rgba(0,0,0,.08);
+  }
+
+  /* Стеклянная карточка — с глубиной и hover-подъёмом */
   .glass-card {
-    background: var(--color-card);
-    border: 1px solid var(--color-border);
+    background: linear-gradient(160deg, rgba(24, 27, 40, 0.92), rgba(18, 21, 31, 0.96));
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid rgba(255,255,255,.07);
     border-radius: var(--r-md);
-    transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease), border-color 0.3s var(--ease);
+    box-shadow: var(--shadow);
+    transition: transform .35s var(--ease), box-shadow .35s var(--ease), border-color .35s var(--ease);
   }
   .glass-card:hover {
-    border-color: rgba(255,87,155,.35);
+    border-color: rgba(255,87,155,.4);
     transform: translateY(-4px);
     box-shadow: var(--shadow-rose);
   }
+  html:not(.dark) .glass-card {
+    background: rgba(255,255,255,.88);
+    border: 1px solid rgba(0,0,0,.06);
+    box-shadow: 0 8px 30px rgba(20,20,60,.08);
+  }
+  html:not(.dark) .glass-card:hover {
+    border-color: rgba(255,87,155,.35);
+    box-shadow: 0 16px 40px rgba(255,87,155,.18);
+  }
 
+  /* Градиентный текст */
   .text-gradient {
     background: var(--spark);
     -webkit-background-clip: text;
@@ -143,11 +221,13 @@ html.dark {
     color: transparent;
   }
 
+  /* Мягкая градиентная поверхность */
   .spark-surface {
-    background: var(--spark-soft);
+    background: var(--spectrum-soft);
     border: 1px solid rgba(255,87,155,.15);
   }
 
+  /* ===== Кнопки ===== */
   .btn-capsule {
     display: inline-flex;
     align-items: center;
@@ -158,51 +238,93 @@ html.dark {
     font-family: 'Manrope', sans-serif;
     font-weight: 600;
     font-size: 14px;
-    transition: all 0.25s var(--ease);
+    transition: all .25s var(--ease);
     cursor: pointer;
     white-space: nowrap;
   }
+
+  /* Основная кнопка — spark-градиент, капсула, свечение */
   .btn-primary {
     background: var(--spark);
     color: #fff;
     box-shadow: var(--shadow-rose);
   }
-  .btn-primary:hover { transform: scale(1.02); box-shadow: 0 20px 50px rgba(255,87,155,.35); }
+  .btn-primary:hover { transform: scale(1.02); box-shadow: 0 20px 50px rgba(255,87,155,.38); }
   .btn-primary:active { transform: scale(0.98); }
+
+  /* Призрачная кнопка — стекло */
+  .btn-ghost,
   .btn-secondary {
-    background: rgba(255,255,255,0.6);
-    border: 1px solid rgba(0,0,0,0.1);
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.12);
     color: var(--color-text);
     backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
-  html.dark .btn-secondary {
-    background: rgba(255,255,255,0.05);
-    border-color: rgba(255,255,255,0.12);
+  .btn-ghost:hover,
+  .btn-secondary:hover {
+    border-color: rgba(255,87,155,.5);
+    color: #FF579B;
   }
-  .btn-secondary:hover { border-color: rgba(255,87,155,.5); color: #FF579B; }
+  html:not(.dark) .btn-ghost,
+  html:not(.dark) .btn-secondary {
+    background: rgba(0,0,0,.04);
+    border-color: rgba(0,0,0,.12);
+  }
 
+  /* ===== Инпуты ===== */
   .input-glass {
     width: 100%;
     padding: 11px 16px;
     border-radius: var(--r-sm);
-    background: #f0f2f8;
+    background: rgba(255,255,255,.04);
     border: 1px solid var(--color-border);
     color: var(--color-text);
     font-size: 14px;
     outline: none;
-    transition: all 0.25s var(--ease);
+    transition: all .25s var(--ease);
   }
-  html.dark .input-glass {
-    background: rgba(255,255,255,0.04);
+  html:not(.dark) .input-glass {
+    background: #f0f2f8;
   }
   .input-glass::placeholder { color: var(--color-faint); }
   .input-glass:focus {
     border-color: rgba(255,87,155,.6);
-    box-shadow: 0 0 0 3px rgba(255,87,155,.15);
+    box-shadow: 0 0 0 3px rgba(255,87,155,.16);
+  }
+
+  /* ===== Анимации (apple spring) ===== */
+  @keyframes springUp {
+    0% { opacity: 0; transform: translateY(6px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  .animate-spring-up { animation: springUp .4s ease-out forwards; }
+
+  @keyframes springIn {
+    0% { opacity: 0; transform: scale(.94); }
+    60% { opacity: 1; transform: scale(1.02); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  .animate-spring-in { animation: springIn .4s cubic-bezier(.22,.61,.36,1) forwards; }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  .animate-float { animation: float 4s ease-in-out infinite; }
+
+  /* Градиентная обводка при hover (для карточек) */
+  .gradient-ring {
+    position: relative;
+  }
+  .gradient-ring:hover {
+    border-color: transparent;
   }
 }
 
-/* ===== Светлая тема: белый текст из тёмных страниц делаем читаемым ===== */
+/* ============================================================
+   Светлая тема — читаемость белого текста на светлых карточках
+   ============================================================ */
 html:not(.dark) .text-white { color: #0d0e1c; }
 html:not(.dark) .text-white\/90 { color: rgba(13,14,28,.9); }
 html:not(.dark) .text-white\/85 { color: rgba(13,14,28,.85); }
@@ -217,29 +339,37 @@ html:not(.dark) .text-white\/20 { color: rgba(13,14,28,.2); }
 html:not(.dark) .text-white\/15 { color: rgba(13,14,28,.15); }
 html:not(.dark) .text-white\/10 { color: rgba(13,14,28,.1); }
 
-/* ===== Светлая тема: тёмные фоны → светлые ===== */
-html:not(.dark) .bg-\[\#1a1a24\] { background-color: #ffffff; }
-html:not(.dark) .bg-\[\#0a0a0f\] { background-color: #ffffff; }
-html:not(.dark) .bg-\[\#111118\] { background-color: #ffffff; }
-html:not(.dark) .bg-\[\#111115\] { background-color: #f1f2f6; }
-html:not(.dark) .bg-\[\#1e1e2a\] { background-color: #f1f2f6; }
-html:not(.dark) .bg-\[\#22222d\] { background-color: #f8f9fc; }
+/* ===== Светлая тема: плоские тёмные фоны → стекло/светлое ===== */
+html:not(.dark) .bg-\[\#1a1a24\],
+html:not(.dark) .bg-\[\#0a0a0f\],
+html:not(.dark) .bg-\[\#111118\],
+html:not(.dark) .bg-\[\#0f0f16\] { background-color: #ffffff; }
+html:not(.dark) .bg-\[\#111115\],
+html:not(.dark) .bg-\[\#1e1e2a\],
+html:not(.dark) .bg-\[\#22222d\] { background-color: #f1f2f6; }
 
 /* ===== Светлая тема: полупрозрачные белые фоны → полупрозрачный чёрный ===== */
-html:not(.dark) .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.02); }
-html:not(.dark) .bg-white\/\[0\.04\] { background-color: rgba(0,0,0,0.03); }
-html:not(.dark) .bg-white\/\[0\.06\] { background-color: rgba(0,0,0,0.05); }
-html:not(.dark) .bg-white\/\[0\.08\] { background-color: rgba(0,0,0,0.06); }
+html:not(.dark) .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,.02); }
+html:not(.dark) .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,.025); }
+html:not(.dark) .bg-white\/\[0\.04\] { background-color: rgba(0,0,0,.03); }
+html:not(.dark) .bg-white\/\[0\.06\] { background-color: rgba(0,0,0,.05); }
+html:not(.dark) .bg-white\/\[0\.08\] { background-color: rgba(0,0,0,.06); }
+html:not(.dark) .bg-white\/\[0\.10\] { background-color: rgba(0,0,0,.07); }
+html:not(.dark) .bg-white\/\[0\.12\] { background-color: rgba(0,0,0,.08); }
+html:not(.dark) .bg-white\/\[0\.15\] { background-color: rgba(0,0,0,.1); }
 
 /* ===== Светлая тема: светлые рамки → тёмные ===== */
-html:not(.dark) .border-white\/\[0\.02\] { border-color: rgba(0,0,0,0.04); }
-html:not(.dark) .border-white\/\[0\.04\] { border-color: rgba(0,0,0,0.06); }
-html:not(.dark) .border-white\/\[0\.06\] { border-color: rgba(0,0,0,0.08); }
-html:not(.dark) .border-white\/\[0\.08\] { border-color: rgba(0,0,0,0.10); }
-html:not(.dark) .border-\[\#111118\] { border-color: rgba(0,0,0,0.10); }
+html:not(.dark) .border-white\/\[0\.02\] { border-color: rgba(0,0,0,.04); }
+html:not(.dark) .border-white\/\[0\.03\] { border-color: rgba(0,0,0,.05); }
+html:not(.dark) .border-white\/\[0\.04\] { border-color: rgba(0,0,0,.06); }
+html:not(.dark) .border-white\/\[0\.06\] { border-color: rgba(0,0,0,.08); }
+html:not(.dark) .border-white\/\[0\.08\] { border-color: rgba(0,0,0,.10); }
+html:not(.dark) .border-white\/\[0\.10\] { border-color: rgba(0,0,0,.12); }
+html:not(.dark) .border-white\/\[0\.12\] { border-color: rgba(0,0,0,.14); }
+html:not(.dark) .border-\[\#111118\] { border-color: rgba(0,0,0,.10); }
 html:not(.dark) .bg-black { background-color: #f1f2f6; }
 
-/* ===== Светлая тема: placeholder'ы (pseudo-element) ===== */
+/* ===== Светлая тема: placeholder'ы ===== */
 html:not(.dark) input::placeholder,
 html:not(.dark) textarea::placeholder {
   color: #9898b8;
@@ -252,4 +382,19 @@ html:not(.dark) input.bg-white\/\[0\.06\],
 html:not(.dark) textarea.bg-white\/\[0\.04\],
 html:not(.dark) textarea.bg-white\/\[0\.06\] {
   background-color: #f0f2f8;
+}
+
+/* ===== Reduced motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spring-up, .animate-spring-in { animation: none; opacity: 1; transform: none; }
+  .animate-float { animation: none; }
+}
+
+/* ===== iOS: убрать авто-зум при фокусе на полях ввода ===== */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }

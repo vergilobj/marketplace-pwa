@@ -6,6 +6,8 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 
+const GS = { background: 'linear-gradient(135deg, #FF579B 0%, #9C6AFF 50%, #1DB4FF 100%)' } as const;
+
 const sc: Record<string, { i: React.ReactNode; v: string; l: string }> = {
   pending: { i: <Clock size={13} />, v: 'warning', l: 'На рассмотрении' },
   approved: { i: <CheckCircle2 size={13} />, v: 'success', l: 'Одобрена' },
@@ -71,15 +73,15 @@ export default function WithdrawalsPage() {
   if (loading)
     return (
       <div className="flex justify-center py-32">
-        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 animate-pulse" />
+        <div style={GS} className="w-10 h-10 rounded-2xl animate-pulse" />
       </div>
     );
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold text-white mb-2">Вывод средств</h1>
-        <p className="text-white/60 text-sm mb-8">
+        <h1 className="text-2xl font-bold text-[var(--color-text)] mb-2">Вывод средств</h1>
+        <p className="text-[var(--color-muted)] text-sm mb-8">
           Заявки на вывод бонусного баланса (USDT BSC)
         </p>
       </motion.div>
@@ -87,14 +89,14 @@ export default function WithdrawalsPage() {
       <motion.div
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-6 mb-6 bg-gradient-to-br from-emerald-500/5 to-teal-500/5"
+        className="glass-card rounded-[26px] p-6 mb-6"
       >
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #34d399, #2dd4bf)' }}>
             <Wallet size={20} className="text-white" />
           </div>
           <div>
-            <p className="text-white/60 text-xs">Доступный баланс</p>
+            <p className="text-[var(--color-muted)] text-xs">Доступный баланс</p>
             <p className="text-2xl font-bold text-emerald-400">
               {balance.toLocaleString('ru-RU')} ₽
             </p>
@@ -108,12 +110,13 @@ export default function WithdrawalsPage() {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Сумма"
-              className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/35 outline-none focus:border-emerald-500/50 transition-all"
+              className="flex-1 px-4 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(255,87,155,0.5)] transition-all"
             />
             <button
               onClick={handleReq}
               disabled={req}
-              className="px-5 py-2.5 rounded-xl bg-emerald-500 text-white font-semibold text-sm hover:bg-emerald-400 transition-all shadow-lg disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg, #34d399, #2dd4bf)' }}
+              className="px-5 py-2.5 rounded-full text-white font-semibold text-sm transition-all shadow-lg disabled:opacity-50 hover:scale-[1.02]"
             >
               {req ? '...' : 'Вывести'}
             </button>
@@ -123,18 +126,18 @@ export default function WithdrawalsPage() {
             value={wallet}
             onChange={(e) => setWallet(e.target.value)}
             placeholder="BSC-адрес кошелька (0x...)"
-            className="w-full px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/35 outline-none focus:border-emerald-500/50 transition-all font-mono"
+            className="w-full px-4 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(255,87,155,0.5)] transition-all font-mono"
           />
         </div>
       </motion.div>
 
-      <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+      <h3 className="text-base font-bold text-[var(--color-text)] mb-4 flex items-center gap-2">
         <Download size={16} /> История
       </h3>
       {list.length === 0 ? (
         <div className="text-center py-16">
-          <Download size={40} className="mx-auto text-white/10 mb-4" />
-          <p className="text-white/60">Нет заявок</p>
+          <Download size={40} className="mx-auto text-[var(--color-faint)] mb-4" />
+          <p className="text-[var(--color-muted)]">Нет заявок</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -146,17 +149,17 @@ export default function WithdrawalsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03 }}
-                className="bg-[#1a1a24] border border-white/[0.06] rounded-2xl p-4 flex items-center justify-between"
+                className="glass-card rounded-2xl p-4 flex items-center justify-between"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white/[0.03] flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-xl bg-[rgba(255,255,255,0.03)] flex items-center justify-center">
                     {c.i}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-white">
+                    <p className="text-sm font-semibold text-[var(--color-text)]">
                       {w.amount.toLocaleString('ru-RU')} ₽
                     </p>
-                    <p className="text-[11px] text-white/35">
+                    <p className="text-[11px] text-[var(--color-muted)]">
                       {w.createdAt
                         ? format(new Date(w.createdAt), 'd MMM, HH:mm', { locale: ru })
                         : ''}
