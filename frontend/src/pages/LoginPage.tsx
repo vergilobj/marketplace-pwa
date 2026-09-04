@@ -5,7 +5,7 @@ import { login } from '../api/auth';
 import { formatPhone, maskPhoneInput, unformatPhone } from '../utils/phone';
 import { LogIn, ArrowLeft, Sparkles } from 'lucide-react';
 
-const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 50%, #38bdf8 100%)' } as const;
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -27,8 +27,8 @@ export default function LoginPage() {
     <div className="min-h-[80vh] flex items-center justify-center px-4 relative">
       {/* градиентный фон-подложка */}
       <div className="absolute inset-0 -z-10 pointer-events-none overflow-hidden rounded-[34px]">
-        <div className="absolute top-0 left-1/4 w-72 h-72 rounded-full blur-3xl opacity-30" style={{ background: 'radial-gradient(circle, #c9f267, transparent 70%)' }} />
-        <div className="absolute bottom-0 right-1/4 w-72 h-72 rounded-full blur-3xl opacity-30" style={{ background: 'radial-gradient(circle, #8ee8ff, transparent 70%)' }} />
+        <div className="absolute top-0 left-1/4 w-72 h-72 rounded-full blur-3xl opacity-30" style={{ background: 'radial-gradient(circle, #6366f1, transparent 70%)' }} />
+        <div className="absolute bottom-0 right-1/4 w-72 h-72 rounded-full blur-3xl opacity-30" style={{ background: 'radial-gradient(circle, #38bdf8, transparent 70%)' }} />
       </div>
 
       <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
@@ -49,7 +49,7 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 pt-6 border-t border-[rgba(255,255,255,0.06)] text-center">
-            <p className="text-[var(--color-muted)] text-sm">Нет аккаунта? <Link to="/register" className="text-[#c9f267] hover:text-[#b6e04f] font-semibold">Зарегистрироваться</Link></p>
+            <p className="text-[var(--color-muted)] text-sm">Нет аккаунта? <Link to="/register" className="text-[#6366f1] hover:text-[#4f46e5] font-semibold">Зарегистрироваться</Link></p>
           </div>
         </div>
       </motion.div>

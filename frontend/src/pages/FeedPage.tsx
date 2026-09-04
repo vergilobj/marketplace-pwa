@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
-const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 50%, #38bdf8 100%)' } as const;
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 type TabType = 'all' | 'posts' | 'products' | 'ads';
@@ -148,7 +148,7 @@ export default function FeedPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="relative overflow-hidden rounded-[34px] mb-10 p-6 sm:p-12"
-        style={{ background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 55%, #8ee8ff 100%)' }}
+        style={{ background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 55%, #38bdf8 100%)' }}
       >
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_50%,rgba(255,255,255,0.15)_0%,transparent_60%)]" />
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
@@ -223,7 +223,7 @@ export default function FeedPage() {
 
           {/* Infinite scroll loader */}
           <div ref={loaderRef} className="py-10 flex justify-center">
-            {loadingMore && <Loader2 size={24} className="animate-spin text-[#c9f267]" />}
+            {loadingMore && <Loader2 size={24} className="animate-spin text-[#6366f1]" />}
             {!showLoader && !loadingMore && items.length > 0 && (
               <p className="text-[var(--color-faint)] text-sm">Все загружены</p>
             )}
