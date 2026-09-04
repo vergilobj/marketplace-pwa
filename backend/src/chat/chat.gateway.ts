@@ -85,7 +85,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const text = data.text?.trim();
     const file = data.file;
 
-    if (!text && !file) {
+    if (!text && !data.ciphertext && !file) {
       return { error: 'text_required', reason: 'Текст или файл обязателен' };
     }
 
@@ -124,7 +124,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(receiverSocketId).emit('newMessage', msg);
     } else {
       // Офлайн — push + внутреннее уведомление
-      const preview = text || '📎 Файл';
+      const preview = text || (data.ciphertext && !file ? '🔒 Зашифрованное сообщение' : '📎 Файл');
       try {
         await this.notificationsService.createNotification(
           data.receiverId,

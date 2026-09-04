@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import { Search, Send, ArrowLeft, Paperclip, Plus, X, UserPlus, Flag } from 'lucide-react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
+import { getOrCreateIdentityKey, exportPublicKeyRaw, importPeerPublicKey, deriveSharedKey, encryptMessage, decryptMessage } from '../utils/crypto';
 
 interface Conversation {
   userId: string;
@@ -56,6 +57,8 @@ export default function ChatPage() {
   const [pendingFiles, setPendingFiles] = useState<Array<{ url: string; name: string; type: string; size: number; previewUrl?: string }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const identityKeyRef = useRef<CryptoKeyPair | null>(null);
+  const sharedKeysRef = useRef<Map<string, CryptoKey>>(new Map());
 
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
@@ -68,6 +71,19 @@ export default function ChatPage() {
     if (!userId) { navigate('/login'); return; }
   }, [userId]);
 
+  // Register identity key with backend (best-effort, non-blocking)
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      try {
+        const kp = await getOrCreateIdentityKey();
+        identityKeyRef.current = kp;
+        const publicKey = await exportPublicKeyRaw(kp.publicKey);
+        await api.post('/chat/keys', { publicKey });
+      } catch { /* plaintext fallback */ }
+    })();
+  }, [userId]);
+
   const loadConversations = useCallback(async () => {
     try {
       const { data } = await api.get('/chat/conversations');
@@ -76,6 +92,19 @@ export default function ChatPage() {
       return data;
     } catch { setLoading(false); return []; }
   }, []);
+
+  const decryptDisplayMessage = useCallback(async (m: Message): Promise<Message> => {
+    if (!m.ciphertext || m.text) return m;
+    const partnerId = m.senderId === userId ? m.receiverId : m.senderId;
+    const sharedKey = sharedKeysRef.current.get(partnerId);
+    if (!sharedKey) return { ...m, text: '(сообщение зашифровано)' };
+    try {
+      const text = await decryptMessage(m.ciphertext, sharedKey);
+      return { ...m, text };
+    } catch {
+      return { ...m, text: '(сообщение зашифровано)' };
+    }
+  }, [userId]);
 
   // Socket connection
   useEffect(() => {
@@ -100,8 +129,10 @@ export default function ChatPage() {
     s.on('newMessage', (msg: Message) => {
       const partnerId = msg.senderId === userId ? msg.receiverId : msg.senderId;
       if (selectedUser && selectedUser.userId === partnerId) {
-        setMessages(prev => [...prev, msg]);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        decryptDisplayMessage(msg).then(decrypted => {
+          setMessages(prev => [...prev, decrypted]);
+          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        });
         s.emit('markRead', { senderId: msg.senderId });
       }
       loadConversations();
@@ -109,15 +140,17 @@ export default function ChatPage() {
 
     s.on('messageSent', (msg: Message) => {
       if (selectedUser && (msg.receiverId === selectedUser.userId || msg.senderId === selectedUser.userId)) {
-        setMessages(prev => [...prev, msg]);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        decryptDisplayMessage(msg).then(decrypted => {
+          setMessages(prev => [...prev, decrypted]);
+          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        });
       }
       loadConversations();
     });
 
     loadConversations();
     return () => { s.disconnect(); };
-  }, [userId, selectedUser?.userId, loadConversations]);
+  }, [userId, selectedUser?.userId, loadConversations, decryptDisplayMessage]);
 
   // Auto-open chat from product page
   useEffect(() => {
@@ -154,8 +187,31 @@ export default function ChatPage() {
   const selectConversation = async (user: { userId: string; name: string }) => {
     setSelectedUser(user);
     try {
+      // Ensure peer shared key is cached
+      if (identityKeyRef.current && !sharedKeysRef.current.has(user.userId)) {
+        try {
+          const { data } = await api.get(`/chat/keys/${user.userId}`);
+          if (data?.publicKey) {
+            const peerPublic = await importPeerPublicKey(data.publicKey);
+            const sharedKey = await deriveSharedKey(identityKeyRef.current.privateKey, peerPublic);
+            sharedKeysRef.current.set(user.userId, sharedKey);
+          }
+        } catch { /* plaintext fallback */ }
+      }
       const { data } = await api.get(`/chat/messages/${user.userId}?limit=50`);
-      const msgs: Message[] = data.items || [];
+      const rawMessages: Message[] = data.items || [];
+      const sharedKey = sharedKeysRef.current.get(user.userId);
+      const msgs = await Promise.all(rawMessages.map(async (m) => {
+        if (m.ciphertext && sharedKey && !m.text) {
+          try {
+            const text = await decryptMessage(m.ciphertext, sharedKey);
+            return { ...m, text };
+          } catch {
+            return { ...m, text: '(сообщение зашифровано)' };
+          }
+        }
+        return m;
+      }));
       setMessages(msgs);
     } catch {
       setMessages([]);
@@ -170,9 +226,20 @@ export default function ChatPage() {
     setMessageText('');
     setPendingFiles([]);
 
+    let ciphertext: string | undefined;
+    let finalText: string | undefined = text || undefined;
+    const sharedKey = sharedKeysRef.current.get(selectedUser.userId);
+    if (sharedKey && text) {
+      try {
+        ciphertext = await encryptMessage(text, sharedKey);
+        finalText = undefined;
+      } catch { /* fall back to plaintext */ }
+    }
+
     socket.emit('sendMessage', {
       receiverId: selectedUser.userId,
-      text: text || undefined,
+      text: finalText,
+      ciphertext,
       file,
     }, (res: { error?: string; reason?: string } | null) => {
       if (res?.error === 'moderated') {
