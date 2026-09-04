@@ -11,25 +11,25 @@
 @theme {
   /* === АКЦЕНТЫ: ремап Tailwind-утилит на палитру agentbox === */
   /* indigo → лайм (primary/CTA) */
-  --color-indigo-300: #d6ee9c;
-  --color-indigo-400: #c9f267;
-  --color-indigo-500: #c9f267;
-  --color-indigo-600: #b3e04a;
-  --color-indigo-700: #9cc936;
+  --color-indigo-300: #eceeec;
+  --color-indigo-400: #fbfbf8;
+  --color-indigo-500: #fbfbf8;
+  --color-indigo-600: #e8eae8;
+  --color-indigo-700: #d0d4d0;
 
   /* blue → электрик (вторичный) */
-  --color-blue-300: #c1f1ff;
-  --color-blue-400: #8ee8ff;
-  --color-blue-500: #8ee8ff;
-  --color-blue-600: #5fd8fa;
-  --color-blue-700: #3fbcdd;
+  --color-blue-300: #d8dcd8;
+  --color-blue-400: #a8b0a8;
+  --color-blue-500: #a8b0a8;
+  --color-blue-600: #b0b8b0;
+  --color-blue-700: #8a928a;
 
   /* purple → фиолет (третичный) */
-  --color-purple-300: #d4c8f2;
-  --color-purple-400: #b7a7e6;
-  --color-purple-500: #b7a7e6;
-  --color-purple-600: #9d88d8;
-  --color-purple-700: #8570c0;
+  --color-purple-300: #e0e4e0;
+  --color-purple-400: #c8ccc8;
+  --color-purple-500: #c8ccc8;
+  --color-purple-600: #b0b4b0;
+  --color-purple-700: #888c88;
 
   /* === ШРИФТЫ: строгий гротеск + моноширинные метки === */
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -55,10 +55,10 @@
   --paper: #fbfbf8;
   --paper-2: #f4f3ee;
   --muted: #6f766f;
-  --signal: #c9f267;
+  --signal: #fbfbf8;
   --signal-ink: #0b0e0d;   /* тёмный текст на лайме */
-  --electric: #8ee8ff;
-  --violet: #b7a7e6;
+  --electric: #a8b0a8;
+  --violet: #c8ccc8;
 
   /* Семантические алиасы */
   --bg: var(--night);
@@ -100,9 +100,9 @@
   --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.55);
-  --shadow-signal: 0 8px 28px rgba(201, 242, 103, 0.16);
-  --shadow-electric: 0 8px 28px rgba(142, 232, 255, 0.14);
-  --shadow-violet: 0 8px 28px rgba(183, 167, 230, 0.14);
+  --shadow-signal: 0 8px 28px rgba(251, 251, 248, 0.16);
+  --shadow-electric: 0 8px 28px rgba(251, 251, 248, 0.14);
+  --shadow-violet: 0 8px 28px rgba(251, 251, 248, 0.14);
 
   --ease: cubic-bezier(.22, .61, .36, 1);
 }
@@ -143,7 +143,7 @@
   }
   ::-webkit-scrollbar-thumb:hover { background: rgba(251, 251, 248, 0.28); }
 
-  ::selection { background: rgba(201, 242, 103, 0.28); color: var(--paper); }
+  ::selection { background: rgba(251, 251, 248, 0.28); color: var(--paper); }
 }
 
 /* ============================================================
@@ -188,8 +188,8 @@
 
   /* Акцентная поверхность — лаймовая */
   .spark-surface {
-    background: rgba(201, 242, 103, 0.06);
-    border: 1px solid rgba(201, 242, 103, 0.2);
+    background: rgba(251, 251, 248, 0.06);
+    border: 1px solid rgba(251, 251, 248, 0.2);
   }
 
   /* ===== Кнопки ===== */
@@ -214,7 +214,7 @@
     color: var(--signal-ink);
     box-shadow: var(--shadow-signal);
   }
-  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(201, 242, 103, 0.24); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(251, 251, 248, 0.24); }
   .btn-primary:active { transform: translateY(0); }
 
   /* Призрачная кнопка — тёмная нейтральная */
@@ -226,7 +226,7 @@
   }
   .btn-ghost:hover,
   .btn-secondary:hover {
-    border-color: rgba(201, 242, 103, 0.5);
+    border-color: rgba(251, 251, 248, 0.5);
     color: var(--signal);
   }
 
@@ -244,8 +244,8 @@
   }
   .input-glass::placeholder { color: var(--faint); }
   .input-glass:focus {
-    border-color: rgba(201, 242, 103, 0.55);
-    box-shadow: 0 0 0 3px rgba(201, 242, 103, 0.14);
+    border-color: rgba(251, 251, 248, 0.55);
+    box-shadow: 0 0 0 3px rgba(251, 251, 248, 0.14);
   }
 
   /* ===== Анимации ===== */

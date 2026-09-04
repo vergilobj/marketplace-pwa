@@ -8,7 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
-const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #fbfbf8 0%, #a8b0a8 50%, #a8b0a8 100%)' } as const;
 
 interface Props { post: any; onDelete?: (id: string) => void; onEdit?: (post: any) => void; }
 
@@ -70,7 +70,7 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
 
       {/* Content */}
       <div className="px-4 pb-4">
-        <h2 className="text-base font-bold mb-2 line-clamp-2 text-[var(--color-text)] group-hover:text-[#c9f267] transition-colors">{post.title}</h2>
+        <h2 className="text-base font-bold mb-2 line-clamp-2 text-[var(--color-text)] group-hover:text-[#fbfbf8] transition-colors">{post.title}</h2>
         {post.content && <p className="text-sm text-[var(--color-muted)] line-clamp-3 mb-3 leading-relaxed">{post.content}</p>}
         {media.length > 0 && (
           <div className="rounded-xl overflow-hidden mb-3">
@@ -78,7 +78,7 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
           </div>
         )}
         {post.link && (
-          <a href={post.link} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-[#c9f267] hover:text-[#b6e04f] font-medium">
+          <a href={post.link} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-[#fbfbf8] hover:text-[#e8eae8] font-medium">
             <ExternalLink size={12} /> Ссылка
           </a>
         )}
@@ -86,7 +86,7 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
 
       {/* Actions */}
       <div className="px-4 pb-4 flex items-center gap-4">
-        <button onClick={handleLike} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${liked ? 'text-[#c9f267] bg-[rgba(201,242,103,0.1)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.04)]'}`}>
+        <button onClick={handleLike} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${liked ? 'text-[#fbfbf8] bg-[rgba(201,242,103,0.1)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.04)]'}`}>
           <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
           {likes > 0 && likes}
         </button>

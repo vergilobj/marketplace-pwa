@@ -21,7 +21,7 @@ function useClickAway(callback: () => void) {
   return ref;
 }
 
-const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #fbfbf8 0%, #a8b0a8 50%, #a8b0a8 100%)' } as const;
 
 export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -122,13 +122,13 @@ export default function Layout() {
           </form>
 
           <nav className="hidden md:flex items-center space-x-1.5 ml-4">
-            <button onClick={() => setLightMode(!lightMode)} className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors" title={lightMode ? 'Тёмная тема' : 'Светлая тема'}>
+            <button onClick={() => setLightMode(!lightMode)} className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#fbfbf8] transition-colors" title={lightMode ? 'Тёмная тема' : 'Светлая тема'}>
               {lightMode ? <Moon size={20} /> : <Sun size={20} />}
             </button>
-            <Link to="/favorites" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors">
+            <Link to="/favorites" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#fbfbf8] transition-colors">
               <Heart size={20} />
             </Link>
-            <Link to="/cart" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors relative">
+            <Link to="/cart" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#fbfbf8] transition-colors relative">
               <ShoppingBag size={20} />
               {cart.length > 0 && (
                 <span style={GS} className="absolute -top-0.5 -right-0.5 text-[#0b0e0d] text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{cart.length > 9 ? '9+' : cart.length}</span>
@@ -136,10 +136,10 @@ export default function Layout() {
             </Link>
             {isAuthenticated && (
               <>
-                <Link to="/chat" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors">
+                <Link to="/chat" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#fbfbf8] transition-colors">
                   <MessageCircle size={20} />
                 </Link>
-                <Link to="/notifications" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors relative">
+                <Link to="/notifications" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#fbfbf8] transition-colors relative">
                   <Bell size={20} />
                   {unreadCount > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-[var(--color-text)] text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>
@@ -149,7 +149,7 @@ export default function Layout() {
                 <div className="relative" ref={profileMenuRef}>
                   <button
                     onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                    className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors"
+                    className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#fbfbf8] transition-colors"
                   >
                     <User size={20} />
                   </button>
@@ -202,7 +202,7 @@ export default function Layout() {
               {isAdmin && <Link to="/admin" className="block py-2 text-sm" onClick={() => setMenuOpen(false)}>Админ</Link>}
               <button onClick={handleLogout} className="block py-2 text-sm text-red-400 w-full text-left">Выйти</button>
             </>)}
-            {!isAuthenticated && <Link to="/login" className="block py-2 text-sm text-[#c9f267]" onClick={() => setMenuOpen(false)}>Войти</Link>}
+            {!isAuthenticated && <Link to="/login" className="block py-2 text-sm text-[#fbfbf8]" onClick={() => setMenuOpen(false)}>Войти</Link>}
           </div>
         )}
       </header>
@@ -220,18 +220,18 @@ export default function Layout() {
           <div>
             <h4 className="font-semibold text-sm mb-3">Навигация</h4>
             <div className="space-y-2">
-              <Link to="/" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Главная</Link>
-              <Link to="/products" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Товары</Link>
-              <Link to="/favorites" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Избранное</Link>
-              <Link to="/cart" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Корзина</Link>
+              <Link to="/" className="block text-[var(--color-muted)] text-sm hover:text-[#fbfbf8] transition-colors">Главная</Link>
+              <Link to="/products" className="block text-[var(--color-muted)] text-sm hover:text-[#fbfbf8] transition-colors">Товары</Link>
+              <Link to="/favorites" className="block text-[var(--color-muted)] text-sm hover:text-[#fbfbf8] transition-colors">Избранное</Link>
+              <Link to="/cart" className="block text-[var(--color-muted)] text-sm hover:text-[#fbfbf8] transition-colors">Корзина</Link>
             </div>
           </div>
           <div>
             <h4 className="font-semibold text-sm mb-3">Сервис</h4>
             <div className="space-y-2">
-              <Link to="/privacy" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Приватность</Link>
-              <Link to="/chat" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Чат</Link>
-              <Link to="/referrals" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Рефералы</Link>
+              <Link to="/privacy" className="block text-[var(--color-muted)] text-sm hover:text-[#fbfbf8] transition-colors">Приватность</Link>
+              <Link to="/chat" className="block text-[var(--color-muted)] text-sm hover:text-[#fbfbf8] transition-colors">Чат</Link>
+              <Link to="/referrals" className="block text-[var(--color-muted)] text-sm hover:text-[#fbfbf8] transition-colors">Рефералы</Link>
             </div>
           </div>
           <div>
@@ -251,7 +251,7 @@ export default function Layout() {
         {mobileLinks.map(item => {
           const isActive = location.pathname === item.to;
           return (
-            <Link key={item.to} to={item.to} className={`flex flex-col items-center text-xs ${isActive ? 'text-[#c9f267]' : 'text-[var(--color-muted)]'}`}>
+            <Link key={item.to} to={item.to} className={`flex flex-col items-center text-xs ${isActive ? 'text-[#fbfbf8]' : 'text-[var(--color-muted)]'}`}>
               <item.icon size={20} /><span className="mt-1">{item.label}</span>
             </Link>
           );

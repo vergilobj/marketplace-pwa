@@ -11,7 +11,7 @@ import { useAuth } from '../hooks/useAuth';
 import Breadcrumbs from '../components/Breadcrumbs';
 import Skeleton from '../components/ui/Skeleton';
 
-const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #fbfbf8 0%, #a8b0a8 50%, #a8b0a8 100%)' } as const;
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -235,11 +235,11 @@ export default function ProductDetailPage() {
                 <span className="text-[var(--color-muted)]">Быстрая доставка</span>
               </div>
               <div className="flex flex-col items-center gap-1 p-3 glass rounded-2xl">
-                <ShieldCheck size={20} className="text-[#8ee8ff]" />
+                <ShieldCheck size={20} className="text-[#a8b0a8]" />
                 <span className="text-[var(--color-muted)]">Гарантия возврата</span>
               </div>
               <div className="flex flex-col items-center gap-1 p-3 glass rounded-2xl">
-                <RotateCcw size={20} className="text-[#8ee8ff]" />
+                <RotateCcw size={20} className="text-[#a8b0a8]" />
                 <span className="text-[var(--color-muted)]">14 дней на обмен</span>
               </div>
             </div>

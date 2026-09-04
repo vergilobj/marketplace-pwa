@@ -10,10 +10,10 @@ export default function DashboardPage() {
   }, []);
 
   const actions = [
-    { to: '/products', icon: ShoppingBag, label: 'Товары', desc: 'Покупайте и продавайте', grad: 'linear-gradient(135deg, #c9f267, #8ee8ff)' },
-    { to: '/posts', icon: Newspaper, label: 'Лента', desc: 'Новости и реклама', grad: 'linear-gradient(135deg, #8ee8ff, #8ee8ff)' },
-    { to: '/chat', icon: MessageCircle, label: 'Чат', desc: 'Общайтесь с продавцами', grad: 'linear-gradient(135deg, #8ee8ff, #c9f267)' },
-    { to: '/profile', icon: User, label: 'Профиль', desc: 'Ваши данные и заказы', grad: 'linear-gradient(135deg, #c9f267, #8ee8ff)' },
+    { to: '/products', icon: ShoppingBag, label: 'Товары', desc: 'Покупайте и продавайте', grad: 'linear-gradient(135deg, #fbfbf8, #a8b0a8)' },
+    { to: '/posts', icon: Newspaper, label: 'Лента', desc: 'Новости и реклама', grad: 'linear-gradient(135deg, #a8b0a8, #a8b0a8)' },
+    { to: '/chat', icon: MessageCircle, label: 'Чат', desc: 'Общайтесь с продавцами', grad: 'linear-gradient(135deg, #a8b0a8, #fbfbf8)' },
+    { to: '/profile', icon: User, label: 'Профиль', desc: 'Ваши данные и заказы', grad: 'linear-gradient(135deg, #fbfbf8, #a8b0a8)' },
   ];
 
   return (
@@ -37,7 +37,7 @@ export default function DashboardPage() {
                 <h3 className="font-semibold text-lg">{label}</h3>
                 <p className="text-[var(--color-muted)] text-sm">{desc}</p>
               </div>
-              <ArrowRight className="w-5 h-5 text-[var(--color-faint)] group-hover:text-[#c9f267] group-hover:translate-x-1 transition-all" />
+              <ArrowRight className="w-5 h-5 text-[var(--color-faint)] group-hover:text-[#fbfbf8] group-hover:translate-x-1 transition-all" />
             </Card>
           </Link>
         ))}

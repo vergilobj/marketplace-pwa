@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 
-const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #fbfbf8 0%, #a8b0a8 50%, #a8b0a8 100%)' } as const;
 
 export default function ProductCard({ product }: { product: any }) {
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ export default function ProductCard({ product }: { product: any }) {
         )}
 
         <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-2 group-hover:translate-x-0">
-          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }} className={`p-2.5 rounded-full backdrop-blur-xl transition-all ${fav ? 'bg-[#c9f267] text-[#0b0e0d] shadow-lg shadow-[rgba(201,242,103,0.4)]' : 'bg-black/50 text-[var(--color-text)] hover:bg-black/70'}`}>
+          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }} className={`p-2.5 rounded-full backdrop-blur-xl transition-all ${fav ? 'bg-[#fbfbf8] text-[#0b0e0d] shadow-lg shadow-[rgba(201,242,103,0.4)]' : 'bg-black/50 text-[var(--color-text)] hover:bg-black/70'}`}>
             <Heart size={16} fill={fav ? 'currentColor' : 'none'} />
           </button>
           {!inCart && (
@@ -45,7 +45,7 @@ export default function ProductCard({ product }: { product: any }) {
       </div>
 
       <div className="p-4 flex flex-col flex-1">
-        <h3 className="font-semibold text-[15px] text-[var(--color-text)] line-clamp-2 mb-2 group-hover:text-[#c9f267] transition-colors flex-1">{product.title}</h3>
+        <h3 className="font-semibold text-[15px] text-[var(--color-text)] line-clamp-2 mb-2 group-hover:text-[#fbfbf8] transition-colors flex-1">{product.title}</h3>
         {product.seller?.name && (
           <div className="flex items-center gap-2 mb-3">
             <span style={GS} className="w-5 h-5 rounded-full text-[#0b0e0d] text-[9px] font-bold flex items-center justify-center shrink-0">{product.seller.name[0]}</span>
@@ -55,11 +55,11 @@ export default function ProductCard({ product }: { product: any }) {
 
         {inCart ? (
           <div className="mt-auto flex items-center justify-between gap-1 bg-[rgba(201,242,103,0.08)] border border-[rgba(201,242,103,0.2)] rounded-full px-2 py-1.5" onClick={e => e.stopPropagation()}>
-            <button onClick={(e) => { e.stopPropagation(); updateQuantity(product.id, -1); }} className="p-1.5 rounded-full hover:bg-[rgba(255,255,255,0.08)] text-[#c9f267] hover:text-[#b6e04f] transition-all">
+            <button onClick={(e) => { e.stopPropagation(); updateQuantity(product.id, -1); }} className="p-1.5 rounded-full hover:bg-[rgba(255,255,255,0.08)] text-[#fbfbf8] hover:text-[#e8eae8] transition-all">
               <Minus size={14} />
             </button>
             <span className="text-sm font-bold text-[var(--color-text)] min-w-[24px] text-center">{quantity}</span>
-            <button onClick={(e) => { e.stopPropagation(); addToCart(product); }} className="p-1.5 rounded-full hover:bg-[rgba(255,255,255,0.08)] text-[#c9f267] hover:text-[#b6e04f] transition-all">
+            <button onClick={(e) => { e.stopPropagation(); addToCart(product); }} className="p-1.5 rounded-full hover:bg-[rgba(255,255,255,0.08)] text-[#fbfbf8] hover:text-[#e8eae8] transition-all">
               <Plus size={14} />
             </button>
           </div>

@@ -6,7 +6,7 @@ import { User, Settings, TrendingUp, Gift, LogOut, Save } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
-const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #fbfbf8 0%, #a8b0a8 50%, #a8b0a8 100%)' } as const;
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -35,7 +35,7 @@ export default function ProfilePage() {
           <div>
             <h2 className="text-lg font-bold text-[var(--color-text)]">{profile?.name || 'Пользователь'}</h2>
             <p className="text-[var(--color-muted)] text-sm">{formatPhone(profile?.phone)}</p>
-            <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-[rgba(201,242,103,0.1)] text-[#c9f267] text-[11px] font-semibold">{profile?.role === 'ADMIN' ? 'Админ' : profile?.role === 'SELLER' ? 'Продавец' : 'Покупатель'}</span>
+            <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-[rgba(201,242,103,0.1)] text-[#fbfbf8] text-[11px] font-semibold">{profile?.role === 'ADMIN' ? 'Админ' : profile?.role === 'SELLER' ? 'Продавец' : 'Покупатель'}</span>
           </div>
         </div>
         {editing ? (
@@ -51,7 +51,7 @@ export default function ProfilePage() {
 
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          {[{ label: 'Покупок', value: stats.boughtCount, icon: <TrendingUp size={16} />, color: 'linear-gradient(135deg, #c9f267, #8ee8ff)' }, { label: 'Продаж', value: stats.soldCount, icon: <Gift size={16} />, color: 'linear-gradient(135deg, #8ee8ff, #8ee8ff)' }, { label: 'Рефералы', value: `${stats.referralEarned || 0} USDT`, icon: <User size={16} />, color: 'linear-gradient(135deg, #c9f267, #8ee8ff)' }, { label: 'Баланс', value: `${stats.bonusBalance || 0} USDT`, icon: <TrendingUp size={16} />, color: 'linear-gradient(135deg, #8ee8ff, #8ee8ff)' }].map((s, i) => (
+          {[{ label: 'Покупок', value: stats.boughtCount, icon: <TrendingUp size={16} />, color: 'linear-gradient(135deg, #fbfbf8, #a8b0a8)' }, { label: 'Продаж', value: stats.soldCount, icon: <Gift size={16} />, color: 'linear-gradient(135deg, #a8b0a8, #a8b0a8)' }, { label: 'Рефералы', value: `${stats.referralEarned || 0} USDT`, icon: <User size={16} />, color: 'linear-gradient(135deg, #fbfbf8, #a8b0a8)' }, { label: 'Баланс', value: `${stats.bonusBalance || 0} USDT`, icon: <TrendingUp size={16} />, color: 'linear-gradient(135deg, #a8b0a8, #a8b0a8)' }].map((s, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="glass-card rounded-2xl p-4 text-center">
               <div className="w-9 h-9 mx-auto mb-2 rounded-xl flex items-center justify-center text-[var(--color-text)] shadow-lg" style={{ background: s.color }}>{s.icon}</div>
               <div className="text-lg font-bold text-[var(--color-text)]">{s.value}</div>

@@ -5,7 +5,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
 }
 
-const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #fbfbf8 0%, #a8b0a8 50%, #a8b0a8 100%)' } as const;
 
 const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
@@ -21,7 +21,7 @@ const Button: React.FC<ButtonProps> = ({
     primary:
       'text-[#0b0e0d] hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(201,242,103,0.38)]',
     secondary:
-      'text-[var(--color-text)] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] backdrop-blur hover:border-[rgba(201,242,103,0.5)] hover:text-[#c9f267]',
+      'text-[var(--color-text)] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] backdrop-blur hover:border-[rgba(201,242,103,0.5)] hover:text-[#fbfbf8]',
     ghost:
       'text-[var(--color-muted)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--color-text)]',
   };
