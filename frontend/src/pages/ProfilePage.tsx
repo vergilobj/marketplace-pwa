@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { getProfile, updateProfile, getStats } from '../api/users';
+import { formatPhone, maskPhoneInput, unformatPhone } from '../utils/phone';
 import { User, Settings, TrendingUp, Gift, LogOut, Save } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -19,7 +20,7 @@ export default function ProfilePage() {
     Promise.all([getProfile(), getStats()]).then(([p, s]) => { setProfile(p); setStats(s); setForm({ name: p.name || '', phone: p.phone || '' }); }).finally(() => setLoading(false));
   }, []);
 
-  const handleSave = async () => { try { await updateProfile(form); const p = await getProfile(); setProfile(p); setEditing(false); toast.success('Профиль обновлён'); } catch { toast.error('Ошибка'); } };
+  const handleSave = async () => { try { await updateProfile({ ...form, phone: unformatPhone(form.phone) }); const p = await getProfile(); setProfile(p); setEditing(false); toast.success('Профиль обновлён'); } catch { toast.error('Ошибка'); } };
   const handleLogout = () => { window.OneSignal?.logout()?.catch(() => {}); localStorage.clear(); navigate('/login'); };
 
   if (loading) return <div className="flex justify-center py-32"><div style={GS} className="w-10 h-10 rounded-2xl animate-pulse" /></div>;
@@ -33,14 +34,14 @@ export default function ProfilePage() {
           <div style={GS} className="w-16 h-16 rounded-2xl text-[var(--color-text)] text-xl font-bold flex items-center justify-center shadow-[0_16px_40px_rgba(201,242,103,0.3)]">{(profile?.name?.[0] || '?').toUpperCase()}</div>
           <div>
             <h2 className="text-lg font-bold text-[var(--color-text)]">{profile?.name || 'Пользователь'}</h2>
-            <p className="text-[var(--color-muted)] text-sm">{profile?.phone}</p>
+            <p className="text-[var(--color-muted)] text-sm">{formatPhone(profile?.phone)}</p>
             <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-[rgba(201,242,103,0.1)] text-[#c9f267] text-[11px] font-semibold">{profile?.role === 'ADMIN' ? 'Админ' : profile?.role === 'SELLER' ? 'Продавец' : 'Покупатель'}</span>
           </div>
         </div>
         {editing ? (
           <div className="space-y-3">
             <div><label className="block text-sm text-[var(--color-muted)] mb-1">Имя</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm outline-none focus:border-[rgba(201,242,103,0.5)] focus:ring-4 focus:ring-[rgba(201,242,103,0.1)] transition-all" /></div>
-            <div><label className="block text-sm text-[var(--color-muted)] mb-1">Телефон</label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm outline-none focus:border-[rgba(201,242,103,0.5)] focus:ring-4 focus:ring-[rgba(201,242,103,0.1)] transition-all" /></div>
+            <div><label className="block text-sm text-[var(--color-muted)] mb-1">Телефон</label><input value={formatPhone(form.phone)} onChange={e => setForm({ ...form, phone: maskPhoneInput(e.target.value) })} placeholder="+7 (999) 123-45-67" className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm outline-none focus:border-[rgba(201,242,103,0.5)] focus:ring-4 focus:ring-[rgba(201,242,103,0.1)] transition-all" /></div>
             <div className="flex gap-2"><button onClick={handleSave} style={GS} className="flex items-center gap-2 px-5 py-2.5 rounded-full text-[var(--color-text)] text-sm font-semibold transition-all shadow-[0_8px_24px_rgba(201,242,103,0.3)] hover:scale-[1.02]"><Save size={14} /> Сохранить</button><button onClick={() => setEditing(false)} className="px-5 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] text-[var(--color-muted)] text-sm font-medium hover:bg-[rgba(255,255,255,0.08)] transition-all">Отмена</button></div>
           </div>
         ) : (

@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { Users, ShoppingBag, Newspaper, Wallet, TrendingUp, Download, Plus, Trash2, Copy, Check, Settings, Search } from 'lucide-react';
+import { formatPhone } from '../utils/phone';
 
 const statusMap: Record<string, string> = { pending: 'На рассмотрении', approved: 'Одобрена', rejected: 'Отклонена' };
 
@@ -84,7 +85,7 @@ export default function AdminPage() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-[var(--color-text)] text-xs font-bold flex items-center justify-center">{(u.name || '?')[0].toUpperCase()}</div>
             <div>
               <p className="text-sm font-semibold text-white">{u.name || 'Без имени'}</p>
-              <p className="text-xs text-white/35">{u.phone}</p>
+              <p className="text-xs text-white/35">{formatPhone(u.phone)}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

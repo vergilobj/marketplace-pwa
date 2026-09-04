@@ -5,6 +5,7 @@ import { Search, Send, ArrowLeft, Paperclip, Plus, X, UserPlus, Flag } from 'luc
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { getOrCreateIdentityKey, exportPublicKeyRaw, importPeerPublicKey, deriveSharedKey, encryptMessage, decryptMessage } from '../utils/crypto';
+import { maskPhoneInput, unformatPhone } from '../utils/phone';
 
 interface Conversation {
   userId: string;
@@ -171,7 +172,7 @@ export default function ChatPage() {
     if (!newChatPhone.trim()) return;
     try {
       // Find user by phone
-      const { data } = await api.get(`/users/search?phone=${encodeURIComponent(newChatPhone)}`);
+      const { data } = await api.get(`/users/search?phone=${encodeURIComponent(unformatPhone(newChatPhone))}`);
       if (data?.id) {
         selectConversation({ userId: data.id, name: data.name || newChatPhone });
         setShowNewChat(false);
@@ -331,9 +332,9 @@ export default function ChatPage() {
               <div className="flex gap-2">
                 <input
                   value={newChatPhone}
-                  onChange={e => setNewChatPhone(e.target.value)}
+                  onChange={e => setNewChatPhone(maskPhoneInput(e.target.value))}
                   onKeyDown={e => e.key === 'Enter' && startNewChat()}
-                  placeholder="+790****0000"
+                  placeholder="+7 (999) 123-45-67"
                   className="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-[var(--color-text)] placeholder:text-white/20 outline-none focus:border-indigo-500/40"
                 />
                 <button
