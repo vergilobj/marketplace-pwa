@@ -29,8 +29,8 @@ export default function Layout() {
   const [searchQuery, setSearchQuery] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [lightMode, setLightMode] = useState(() => {
-    const saved = localStorage.getItem('theme');
-    return saved === null ? true : saved === 'dark';
+    const saved = localStorage.getItem('theme_v2');
+    return saved === 'dark';
   });
   const navigate = useNavigate();
   const location = useLocation();
@@ -46,7 +46,7 @@ export default function Layout() {
     } else {
       document.documentElement.classList.remove('dark');
     }
-    localStorage.setItem('theme', lightMode ? 'dark' : 'light');
+    localStorage.setItem('theme_v2', lightMode ? 'dark' : 'light');
   }, [lightMode]);
 
   const handleLogout = () => {
