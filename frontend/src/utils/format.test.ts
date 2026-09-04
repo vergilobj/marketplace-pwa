@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { formatPrice, formatNumber } from './format';
 
 describe('formatPrice', () => {
-  it('formats rubles with currency symbol', () => {
+  it('formats price with USDT currency symbol', () => {
     expect(formatPrice(1000)).toBe('1,000 USDT');
   });
 
