@@ -25,14 +25,14 @@ export default function ReferralsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
-      <motion.div initial={{opacity:0,y:-10}} animate={{opacity:1,y:0}}><h1 className="text-2xl font-bold text-white mb-2">Рефералы</h1><p className="text-white/60 text-sm mb-8">Приглашайте друзей и получайте бонусы</p></motion.div>
+      <motion.div initial={{opacity:0,y:-10}} animate={{opacity:1,y:0}}><h1 className="text-2xl font-bold text-[var(--color-text)] mb-2">Рефералы</h1><p className="text-white/60 text-sm mb-8">Приглашайте друзей и получайте бонусы</p></motion.div>
 
       <motion.div initial={{opacity:0,scale:.97}} animate={{opacity:1,scale:1}} className="glass-card rounded-[26px] p-6 mb-6">
         <div className="text-center mb-4"><div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg"><Gift size={24} className="text-white"/></div><h2 className="text-lg font-bold text-white">Ваш реферальный код</h2><p className="text-white/60 text-sm mt-1">5% с заказов приглашённых</p></div>
         <div className="flex items-center gap-2 max-w-xs mx-auto"><div className="flex-1 glass rounded-xl px-4 py-3 text-center font-mono text-lg font-bold text-[#c9f267] border border-[rgba(255,255,255,0.06)]">{profile?.referralCode||'—'}</div><button onClick={copyCode} className={`p-3 rounded-full transition-all ${copied?'bg-emerald-500 text-white':'text-[#0b0e0d]'} shadow-lg`} style={copied ? undefined : { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' }}>{copied?<Check size={16}/>:<Copy size={16}/>}</button></div>
       </motion.div>
 
-      <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2"><Users size={16}/> Приглашённые</h3>
+      <h3 className="text-base font-bold text-[var(--color-text)] mb-4 flex items-center gap-2"><Users size={16}/> Приглашённые</h3>
       {refs.length===0 ? <div className="text-center py-16"><Users size={40} className="mx-auto text-white/10 mb-4"/><p className="text-white/60">Пока нет рефералов</p></div> :
         <div className="space-y-2">{refs.map((r,i)=><motion.div key={r.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:i*.03}} className="glass-card rounded-2xl p-4 flex items-center justify-between"><div><p className="text-sm font-semibold text-white">{r.buyer?.name||'Пользователь'}</p><p className="text-xs text-white/50">{r.product?.title||'Заказ'} • {r.createdAt?format(new Date(r.createdAt),'d MMM',{locale:ru}):''}</p></div><div className="text-right"><p className="font-bold text-emerald-400 text-sm">+{r.referralBonus||0} ₽</p></div></motion.div>)}</div>}
     </div>

@@ -22,7 +22,7 @@ export default function NotificationsPage() {
   return (
     <div className="max-w-2xl mx-auto px-6 py-8">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
-        <div><h1 className="text-2xl font-bold text-white mb-1">Уведомления</h1><p className="text-white/60 text-sm">{list.filter(n=>!n.isRead).length} непрочитанных</p></div>
+        <div><h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Уведомления</h1><p className="text-white/60 text-sm">{list.filter(n=>!n.isRead).length} непрочитанных</p></div>
         {list.some(n=>!n.isRead) && <button onClick={readAll} className="text-sm text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1"><CheckCheck size={14} /> Прочитать все</button>}
       </motion.div>
       {list.length === 0 ? <div className="text-center py-16"><Bell size={40} className="mx-auto text-white/10 mb-4" /><p className="text-white/60">Уведомлений нет</p></div> : (

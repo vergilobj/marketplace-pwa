@@ -110,7 +110,7 @@ export default function CheckoutPage() {
     <div className="max-w-2xl mx-auto px-6 py-8">
       <button
         onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-2 text-white/50 hover:text-white mb-6 transition-colors text-sm"
+        className="inline-flex items-center gap-2 text-white/50 hover:text-[var(--color-text)] mb-6 transition-colors text-sm"
       >
         <ArrowLeft size={16} />
         Назад
@@ -166,7 +166,7 @@ export default function CheckoutPage() {
             <button
               onClick={handleOrder}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-semibold text-sm hover:from-indigo-400 transition-all shadow-lg disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-[var(--color-text)] font-semibold text-sm hover:from-indigo-400 transition-all shadow-lg disabled:opacity-50"
             >
               <Sparkles size={16} />
               {loading ? 'Оформление...' : 'Оплатить'}
@@ -177,7 +177,7 @@ export default function CheckoutPage() {
         {/* Карточка оплаты USDT (BSC) */}
         {payment?.depositAddress && (
           <div className="mt-6 glass border border-emerald-500/20 rounded-2xl p-5">
-            <p className="text-sm font-bold text-white mb-1">
+            <p className="text-sm font-bold text-[var(--color-text)] mb-1">
               Оплатите USDT (BSC) на адрес:
             </p>
             <div className="flex items-center gap-2 mt-2">
@@ -186,7 +186,7 @@ export default function CheckoutPage() {
               </code>
               <button
                 onClick={copyAddress}
-                className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white text-xs font-semibold transition-colors shrink-0"
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-[var(--color-text)] text-xs font-semibold transition-colors shrink-0"
               >
                 {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
                 {copied ? 'Готово' : 'Копировать'}

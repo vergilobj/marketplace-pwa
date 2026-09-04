@@ -116,7 +116,7 @@ export default function EditPostPage() {
                 {existingMedia.map((url, idx) => (
                   <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden">
                     <img src={url} alt="" className="w-full h-full object-cover" />
-                    <button type="button" onClick={() => removeExistingMedia(idx)} className="absolute top-0 right-0 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center"><X size={12} /></button>
+                    <button type="button" onClick={() => removeExistingMedia(idx)} className="absolute top-0 right-0 bg-black/60 text-[var(--color-text)] rounded-full w-5 h-5 flex items-center justify-center"><X size={12} /></button>
                   </div>
                 ))}
               </div>
@@ -130,7 +130,7 @@ export default function EditPostPage() {
               {previews.map((src, idx) => (
                 <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden">
                   <img src={src} alt="" className="w-full h-full object-cover" />
-                  <button type="button" onClick={() => removeFile(idx)} className="absolute top-0 right-0 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center"><X size={12} /></button>
+                  <button type="button" onClick={() => removeFile(idx)} className="absolute top-0 right-0 bg-black/60 text-[var(--color-text)] rounded-full w-5 h-5 flex items-center justify-center"><X size={12} /></button>
                 </div>
               ))}
             </div>

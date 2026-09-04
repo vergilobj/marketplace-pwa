@@ -154,12 +154,12 @@ export default function FeedPage() {
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
         <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-purple-400/20 rounded-full blur-3xl" />
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-md text-white text-sm font-medium mb-6 border border-white/20 shadow-lg"><Zap size={14} className="text-yellow-200" /> Закрытый маркетплейс</div>
-          <h1 className="text-xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-3 tracking-tight leading-[1.15] drop-shadow-md">Покупайте и продавайте в надёжном сообществе</h1>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-md text-[var(--color-text)] text-sm font-medium mb-6 border border-white/20 shadow-lg"><Zap size={14} className="text-yellow-200" /> Закрытый маркетплейс</div>
+          <h1 className="text-xl sm:text-3xl lg:text-4xl font-extrabold text-[var(--color-text)] mb-3 tracking-tight leading-[1.15] drop-shadow-md">Покупайте и продавайте в надёжном сообществе</h1>
           <p className="text-white/85 text-base max-w-lg mb-5">Закрытая площадка для проверенных участников. Товары, чат, реферальная программа — всё в одном месте.</p>
           <div className="flex flex-wrap gap-3">
             {isSeller && <button onClick={() => navigate('/products/new')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-slate-900 font-semibold text-sm hover:bg-white/90 transition-all shadow-xl hover:scale-[1.03]"><Sparkles size={16} /> Выставить товар</button>}
-            {isAdmin && <button onClick={() => navigate('/posts/new')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/15 backdrop-blur-md text-white font-semibold text-sm border border-white/25 hover:bg-white/25 transition-all"><FileText size={16} /> Новый пост</button>}
+            {isAdmin && <button onClick={() => navigate('/posts/new')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/15 backdrop-blur-md text-[var(--color-text)] font-semibold text-sm border border-white/25 hover:bg-white/25 transition-all"><FileText size={16} /> Новый пост</button>}
             {!isAuthenticated && <button onClick={() => navigate('/register')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-slate-900 font-semibold text-sm hover:bg-white/90 transition-all shadow-xl hover:scale-[1.03]">Присоединиться <ArrowRight size={16} /></button>}
           </div>
         </div>
@@ -186,7 +186,7 @@ export default function FeedPage() {
       {/* Tabs */}
       <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1 -mx-1 px-1">
         {[{ key: 'all', label: 'Всё', icon: <Sparkles size={13} /> }, { key: 'products', label: 'Товары', icon: <Grid3X3 size={13} /> }, { key: 'posts', label: 'Посты', icon: <FileText size={13} /> }, { key: 'ads', label: 'Реклама', icon: <Megaphone size={13} /> }].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.key ? 'text-white shadow-[0_8px_24px_rgba(201,242,103,0.3)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.06)]'}`} style={activeTab === tab.key ? GS : undefined}>{tab.icon}{tab.label}</button>
+          <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.key ? 'text-[var(--color-text)] shadow-[0_8px_24px_rgba(201,242,103,0.3)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.06)]'}`} style={activeTab === tab.key ? GS : undefined}>{tab.icon}{tab.label}</button>
         ))}
       </div>
 

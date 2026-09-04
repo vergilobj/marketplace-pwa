@@ -33,7 +33,7 @@ export default function OrdersPage() {
     <div className="max-w-3xl mx-auto px-6 py-8">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}><h1 className="text-2xl font-bold text-[var(--color-text)] mb-2">Заказы</h1><p className="text-[var(--color-muted)] text-sm mb-6">История покупок и продаж</p></motion.div>
 
-      <div className="flex gap-2 mb-6 flex-wrap">{['', 'PENDING', 'PAID', 'SHIPPED', 'COMPLETED', 'CANCELLED'].map(s => <button key={s} onClick={() => setFilter(s)} className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${filter === s ? 'text-white shadow-[0_6px_20px_rgba(201,242,103,0.3)]' : 'bg-[rgba(255,255,255,0.04)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.08)]'}`} style={filter === s ? GS : undefined}>{s ? statusConfig[s]?.label : 'Все'}</button>)}</div>
+      <div className="flex gap-2 mb-6 flex-wrap">{['', 'PENDING', 'PAID', 'SHIPPED', 'COMPLETED', 'CANCELLED'].map(s => <button key={s} onClick={() => setFilter(s)} className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${filter === s ? 'text-[var(--color-text)] shadow-[0_6px_20px_rgba(201,242,103,0.3)]' : 'bg-[rgba(255,255,255,0.04)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.08)]'}`} style={filter === s ? GS : undefined}>{s ? statusConfig[s]?.label : 'Все'}</button>)}</div>
 
       {filtered.length === 0 ? <div className="text-center py-16"><PackageCheck size={40} className="mx-auto text-[var(--color-faint)] mb-4" /><p className="text-[var(--color-muted)]">Заказов нет</p></div> : (
         <div className="space-y-3">

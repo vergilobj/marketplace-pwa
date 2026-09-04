@@ -15,7 +15,7 @@ export default function Breadcrumbs({ items }: BreadcrumbsProps) {
           {item.to ? (
             <Link to={item.to} className="hover:text-blue-600 transition">{item.label}</Link>
           ) : (
-            <span className="text-gray-900 dark:text-white font-medium">{item.label}</span>
+            <span className="text-gray-900 dark:text-[var(--color-text)] font-medium">{item.label}</span>
           )}
         </React.Fragment>
       ))}

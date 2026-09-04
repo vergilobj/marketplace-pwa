@@ -30,7 +30,7 @@ export default function ProfilePage() {
 
       <div className="glass-card rounded-[26px] p-6 mb-6">
         <div className="flex items-center gap-5 mb-6">
-          <div style={GS} className="w-16 h-16 rounded-2xl text-white text-xl font-bold flex items-center justify-center shadow-[0_16px_40px_rgba(201,242,103,0.3)]">{(profile?.name?.[0] || '?').toUpperCase()}</div>
+          <div style={GS} className="w-16 h-16 rounded-2xl text-[var(--color-text)] text-xl font-bold flex items-center justify-center shadow-[0_16px_40px_rgba(201,242,103,0.3)]">{(profile?.name?.[0] || '?').toUpperCase()}</div>
           <div>
             <h2 className="text-lg font-bold text-[var(--color-text)]">{profile?.name || 'Пользователь'}</h2>
             <p className="text-[var(--color-muted)] text-sm">{profile?.phone}</p>
@@ -41,7 +41,7 @@ export default function ProfilePage() {
           <div className="space-y-3">
             <div><label className="block text-sm text-[var(--color-muted)] mb-1">Имя</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm outline-none focus:border-[rgba(201,242,103,0.5)] focus:ring-4 focus:ring-[rgba(201,242,103,0.1)] transition-all" /></div>
             <div><label className="block text-sm text-[var(--color-muted)] mb-1">Телефон</label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="w-full px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm outline-none focus:border-[rgba(201,242,103,0.5)] focus:ring-4 focus:ring-[rgba(201,242,103,0.1)] transition-all" /></div>
-            <div className="flex gap-2"><button onClick={handleSave} style={GS} className="flex items-center gap-2 px-5 py-2.5 rounded-full text-white text-sm font-semibold transition-all shadow-[0_8px_24px_rgba(201,242,103,0.3)] hover:scale-[1.02]"><Save size={14} /> Сохранить</button><button onClick={() => setEditing(false)} className="px-5 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] text-[var(--color-muted)] text-sm font-medium hover:bg-[rgba(255,255,255,0.08)] transition-all">Отмена</button></div>
+            <div className="flex gap-2"><button onClick={handleSave} style={GS} className="flex items-center gap-2 px-5 py-2.5 rounded-full text-[var(--color-text)] text-sm font-semibold transition-all shadow-[0_8px_24px_rgba(201,242,103,0.3)] hover:scale-[1.02]"><Save size={14} /> Сохранить</button><button onClick={() => setEditing(false)} className="px-5 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] text-[var(--color-muted)] text-sm font-medium hover:bg-[rgba(255,255,255,0.08)] transition-all">Отмена</button></div>
           </div>
         ) : (
           <button onClick={() => setEditing(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] text-[var(--color-muted)] text-sm font-medium hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--color-text)] transition-all"><Settings size={14} /> Редактировать</button>
@@ -52,7 +52,7 @@ export default function ProfilePage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           {[{ label: 'Покупок', value: stats.boughtCount, icon: <TrendingUp size={16} />, color: 'linear-gradient(135deg, #c9f267, #8ee8ff)' }, { label: 'Продаж', value: stats.soldCount, icon: <Gift size={16} />, color: 'linear-gradient(135deg, #8ee8ff, #8ee8ff)' }, { label: 'Рефералы', value: `${stats.referralEarned || 0} ₽`, icon: <User size={16} />, color: 'linear-gradient(135deg, #c9f267, #8ee8ff)' }, { label: 'Баланс', value: `${stats.bonusBalance || 0} ₽`, icon: <TrendingUp size={16} />, color: 'linear-gradient(135deg, #8ee8ff, #8ee8ff)' }].map((s, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="glass-card rounded-2xl p-4 text-center">
-              <div className="w-9 h-9 mx-auto mb-2 rounded-xl flex items-center justify-center text-white shadow-lg" style={{ background: s.color }}>{s.icon}</div>
+              <div className="w-9 h-9 mx-auto mb-2 rounded-xl flex items-center justify-center text-[var(--color-text)] shadow-lg" style={{ background: s.color }}>{s.icon}</div>
               <div className="text-lg font-bold text-[var(--color-text)]">{s.value}</div>
               <div className="text-[11px] text-[var(--color-muted)]">{s.label}</div>
             </motion.div>

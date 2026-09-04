@@ -10,7 +10,7 @@ export default function Avatar({ src, name, size = 'md', ring = false, className
   const content = src ? (
     <img src={src} alt={name || 'Avatar'} className={`${sizes[size]} rounded-full object-cover ${ring ? 'ring-2 ring-white dark:ring-slate-800' : ''}`} />
   ) : (
-    <div className={`${sizes[size]} rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold ${ring ? 'ring-2 ring-white dark:ring-slate-800' : ''}`}>
+    <div className={`${sizes[size]} rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-[var(--color-text)] font-bold ${ring ? 'ring-2 ring-white dark:ring-slate-800' : ''}`}>
       {initials || <User size={iconSizes[size]} />}
     </div>
   );

@@ -29,7 +29,7 @@ export default function ProductCard({ product }: { product: any }) {
         )}
 
         <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-2 group-hover:translate-x-0">
-          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }} className={`p-2.5 rounded-full backdrop-blur-xl transition-all ${fav ? 'bg-[#c9f267] text-[#0b0e0d] shadow-lg shadow-[rgba(201,242,103,0.4)]' : 'bg-black/50 text-white hover:bg-black/70'}`}>
+          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }} className={`p-2.5 rounded-full backdrop-blur-xl transition-all ${fav ? 'bg-[#c9f267] text-[#0b0e0d] shadow-lg shadow-[rgba(201,242,103,0.4)]' : 'bg-black/50 text-[var(--color-text)] hover:bg-black/70'}`}>
             <Heart size={16} fill={fav ? 'currentColor' : 'none'} />
           </button>
           {!inCart && (
@@ -40,7 +40,7 @@ export default function ProductCard({ product }: { product: any }) {
         </div>
 
         <div className="absolute bottom-3 left-3">
-          <span className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl text-base font-bold text-white shadow-lg">{price}</span>
+          <span className="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl text-base font-bold text-[var(--color-text)] shadow-lg">{price}</span>
         </div>
       </div>
 

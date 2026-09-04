@@ -116,7 +116,7 @@ export default function WithdrawalsPage() {
               onClick={handleReq}
               disabled={req}
               style={{ background: 'linear-gradient(135deg, #34d399, #2dd4bf)' }}
-              className="px-5 py-2.5 rounded-full text-white font-semibold text-sm transition-all shadow-lg disabled:opacity-50 hover:scale-[1.02]"
+              className="px-5 py-2.5 rounded-full text-[var(--color-text)] font-semibold text-sm transition-all shadow-lg disabled:opacity-50 hover:scale-[1.02]"
             >
               {req ? '...' : 'Вывести'}
             </button>

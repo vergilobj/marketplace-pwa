@@ -184,7 +184,7 @@ export default function ProductDetailPage() {
 
             {/* Продавец */}
             <div className="flex items-center gap-3 text-sm text-[var(--color-muted)]">
-              <div style={GS} className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold">
+              <div style={GS} className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--color-text)] font-bold">
                 {product.seller?.name?.[0] || '?'}
               </div>
               <span>Продавец: <span className="font-medium text-[var(--color-text)]">{product.seller?.name || 'Неизвестный'}</span></span>

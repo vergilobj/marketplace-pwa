@@ -70,13 +70,13 @@ export default function ProductsPage() {
         <h1 className="text-2xl font-bold text-[var(--color-text)]">Товары</h1>
         <div className="flex items-center gap-2">
           {isSeller && (
-            <Link to="/products/new" style={GS} className="flex items-center gap-2 px-4 py-2.5 rounded-full text-white text-sm font-semibold transition-all shadow-[0_8px_24px_rgba(201,242,103,0.3)] hover:scale-[1.03]">
+            <Link to="/products/new" style={GS} className="flex items-center gap-2 px-4 py-2.5 rounded-full text-[var(--color-text)] text-sm font-semibold transition-all shadow-[0_8px_24px_rgba(201,242,103,0.3)] hover:scale-[1.03]">
               <Plus size={16} /> Создать
             </Link>
           )}
           <div className="flex items-center gap-1 p-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-full">
             {sortOptions.map(opt => (
-              <button key={opt.value} onClick={() => setSort(opt.value)} className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap ${sort === opt.value ? 'text-white shadow-[0_6px_20px_rgba(201,242,103,0.25)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.06)]'}`} style={sort === opt.value ? GS : undefined}>{opt.icon}{opt.label}</button>
+              <button key={opt.value} onClick={() => setSort(opt.value)} className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap ${sort === opt.value ? 'text-[var(--color-text)] shadow-[0_6px_20px_rgba(201,242,103,0.25)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.06)]'}`} style={sort === opt.value ? GS : undefined}>{opt.icon}{opt.label}</button>
             ))}
           </div>
         </div>

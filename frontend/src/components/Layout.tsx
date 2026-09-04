@@ -142,7 +142,7 @@ export default function Layout() {
                 <Link to="/notifications" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors relative">
                   <Bell size={20} />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-[var(--color-text)] text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>
                   )}
                 </Link>
 

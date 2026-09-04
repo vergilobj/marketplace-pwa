@@ -3,113 +3,116 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* ===== Agentbox accent tokens (через существующие utility-неймспейсы) ===== */
-  --color-indigo-300: #d8f5a1;
-  --color-indigo-400: #c9f267;
-  --color-indigo-500: #c9f267;
-  --color-indigo-600: #b6e04f;
-  --color-indigo-700: #9cc63c;
+  /* ===== Claude/Anthropic — терракотовый акцент (заглушка лайм/электрик токенов) ===== */
+  --color-indigo-300: #e08a6a;
+  --color-indigo-400: #d97757;
+  --color-indigo-500: #d97757;
+  --color-indigo-600: #c4553d;
+  --color-indigo-700: #a8462f;
 
-  --color-blue-400: #8ee8ff;
-  --color-blue-500: #8ee8ff;
-  --color-blue-600: #8ee8ff;
-  --color-blue-700: #6fc8e6;
+  --color-blue-400: #d97757;
+  --color-blue-500: #d97757;
+  --color-blue-600: #c4553d;
+  --color-blue-700: #a8462f;
 
-  --color-purple-300: #d7c9f5;
-  --color-purple-400: #c4b4ef;
-  --color-purple-500: #b7a7e6;
-  --color-purple-600: #a08fd4;
-  --color-purple-700: #8878c0;
+  /* фиолетовый → тёплый нейтральный серый (заглушка) */
+  --color-purple-300: #e5e3da;
+  --color-purple-400: #d1cfc5;
+  --color-purple-500: #b0b0a8;
+  --color-purple-600: #8a8a82;
+  --color-purple-700: #6e6e6a;
 
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Manrope', 'Inter', system-ui, -apple-system, sans-serif;
 
-  --radius-sm: 12px;
-  --radius-md: 16px;
-  --radius-lg: 22px;
-  --radius-xl: 28px;
+  /* умеренные радиусы — без капсул и 22px+ */
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
 }
 
 /* ============================================================
-   Agentbox Design System — матовый чёрный + кислотный неон
+   Claude/Anthropic Design System — тёплый кремовый, строгий
    ============================================================ */
 :root {
-  --signal: #c9f267;
-  --electric: #8ee8ff;
-  --violet: #b7a7e6;
-  --night: #0b0e0d;
-  --night-soft: #141817;
-  --paper: #f4f3ee;
+  /* Акценты (заглушка неоновой палитры) */
+  --signal: #d97757;
+  --electric: #d97757;
+  --violet: #b0b0a8;
 
-  /* Базовая тёмная тема */
-  --bg: #0b0e0d;
-  --bg-alt: #0f1311;
-  --bg-tint: #111512;
-  --card: #141817;
-  --ink: #f4f3ee;
-  --ink-soft: #c8cdc8;
-  --muted: #6f766f;
-  --faint: #4a504a;
-  --line: rgba(243, 244, 237, 0.07);
-  --line-strong: rgba(243, 244, 237, 0.13);
+  /* Базовая СВЕТЛАЯ тема (дефолт) */
+  --bg: #f5f4ee;
+  --bg-alt: #ecebe3;
+  --bg-tint: #faf9f5;
+  --card: #ffffff;
+  --ink: #1f1e1d;
+  --ink-soft: #6e6e6a;
+  --muted: #6e6e6a;
+  --faint: #b0b0a8;
+  --line: rgba(0, 0, 0, 0.08);
+  --line-strong: rgba(0, 0, 0, 0.14);
 
-  --color-bg: #0b0e0d;
-  --color-surface: #0f1311;
-  --color-card: #141817;
-  --color-border: rgba(243, 244, 237, 0.07);
-  --color-text: #f4f3ee;
-  --color-muted: #6f766f;
-  --color-faint: #4a504a;
-  --color-accent: #c9f267;
+  --color-bg: #f5f4ee;
+  --color-surface: #ffffff;
+  --color-card: #ffffff;
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-text: #1f1e1d;
+  --color-muted: #6e6e6a;
+  --color-faint: #b0b0a8;
+  --color-accent: #d97757;
 
-  /* Матовый чёрный фон — БЕЗ розово-синих радиальных градиентов */
+  /* Фон — тёплый кремовый, без цветных радиальных градиентов */
   --bg-dark-gradient:
-    radial-gradient(ellipse 120% 90% at 50% -10%, rgba(201, 242, 103, 0.05) 0%, transparent 55%),
-    linear-gradient(160deg, #080a09 0%, #0b0e0d 55%, #0d100e 100%);
+    linear-gradient(160deg, #faf9f5 0%, #f5f4ee 55%, #efeee6 100%);
   --bg-glow: var(--bg-dark-gradient);
 
-  /* Радиусы — щедрые, но не капсулы повсюду */
-  --r-sm: 12px;
-  --r-md: 16px;
-  --r-lg: 22px;
-  --r-xl: 28px;
+  /* Радиусы — сдержанные */
+  --r-sm: 10px;
+  --r-md: 12px;
+  --r-lg: 14px;
+  --r-xl: 16px;
   --r-full: 999px;
 
-  /* Тени — нейтральные, без розового свечения */
-  --shadow-xs: 0 2px 10px rgba(0, 0, 0, 0.35);
-  --shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 30px 80px rgba(0, 0, 0, 0.6);
-  --shadow-signal: 0 16px 40px rgba(201, 242, 103, 0.12);
-  --shadow-electric: 0 16px 40px rgba(142, 232, 255, 0.12);
+  /* Тени — нейтральные, без цветного свечения */
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.09);
+  --shadow-signal: 0 8px 24px rgba(217, 119, 87, 0.18);
+  --shadow-electric: 0 8px 24px rgba(0, 0, 0, 0.08);
 
   --ease: cubic-bezier(.22, .61, .36, 1);
 }
 
 /* ============================================================
-   Светлая тема (переключатель) — тёплый бумажный, без розового
+   Тёмная тема (переключатель, опционально)
    ============================================================ */
-html:not(.dark) {
-  --bg: #f4f3ee;
-  --bg-alt: #ecebe5;
-  --card: #ffffff;
-  --ink: #0b0e0d;
-  --muted: #5c625c;
-  --faint: #8a908a;
-  --line: rgba(0, 0, 0, 0.08);
+html.dark {
+  --bg: #141413;
+  --bg-alt: #1a1a18;
+  --bg-tint: #1e1e1b;
+  --card: #1f1e1d;
+  --ink: #f5f4ee;
+  --ink-soft: #b0aea5;
+  --muted: #87867f;
+  --faint: #5e5d59;
+  --line: rgba(245, 244, 238, 0.08);
+  --line-strong: rgba(245, 244, 238, 0.14);
 
-  --color-bg: #f4f3ee;
-  --color-surface: #ffffff;
-  --color-card: #ffffff;
-  --color-border: rgba(0, 0, 0, 0.08);
-  --color-text: #0b0e0d;
-  --color-muted: #5c625c;
-  --color-faint: #8a908a;
+  --color-bg: #141413;
+  --color-surface: #1a1a18;
+  --color-card: #1f1e1d;
+  --color-border: rgba(245, 244, 238, 0.08);
+  --color-text: #f5f4ee;
+  --color-muted: #87867f;
+  --color-faint: #5e5d59;
+  --color-accent: #d97757;
 
-  --bg-dark-gradient: linear-gradient(160deg, #ffffff 0%, #f0efe9 100%);
+  --bg-dark-gradient: linear-gradient(160deg, #141413 0%, #1a1a18 100%);
   --bg-glow: var(--bg-dark-gradient);
 
-  --shadow: 0 14px 40px rgba(20, 20, 20, 0.1);
-  --shadow-signal: 0 16px 40px rgba(201, 242, 103, 0.25);
+  --shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+  --shadow-signal: 0 8px 24px rgba(217, 119, 87, 0.2);
 }
 
 /* ============================================================
@@ -125,13 +128,13 @@ html:not(.dark) {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    color-scheme: dark;
+    color-scheme: light;
     transition: background .3s var(--ease), color .3s var(--ease);
   }
-  html:not(.dark) body { color-scheme: light; }
+  html.dark body { color-scheme: dark; }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-heading);
     font-weight: 700;
     letter-spacing: -0.02em;
   }
@@ -139,84 +142,78 @@ html:not(.dark) {
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: rgba(201, 242, 103, 0.25);
+    background: rgba(0, 0, 0, 0.18);
     border-radius: 10px;
   }
-  html:not(.dark) ::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.18);
+  html.dark ::-webkit-scrollbar-thumb {
+    background: rgba(245, 244, 238, 0.2);
   }
 
-  ::selection { background: rgba(201, 242, 103, 0.28); }
+  ::selection { background: rgba(217, 119, 87, 0.22); }
 }
 
 /* ============================================================
-   Неоновые утилиты (agentbox)
+   Компонентные утилиты (Claude — строгий светлый нейтральный)
    ============================================================ */
 @layer utilities {
-  /* Стеклянная панель — сайдбары, шапки: нейтральное тёмное стекло */
+  /* Стеклянная панель — нейтральный светлый вид, без цвета */
   .glass,
   .glass-panel {
-    background: rgba(15, 18, 16, 0.72);
-    backdrop-filter: blur(24px) saturate(130%);
-    -webkit-backdrop-filter: blur(24px) saturate(130%);
-    border: 1px solid rgba(243, 244, 237, 0.07);
-  }
-  html:not(.dark) .glass,
-  html:not(.dark) .glass-panel {
-    background: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(20px) saturate(100%);
+    -webkit-backdrop-filter: blur(20px) saturate(100%);
     border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+  html.dark .glass,
+  html.dark .glass-panel {
+    background: rgba(31, 30, 29, 0.78);
+    border: 1px solid rgba(245, 244, 238, 0.08);
   }
 
   /* Более плотное стекло — модалки, вложенные панели */
   .glass-strong {
-    background: rgba(11, 14, 13, 0.85);
-    backdrop-filter: blur(32px) saturate(140%);
-    -webkit-backdrop-filter: blur(32px) saturate(140%);
-    border: 1px solid rgba(243, 244, 237, 0.1);
-  }
-  html:not(.dark) .glass-strong {
-    background: rgba(255, 255, 255, 0.92);
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(32px) saturate(100%);
+    -webkit-backdrop-filter: blur(32px) saturate(100%);
     border: 1px solid rgba(0, 0, 0, 0.08);
   }
+  html.dark .glass-strong {
+    background: rgba(31, 30, 29, 0.94);
+    border: 1px solid rgba(245, 244, 238, 0.1);
+  }
 
-  /* Стеклянная карточка — тёмная, hover-подъём + лайм-обводка */
+  /* Карточка — белая с нейтральной обводкой и мягкой тенью */
   .glass-card {
-    background: linear-gradient(160deg, rgba(20, 24, 23, 0.94), rgba(13, 16, 14, 0.98));
-    backdrop-filter: blur(20px) saturate(130%);
-    -webkit-backdrop-filter: blur(20px) saturate(130%);
-    border: 1px solid rgba(243, 244, 237, 0.07);
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.07);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow);
     transition: transform .35s var(--ease), box-shadow .35s var(--ease), border-color .35s var(--ease);
   }
   .glass-card:hover {
-    border-color: rgba(201, 242, 103, 0.35);
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-signal);
+    border-color: rgba(0, 0, 0, 0.13);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.09);
   }
-  html:not(.dark) .glass-card {
-    background: rgba(255, 255, 255, 0.88);
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    box-shadow: 0 8px 30px rgba(20, 20, 20, 0.08);
+  html.dark .glass-card {
+    background: #1f1e1d;
+    border: 1px solid rgba(245, 244, 238, 0.08);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
   }
-  html:not(.dark) .glass-card:hover {
-    border-color: rgba(140, 165, 60, 0.4);
-    box-shadow: 0 16px 40px rgba(201, 242, 103, 0.25);
+  html.dark .glass-card:hover {
+    border-color: rgba(245, 244, 238, 0.16);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
   }
 
-  /* Акцентный текст — лайм (вместо spark-градиента) */
+  /* Акцентный текст — теперь сплошной тёмный, без градиента */
   .text-gradient {
-    background: linear-gradient(135deg, var(--signal) 0%, var(--electric) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
+    color: var(--color-text);
   }
 
-  /* Мягкая акцентная поверхность */
+  /* Мягкая акцентная поверхность — терракотовая */
   .spark-surface {
-    background: rgba(201, 242, 103, 0.04);
-    border: 1px solid rgba(201, 242, 103, 0.15);
+    background: rgba(217, 119, 87, 0.06);
+    border: 1px solid rgba(217, 119, 87, 0.16);
   }
 
   /* ===== Кнопки ===== */
@@ -225,7 +222,7 @@ html:not(.dark) {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 10px 22px;
+    padding: 10px 20px;
     border-radius: var(--r-md);
     font-family: 'Inter', sans-serif;
     font-weight: 600;
@@ -235,33 +232,31 @@ html:not(.dark) {
     white-space: nowrap;
   }
 
-  /* Основная кнопка — лайм с тёмным текстом */
+  /* Основная кнопка — терракотовая с кремовым текстом */
   .btn-primary {
-    background: var(--signal);
-    color: #0b0e0d;
-    box-shadow: var(--shadow-signal);
+    background: var(--color-accent);
+    color: #faf9f5;
+    box-shadow: 0 8px 24px rgba(217, 119, 87, 0.22);
   }
-  .btn-primary:hover { transform: scale(1.02); box-shadow: 0 20px 50px rgba(201, 242, 103, 0.25); }
-  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(217, 119, 87, 0.3); }
+  .btn-primary:active { transform: translateY(0); }
 
-  /* Призрачная кнопка — тёмная с лайм-обводкой */
+  /* Призрачная кнопка — нейтральная */
   .btn-ghost,
   .btn-secondary {
-    background: rgba(243, 244, 237, 0.03);
-    border: 1px solid rgba(243, 244, 237, 0.12);
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.12);
     color: var(--color-text);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
   }
   .btn-ghost:hover,
   .btn-secondary:hover {
-    border-color: rgba(201, 242, 103, 0.5);
-    color: var(--signal);
+    border-color: rgba(0, 0, 0, 0.25);
+    color: var(--color-accent);
   }
-  html:not(.dark) .btn-ghost,
-  html:not(.dark) .btn-secondary {
-    background: rgba(0, 0, 0, 0.04);
-    border-color: rgba(0, 0, 0, 0.12);
+  html.dark .btn-ghost,
+  html.dark .btn-secondary {
+    background: rgba(245, 244, 238, 0.04);
+    border-color: rgba(245, 244, 238, 0.14);
   }
 
   /* ===== Инпуты ===== */
@@ -269,20 +264,20 @@ html:not(.dark) {
     width: 100%;
     padding: 11px 16px;
     border-radius: var(--r-sm);
-    background: rgba(243, 244, 237, 0.03);
+    background: #faf9f5;
     border: 1px solid var(--color-border);
     color: var(--color-text);
     font-size: 14px;
     outline: none;
     transition: all .25s var(--ease);
   }
-  html:not(.dark) .input-glass {
-    background: #eceae3;
-  }
   .input-glass::placeholder { color: var(--color-faint); }
   .input-glass:focus {
-    border-color: rgba(201, 242, 103, 0.6);
-    box-shadow: 0 0 0 3px rgba(201, 242, 103, 0.16);
+    border-color: rgba(217, 119, 87, 0.5);
+    box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.12);
+  }
+  html.dark .input-glass {
+    background: rgba(245, 244, 238, 0.04);
   }
 
   /* ===== Анимации (spring) ===== */
@@ -307,78 +302,141 @@ html:not(.dark) {
 }
 
 /* ============================================================
-   Светлая тема — читаемость белого текста на светлых карточках
+   СВЕТЛАЯ ТЕМА (дефолт) — читаемость текста, нейтрализация фонов
    ============================================================ */
-html:not(.dark) .text-white { color: #0b0e0d; }
-html:not(.dark) .text-white\/90 { color: rgba(11,14,13,.9); }
-html:not(.dark) .text-white\/85 { color: rgba(11,14,13,.85); }
-html:not(.dark) .text-white\/70 { color: rgba(11,14,13,.7); }
-html:not(.dark) .text-white\/60 { color: rgba(11,14,13,.6); }
-html:not(.dark) .text-white\/50 { color: rgba(11,14,13,.5); }
-html:not(.dark) .text-white\/40 { color: rgba(11,14,13,.4); }
-html:not(.dark) .text-white\/35 { color: rgba(11,14,13,.35); }
-html:not(.dark) .text-white\/30 { color: rgba(11,14,13,.3); }
-html:not(.dark) .text-white\/25 { color: rgba(11,14,13,.25); }
-html:not(.dark) .text-white\/20 { color: rgba(11,14,13,.2); }
-html:not(.dark) .text-white\/15 { color: rgba(11,14,13,.15); }
-html:not(.dark) .text-white\/10 { color: rgba(11,14,13,.1); }
 
-/* ===== Светлая тема: плоские тёмные фоны → светлое ===== */
-html:not(.dark) .bg-\[\#1a1a24\],
-html:not(.dark) .bg-\[\#0a0a0f\],
-html:not(.dark) .bg-\[\#111118\],
-html:not(.dark) .bg-\[\#0f0f16\] { background-color: #ffffff; }
-html:not(.dark) .bg-\[\#111115\],
-html:not(.dark) .bg-\[\#1e1e2a\],
-html:not(.dark) .bg-\[\#22222d\] { background-color: #f1f2f6; }
+/* Белый текст → тёмный (кроме акцентных кнопок ниже) */
+.text-white { color: #1f1e1d; }
+.text-white\/90 { color: rgba(31,30,29,.9); }
+.text-white\/85 { color: rgba(31,30,29,.85); }
+.text-white\/70 { color: rgba(31,30,29,.7); }
+.text-white\/60 { color: rgba(31,30,29,.6); }
+.text-white\/50 { color: rgba(31,30,29,.5); }
+.text-white\/40 { color: rgba(31,30,29,.4); }
+.text-white\/35 { color: rgba(31,30,29,.35); }
+.text-white\/30 { color: rgba(31,30,29,.3); }
+.text-white\/25 { color: rgba(31,30,29,.25); }
+.text-white\/20 { color: rgba(31,30,29,.2); }
+.text-white\/15 { color: rgba(31,30,29,.15); }
+.text-white\/10 { color: rgba(31,30,29,.1); }
+.text-white\/5 { color: rgba(31,30,29,.05); }
+html.dark .text-white { color: #f5f4ee; }
+html.dark .text-white\/90 { color: rgba(245,244,238,.9); }
+html.dark .text-white\/85 { color: rgba(245,244,238,.85); }
+html.dark .text-white\/70 { color: rgba(245,244,238,.7); }
+html.dark .text-white\/60 { color: rgba(245,244,238,.6); }
+html.dark .text-white\/50 { color: rgba(245,244,238,.5); }
+html.dark .text-white\/40 { color: rgba(245,244,238,.4); }
+html.dark .text-white\/35 { color: rgba(245,244,238,.35); }
+html.dark .text-white\/30 { color: rgba(245,244,238,.3); }
+html.dark .text-white\/25 { color: rgba(245,244,238,.25); }
+html.dark .text-white\/20 { color: rgba(245,244,238,.2); }
+html.dark .text-white\/15 { color: rgba(245,244,238,.15); }
+html.dark .text-white\/10 { color: rgba(245,244,238,.1); }
+html.dark .text-white\/5 { color: rgba(245,244,238,.05); }
 
-/* ===== Светлая тема: полупрозрачные белые фоны → полупрозрачный чёрный ===== */
-html:not(.dark) .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,.02); }
-html:not(.dark) .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,.025); }
-html:not(.dark) .bg-white\/\[0\.04\] { background-color: rgba(0,0,0,.03); }
-html:not(.dark) .bg-white\/\[0\.06\] { background-color: rgba(0,0,0,.05); }
-html:not(.dark) .bg-white\/\[0\.08\] { background-color: rgba(0,0,0,.06); }
-html:not(.dark) .bg-white\/\[0\.10\] { background-color: rgba(0,0,0,.07); }
-html:not(.dark) .bg-white\/\[0\.12\] { background-color: rgba(0,0,0,.08); }
-html:not(.dark) .bg-white\/\[0\.15\] { background-color: rgba(0,0,0,.1); }
+/* Акцентные терракотовые поверхности → кремовый текст (важнее, чем text-white) */
+.bg-indigo-400,
+.bg-indigo-500,
+.bg-indigo-600 { color: #faf9f5 !important; }
+.text-indigo-400 { color: #d97757 !important; }
+.text-indigo-500 { color: #d97757 !important; }
+.text-blue-400,
+.text-blue-500,
+.text-blue-600 { color: #d97757 !important; }
 
-/* ===== Светлая тема: светлые рамки → тёмные ===== */
-html:not(.dark) .border-white\/\[0\.02\] { border-color: rgba(0,0,0,.04); }
-html:not(.dark) .border-white\/\[0\.03\] { border-color: rgba(0,0,0,.05); }
-html:not(.dark) .border-white\/\[0\.04\] { border-color: rgba(0,0,0,.06); }
-html:not(.dark) .border-white\/\[0\.06\] { border-color: rgba(0,0,0,.08); }
-html:not(.dark) .border-white\/\[0\.08\] { border-color: rgba(0,0,0,.10); }
-html:not(.dark) .border-white\/\[0\.10\] { border-color: rgba(0,0,0,.12); }
-html:not(.dark) .border-white\/\[0\.12\] { border-color: rgba(0,0,0,.14); }
-html:not(.dark) .border-\[\#111118\] { border-color: rgba(0,0,0,.10); }
-html:not(.dark) .bg-black { background-color: #f1f2f6; }
+/* Тёмные плоские фоны → светлые карточки */
+.bg-\[\#1a1a24\],
+.bg-\[\#0a0a0f\],
+.bg-\[\#111118\],
+.bg-\[\#0f0f16\],
+.bg-\[\#0b0e0d\] { background-color: #ffffff; }
+.bg-\[\#111115\],
+.bg-\[\#1e1e2a\],
+.bg-\[\#22222d\] { background-color: #faf9f5; }
+html.dark .bg-\[\#1a1a24\],
+html.dark .bg-\[\#0a0a0f\],
+html.dark .bg-\[\#111118\],
+html.dark .bg-\[\#0f0f16\],
+html.dark .bg-\[\#0b0e0d\] { background-color: #1f1e1d; }
+html.dark .bg-\[\#111115\],
+html.dark .bg-\[\#1e1e2a\],
+html.dark .bg-\[\#22222d\] { background-color: #1a1a18; }
 
-/* ===== Светлая тема: placeholder'ы ===== */
-html:not(.dark) input::placeholder,
-html:not(.dark) textarea::placeholder {
-  color: #8a908a;
+/* Полупрозрачные белые фоны → полупрозрачный чёрный */
+.bg-white\/\[0\.02\] { background-color: rgba(0,0,0,.02); }
+.bg-white\/\[0\.03\] { background-color: rgba(0,0,0,.025); }
+.bg-white\/\[0\.04\] { background-color: rgba(0,0,0,.03); }
+.bg-white\/\[0\.06\] { background-color: rgba(0,0,0,.05); }
+.bg-white\/\[0\.08\] { background-color: rgba(0,0,0,.06); }
+.bg-white\/\[0\.10\] { background-color: rgba(0,0,0,.07); }
+.bg-white\/\[0\.12\] { background-color: rgba(0,0,0,.08); }
+.bg-white\/\[0\.15\] { background-color: rgba(0,0,0,.1); }
+html.dark .bg-white\/\[0\.02\] { background-color: rgba(245,244,238,.02); }
+html.dark .bg-white\/\[0\.03\] { background-color: rgba(245,244,238,.03); }
+html.dark .bg-white\/\[0\.04\] { background-color: rgba(245,244,238,.04); }
+html.dark .bg-white\/\[0\.06\] { background-color: rgba(245,244,238,.06); }
+html.dark .bg-white\/\[0\.08\] { background-color: rgba(245,244,238,.08); }
+html.dark .bg-white\/\[0\.10\] { background-color: rgba(245,244,238,.10); }
+html.dark .bg-white\/\[0\.12\] { background-color: rgba(245,244,238,.12); }
+html.dark .bg-white\/\[0\.15\] { background-color: rgba(245,244,238,.15); }
+
+/* Светлые рамки → тёмные */
+.border-white\/\[0\.02\] { border-color: rgba(0,0,0,.04); }
+.border-white\/\[0\.03\] { border-color: rgba(0,0,0,.05); }
+.border-white\/\[0\.04\] { border-color: rgba(0,0,0,.06); }
+.border-white\/\[0\.06\] { border-color: rgba(0,0,0,.08); }
+.border-white\/\[0\.08\] { border-color: rgba(0,0,0,.10); }
+.border-white\/\[0\.10\] { border-color: rgba(0,0,0,.12); }
+.border-white\/\[0\.12\] { border-color: rgba(0,0,0,.14); }
+.border-\[\#111118\] { border-color: rgba(0,0,0,.10); }
+
+/* Тёмные оверлеи на изображениях (бейджи цен, кнопки удаления, лайтбокс)
+   всегда остаются тёмными, а текст на них — белым */
+[class*="bg-black/"] { color: #ffffff !important; }
+html.dark .border-white\/\[0\.02\] { border-color: rgba(245,244,238,.04); }
+html.dark .border-white\/\[0\.03\] { border-color: rgba(245,244,238,.05); }
+html.dark .border-white\/\[0\.04\] { border-color: rgba(245,244,238,.06); }
+html.dark .border-white\/\[0\.06\] { border-color: rgba(245,244,238,.08); }
+html.dark .border-white\/\[0\.08\] { border-color: rgba(245,244,238,.10); }
+html.dark .border-white\/\[0\.10\] { border-color: rgba(245,244,238,.12); }
+html.dark .border-white\/\[0\.12\] { border-color: rgba(245,244,238,.14); }
+html.dark .border-\[\#111118\] { border-color: rgba(245,244,238,.10); }
+html.dark .bg-black { background-color: #141413; }
+
+/* Placeholder'ы */
+input::placeholder,
+textarea::placeholder {
+  color: #b0b0a8;
   opacity: 1;
 }
 
-/* ===== Светлая тема: инпуты с тёмным фоном → светлые ===== */
-html:not(.dark) input.bg-white\/\[0\.04\],
-html:not(.dark) input.bg-white\/\[0\.06\],
-html:not(.dark) textarea.bg-white\/\[0\.04\],
-html:not(.dark) textarea.bg-white\/\[0\.06\] {
-  background-color: #eceae3;
+/* Инпуты с тёмным фоном → светлые */
+input.bg-white\/\[0\.04\],
+input.bg-white\/\[0\.06\],
+textarea.bg-white\/\[0\.04\],
+textarea.bg-white\/\[0\.06\] {
+  background-color: #faf9f5;
 }
+html.dark input.bg-white\/\[0\.04\],
+html.dark input.bg-white\/\[0\.06\],
+html.dark textarea.bg-white\/\[0\.04\],
+html.dark textarea.bg-white\/\[0\.06\] {
+  background-color: rgba(245,244,238,.06);
+}
+
+/* Акцентная граница слева (уведомления) — терракотовая */
+.border-l-indigo-500 { border-left-color: #d97757 !important; }
 
 /* ============================================================
    МОБИЛЬНЫЕ ОТСТУПЫ — меньше боковых паддингов на телефоне
    ============================================================ */
 @media (max-width: 640px) {
-  /* Внешний каркас почти без полей, страницы сами держат 12px */
   main.max-w-7xl {
     padding-left: 8px !important;
     padding-right: 8px !important;
   }
 
-  /* Вложенные контейнеры страниц — 12px, не 24px */
   .max-w-6xl,
   .max-w-5xl,
   .max-w-4xl,
@@ -388,15 +446,9 @@ html:not(.dark) textarea.bg-white\/\[0\.06\] {
     padding-right: 12px !important;
   }
 
-  /* Карточки и hero — без лишних горизонтальных полей по краям */
   .p-8 { padding-left: 16px; padding-right: 16px; }
   .p-10 { padding-left: 16px; padding-right: 16px; }
 }
-
-/* Лайм-заливка кнопок/бейджей — тёмный текст для читаемости */
-.bg-indigo-500,
-.bg-indigo-400,
-.bg-indigo-600 { color: #0b0e0d !important; }
 
 /* ===== Reduced motion ===== */
 @media (prefers-reduced-motion: reduce) {

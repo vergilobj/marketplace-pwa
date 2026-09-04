@@ -68,7 +68,7 @@ export default function AdminPage() {
         { label: 'Доход', value: `${(dashboard?.totalRevenue || 0).toLocaleString('ru-RU')} ₽`, icon: <TrendingUp size={22} />, color: 'from-purple-500 to-blue-600' },
       ].map((s, i) => (
         <div key={i} className="glass-card rounded-2xl p-5">
-          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center text-white mb-3`}>{s.icon}</div>
+          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center text-[var(--color-text)] mb-3`}>{s.icon}</div>
           <div className="text-2xl font-bold text-white">{s.value}</div>
           <div className="text-sm text-white/50 mt-1">{s.label}</div>
         </div>
@@ -81,7 +81,7 @@ export default function AdminPage() {
       {users.map((u: any) => (
         <div key={u.id} className="glass-card rounded-2xl p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-bold flex items-center justify-center">{(u.name || '?')[0].toUpperCase()}</div>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-[var(--color-text)] text-xs font-bold flex items-center justify-center">{(u.name || '?')[0].toUpperCase()}</div>
             <div>
               <p className="text-sm font-semibold text-white">{u.name || 'Без имени'}</p>
               <p className="text-xs text-white/35">{u.phone}</p>
@@ -122,7 +122,7 @@ export default function AdminPage() {
       {posts.map((p: any) => (
         <div key={p.id} className="glass-card rounded-2xl p-4 flex items-center justify-between">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate">{p.title}</p>
+            <p className="text-sm font-semibold text-[var(--color-text)] truncate">{p.title}</p>
             <p className="text-xs text-white/35">{p.author?.name} • {p.isAd ? 'Реклама' : 'Пост'} • {p.createdAt ? format(new Date(p.createdAt), 'd MMM', { locale: ru }) : ''}</p>
           </div>
           <button onClick={() => handleTogglePost(p.id)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 ml-3 ${p.isHidden ? 'bg-red-400/10 text-red-400 hover:bg-red-400/20' : 'bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20'}`}>{p.isHidden ? 'Скрыт' : 'Виден'}</button>
@@ -133,7 +133,7 @@ export default function AdminPage() {
 
   const renderInvites = () => (
     <div>
-      <button onClick={handleCreateInvite} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 transition-all shadow-lg mb-4"><Plus size={15} /> Создать инвайт</button>
+      <button onClick={handleCreateInvite} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-500 text-[var(--color-text)] text-sm font-semibold hover:bg-indigo-400 transition-all shadow-lg mb-4"><Plus size={15} /> Создать инвайт</button>
       <div className="space-y-2">
         {invites.map((inv: any) => (
           <div key={inv.code} className="glass-card rounded-2xl p-4 flex items-center justify-between">
@@ -142,7 +142,7 @@ export default function AdminPage() {
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${inv.isUsed ? 'bg-red-400/10 text-red-400' : 'bg-emerald-400/10 text-emerald-400'}`}>{inv.isUsed ? 'Использован' : 'Свободен'}</span>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => handleCopyInvite(inv.code)} className="p-2 rounded-lg text-white/35 hover:text-white hover:bg-white/[0.06] transition-all">{copied === inv.code ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}</button>
+              <button onClick={() => handleCopyInvite(inv.code)} className="p-2 rounded-lg text-white/35 hover:text-[var(--color-text)] hover:bg-white/[0.06] transition-all">{copied === inv.code ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}</button>
               <button onClick={() => handleDeleteInvite(inv.code)} className="p-2 rounded-lg text-white/35 hover:text-red-400 hover:bg-red-400/5 transition-all"><Trash2 size={15} /></button>
             </div>
           </div>
@@ -203,8 +203,8 @@ export default function AdminPage() {
           <div key={f.key}>
             <label className="block text-sm font-medium text-white/60 mb-1.5">{f.label}</label>
             <div className="flex gap-2">
-              <input value={val} onChange={e => setSettings((prev: any) => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder} className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-sm placeholder:text-white/20 outline-none focus:border-indigo-500/50 transition-all" />
-              <button onClick={() => handleUpdateSetting(f.key, val)} className="px-4 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 transition-all shadow-lg">Сохранить</button>
+              <input value={val} onChange={e => setSettings((prev: any) => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder} className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-[var(--color-text)] text-sm placeholder:text-white/20 outline-none focus:border-indigo-500/50 transition-all" />
+              <button onClick={() => handleUpdateSetting(f.key, val)} className="px-4 py-2.5 rounded-xl bg-indigo-500 text-[var(--color-text)] text-sm font-semibold hover:bg-indigo-400 transition-all shadow-lg">Сохранить</button>
             </div>
           </div>
         );
@@ -230,13 +230,13 @@ export default function AdminPage() {
     <div className="max-w-6xl mx-auto px-6 py-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-1">Админ-панель</h1>
+          <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Админ-панель</h1>
           <p className="text-white/50 text-sm">Управление маркетплейсом</p>
         </div>
         {(activeTab === 'users' || activeTab === 'products' || activeTab === 'posts') && (
           <div className="relative">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/35" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск..." className="w-56 pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder:text-white/25 outline-none focus:border-indigo-500/50 transition-all" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск..." className="w-56 pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-[var(--color-text)] placeholder:text-white/25 outline-none focus:border-indigo-500/50 transition-all" />
           </div>
         )}
       </div>
@@ -246,7 +246,7 @@ export default function AdminPage() {
         {tabs.map(tab => (
           <button key={tab.key} onClick={() => { setActiveTab(tab.key); setSearch(''); }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
-              activeTab === tab.key ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'
+              activeTab === tab.key ? 'bg-indigo-500 text-[var(--color-text)] shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-[var(--color-text)] hover:bg-white/[0.06]'
             }`}>{tab.icon}{tab.label}</button>
         ))}
       </div>

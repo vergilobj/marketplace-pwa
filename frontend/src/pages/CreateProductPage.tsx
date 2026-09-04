@@ -84,7 +84,7 @@ export default function CreateProductPage() {
                   <button
                     type="button"
                     onClick={() => removeFile(idx)}
-                    className="absolute top-0 right-0 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center"
+                    className="absolute top-0 right-0 bg-black/60 text-[var(--color-text)] rounded-full w-5 h-5 flex items-center justify-center"
                   >
                     <X size={12} />
                   </button>

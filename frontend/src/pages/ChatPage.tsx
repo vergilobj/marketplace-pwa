@@ -318,7 +318,7 @@ export default function ChatPage() {
             <h1 className="text-lg font-bold text-white">Сообщения</h1>
             <button
               onClick={() => setShowNewChat(!showNewChat)}
-              className="w-8 h-8 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/60 hover:text-white transition-all"
+              className="w-8 h-8 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/60 hover:text-[var(--color-text)] transition-all"
             >
               {showNewChat ? <X size={16} /> : <Plus size={16} />}
             </button>
@@ -334,12 +334,12 @@ export default function ChatPage() {
                   onChange={e => setNewChatPhone(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && startNewChat()}
                   placeholder="+790****0000"
-                  className="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-indigo-500/40"
+                  className="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-[var(--color-text)] placeholder:text-white/20 outline-none focus:border-indigo-500/40"
                 />
                 <button
                   onClick={startNewChat}
                   disabled={!newChatPhone.trim()}
-                  className="px-3 py-2 rounded-lg bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-400 disabled:opacity-30 transition-all"
+                  className="px-3 py-2 rounded-lg bg-indigo-500 text-[var(--color-text)] text-sm font-semibold hover:bg-indigo-400 disabled:opacity-30 transition-all"
                 >
                   <UserPlus size={16} />
                 </button>
@@ -354,7 +354,7 @@ export default function ChatPage() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Поиск..."
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-white placeholder:text-white/20 outline-none focus:border-indigo-500/30 transition-all"
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-[var(--color-text)] placeholder:text-white/20 outline-none focus:border-indigo-500/30 transition-all"
             />
           </div>
         </div>
@@ -370,22 +370,22 @@ export default function ChatPage() {
                 className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.04] transition-all text-left border-b border-white/[0.02] ${selectedUser?.userId === c.userId ? 'bg-indigo-500/10 border-l-[3px] border-l-indigo-500' : ''}`}
               >
                 <div className="relative shrink-0">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-base">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[var(--color-text)] font-bold text-base">
                     {(c.name || '?')[0].toUpperCase()}
                   </div>
                   {isOnline && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[var(--color-card)]" />
                   )}
                   {c.unread > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-[var(--color-card)]">{c.unread > 9 ? '9+' : c.unread}</span>
+                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-indigo-500 text-[var(--color-text)] text-[10px] font-bold flex items-center justify-center border-2 border-[var(--color-card)]">{c.unread > 9 ? '9+' : c.unread}</span>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <p className="text-white text-sm font-semibold truncate">{c.name}</p>
+                    <p className="text-[var(--color-text)] text-sm font-semibold truncate">{c.name}</p>
                     <span className="text-white/25 text-[10px] shrink-0 ml-2">{formatTime(c.lastMessageTime)}</span>
                   </div>
-                  <p className={`text-xs truncate mt-0.5 ${c.unread > 0 ? 'text-white font-medium' : 'text-white/35'}`}>
+                  <p className={`text-xs truncate mt-0.5 ${c.unread > 0 ? 'text-[var(--color-text)] font-medium' : 'text-white/35'}`}>
                     {c.lastMessage || 'Нет сообщений'}
                   </p>
                 </div>
@@ -414,11 +414,11 @@ export default function ChatPage() {
             <button onClick={() => setSelectedUser(null)} className="md:hidden text-white/50 hover:text-white">
               <ArrowLeft size={20} />
             </button>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[var(--color-text)] font-bold text-sm shrink-0">
               {(selectedUser.name || '?')[0].toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-semibold truncate">{selectedUser.name}</p>
+              <p className="text-[var(--color-text)] text-sm font-semibold truncate">{selectedUser.name}</p>
               <p className={`text-[11px] ${onlineUsers.get(selectedUser.userId) === true ? 'text-emerald-400' : 'text-white/30'}`}>
                 {onlineUsers.get(selectedUser.userId) === true ? 'онлайн' : 'офлайн'}
               </p>
@@ -450,7 +450,7 @@ export default function ChatPage() {
                     {msg.text && (
                       <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words shadow-lg ${
                         isMine
-                          ? 'text-white rounded-br-md shadow-[0_8px_20px_rgba(201,242,103,0.25)]'
+                          ? 'text-[var(--color-text)] rounded-br-md shadow-[0_8px_20px_rgba(201,242,103,0.25)]'
                           : 'glass text-[var(--color-text)] rounded-bl-md'
                       }`} style={isMine ? { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 100%)' } : undefined}>
                         {msg.text}
@@ -511,7 +511,7 @@ export default function ChatPage() {
                     )}
                     <button
                       onClick={() => removePendingFile(f.url)}
-                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-[var(--color-text)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <X size={12} />
                     </button>
