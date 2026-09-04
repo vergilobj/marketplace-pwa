@@ -26,7 +26,10 @@ export default function Layout() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
-  const [lightMode, setLightMode] = useState(() => localStorage.getItem('theme') === 'light');
+  const [lightMode, setLightMode] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    return saved === null ? true : saved === 'dark';
+  });
   const navigate = useNavigate();
   const location = useLocation();
   const { cart } = useApp();
@@ -34,15 +37,14 @@ export default function Layout() {
 
   const profileMenuRef = useClickAway(() => setProfileMenuOpen(false));
 
-  // Theme toggle
+  // Theme toggle — class-based: .dark = dark, отсутствие = светлая
   useEffect(() => {
     if (lightMode) {
-      document.documentElement.style.filter = 'invert(1) hue-rotate(180deg)';
-      document.documentElement.style.transition = 'filter 0.3s';
+      document.documentElement.classList.add('dark');
     } else {
-      document.documentElement.style.filter = '';
+      document.documentElement.classList.remove('dark');
     }
-    localStorage.setItem('theme', lightMode ? 'light' : 'dark');
+    localStorage.setItem('theme', lightMode ? 'dark' : 'light');
   }, [lightMode]);
 
   const handleLogout = () => {
@@ -84,10 +86,10 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fc] dark:bg-[#0a0a0f] text-gray-900 dark:text-white">
-      <header className="sticky top-0 z-50 bg-white/80 dark:bg-[#0a0a0f]/80 backdrop-blur-xl border-b border-gray-200 dark:border-white/[0.06]">
+    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+      <header className="sticky top-0 z-50 glass border-b border-[var(--color-border)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <Link to="/" className="text-xl font-bold tracking-tight shrink-0">Marketplace</Link>
+          <Link to="/" className="text-xl font-bold tracking-tight shrink-0 text-gradient">Marketplace</Link>
 
           <form onSubmit={handleGlobalSearch} className="hidden md:flex items-center ml-8 flex-1 max-w-lg">
             <div className="relative w-full">
@@ -103,26 +105,26 @@ export default function Layout() {
           </form>
 
           <nav className="hidden md:flex items-center space-x-2 ml-4">
-            <button onClick={() => setLightMode(!lightMode)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:text-indigo-500 transition-colors" title={lightMode ? 'Тёмная тема' : 'Светлая тема'}>
+            <button onClick={() => setLightMode(!lightMode)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:text-[#FF579B] transition-colors" title={lightMode ? 'Тёмная тема' : 'Светлая тема'}>
               {lightMode ? <Moon size={20} /> : <Sun size={20} />}
             </button>
-            <Link to="/favorites" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:text-indigo-500">
+            <Link to="/favorites" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:text-[#FF579B]">
               <Heart size={20} />
             </Link>
-            <Link to="/cart" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:text-indigo-500 relative">
+            <Link to="/cart" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:text-[#FF579B] relative">
               <ShoppingBag size={20} />
               {cart.length > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-indigo-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-[#FF579B] to-[#9C6AFF] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
                   {cart.length > 9 ? '9+' : cart.length}
                 </span>
               )}
             </Link>
             {isAuthenticated && (
               <>
-                <Link to="/chat" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:text-indigo-500">
+                <Link to="/chat" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:text-[#FF579B]">
                   <MessageCircle size={20} />
                 </Link>
-                <Link to="/notifications" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:text-indigo-500 relative">
+                <Link to="/notifications" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:text-[#FF579B] relative">
                   <Bell size={20} />
                   {unreadCount > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
@@ -134,7 +136,7 @@ export default function Layout() {
                 <div className="relative" ref={profileMenuRef}>
                   <button
                     onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:text-indigo-500"
+                    className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:text-[#FF579B]"
                   >
                     <User size={20} />
                   </button>
@@ -161,7 +163,7 @@ export default function Layout() {
               </>
             )}
             {!isAuthenticated && (
-              <Link to="/login" className="px-4 py-2 rounded-xl bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-400 transition">Войти</Link>
+              <Link to="/login" className="px-5 py-2 rounded-full bg-gradient-to-r from-[#FF579B] via-[#9C6AFF] to-[#1DB4FF] text-white text-sm font-semibold hover:scale-[1.03] transition-transform shadow-[0_8px_24px_rgba(255,87,155,0.3)]">Войти</Link>
             )}
           </nav>
 
@@ -187,7 +189,7 @@ export default function Layout() {
               {isAdmin && <Link to="/admin" className="block py-2 text-sm" onClick={() => setMenuOpen(false)}>Админ</Link>}
               <button onClick={handleLogout} className="block py-2 text-sm text-red-500 w-full text-left">Выйти</button>
             </>)}
-            {!isAuthenticated && <Link to="/login" className="block py-2 text-sm text-indigo-500" onClick={() => setMenuOpen(false)}>Войти</Link>}
+            {!isAuthenticated && <Link to="/login" className="block py-2 text-sm text-[#FF579B]" onClick={() => setMenuOpen(false)}>Войти</Link>}
           </div>
         )}
       </header>
@@ -205,18 +207,18 @@ export default function Layout() {
           <div>
             <h4 className="font-semibold text-sm mb-3">Навигация</h4>
             <div className="space-y-2">
-              <Link to="/" className="block text-gray-500 dark:text-white/40 text-sm hover:text-indigo-500 transition-colors">Главная</Link>
-              <Link to="/products" className="block text-gray-500 dark:text-white/40 text-sm hover:text-indigo-500 transition-colors">Товары</Link>
-              <Link to="/favorites" className="block text-gray-500 dark:text-white/40 text-sm hover:text-indigo-500 transition-colors">Избранное</Link>
-              <Link to="/cart" className="block text-gray-500 dark:text-white/40 text-sm hover:text-indigo-500 transition-colors">Корзина</Link>
+              <Link to="/" className="block text-gray-500 dark:text-white/40 text-sm hover:text-[#FF579B] transition-colors">Главная</Link>
+              <Link to="/products" className="block text-gray-500 dark:text-white/40 text-sm hover:text-[#FF579B] transition-colors">Товары</Link>
+              <Link to="/favorites" className="block text-gray-500 dark:text-white/40 text-sm hover:text-[#FF579B] transition-colors">Избранное</Link>
+              <Link to="/cart" className="block text-gray-500 dark:text-white/40 text-sm hover:text-[#FF579B] transition-colors">Корзина</Link>
             </div>
           </div>
           <div>
             <h4 className="font-semibold text-sm mb-3">Сервис</h4>
             <div className="space-y-2">
-              <Link to="/privacy" className="block text-gray-500 dark:text-white/40 text-sm hover:text-indigo-500 transition-colors">Приватность</Link>
-              <Link to="/chat" className="block text-gray-500 dark:text-white/40 text-sm hover:text-indigo-500 transition-colors">Чат</Link>
-              <Link to="/referrals" className="block text-gray-500 dark:text-white/40 text-sm hover:text-indigo-500 transition-colors">Рефералы</Link>
+              <Link to="/privacy" className="block text-gray-500 dark:text-white/40 text-sm hover:text-[#FF579B] transition-colors">Приватность</Link>
+              <Link to="/chat" className="block text-gray-500 dark:text-white/40 text-sm hover:text-[#FF579B] transition-colors">Чат</Link>
+              <Link to="/referrals" className="block text-gray-500 dark:text-white/40 text-sm hover:text-[#FF579B] transition-colors">Рефералы</Link>
             </div>
           </div>
           <div>
@@ -236,7 +238,7 @@ export default function Layout() {
         {mobileLinks.map(item => {
           const isActive = location.pathname === item.to;
           return (
-            <Link key={item.to} to={item.to} className={`flex flex-col items-center text-xs ${isActive ? 'text-indigo-500' : 'text-gray-500'}`}>
+            <Link key={item.to} to={item.to} className={`flex flex-col items-center text-xs ${isActive ? 'text-[#FF579B]' : 'text-gray-500'}`}>
               <item.icon size={20} /><span className="mt-1">{item.label}</span>
             </Link>
           );

@@ -147,12 +147,12 @@ export default function FeedPage() {
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
         <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-purple-400/20 rounded-full blur-3xl" />
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white/90 text-sm font-medium mb-6"><Zap size={14} className="text-yellow-300" /> Закрытый маркетплейс</div>
-          <h1 className="text-xl xs:text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-3 tracking-tight leading-[1.15]">Покупайте и продавайте в надёжном сообществе</h1>
-          <p className="text-white/70 text-base max-w-lg mb-5">Закрытая площадка для проверенных участников. Товары, чат, реферальная программа — всё в одном месте.</p>
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white/90! text-sm font-medium mb-6"><Zap size={14} className="text-yellow-300" /> Закрытый маркетплейс</div>
+          <h1 className="text-xl sm:text-3xl lg:text-4xl font-extrabold text-white! mb-3 tracking-tight leading-[1.15]">Покупайте и продавайте в надёжном сообществе</h1>
+          <p className="text-white/80! text-base max-w-lg mb-5">Закрытая площадка для проверенных участников. Товары, чат, реферальная программа — всё в одном месте.</p>
           <div className="flex flex-wrap gap-3">
             {isSeller && <button onClick={() => navigate('/products/new')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-slate-900 font-semibold text-sm hover:bg-white/90 transition-all shadow-xl"><Sparkles size={16} /> Выставить товар</button>}
-            {isAdmin && <button onClick={() => navigate('/posts/new')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/15 backdrop-blur-sm text-white font-semibold text-sm border border-white/20 hover:bg-white/25 transition-all"><FileText size={16} /> Новый пост</button>}
+            {isAdmin && <button onClick={() => navigate('/posts/new')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/15 backdrop-blur-sm text-white! font-semibold text-sm border border-white/20 hover:bg-white/25 transition-all"><FileText size={16} /> Новый пост</button>}
             {!isAuthenticated && <button onClick={() => navigate('/register')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-slate-900 font-semibold text-sm hover:bg-white/90 transition-all shadow-xl">Присоединиться <ArrowRight size={16} /></button>}
           </div>
         </div>
@@ -167,7 +167,7 @@ export default function FeedPage() {
         </div>
         <div className="flex items-center gap-1.5 p-1 bg-white/[0.04] rounded-2xl overflow-x-auto flex-nowrap max-w-full">
           {sortOptions.map(opt => (
-            <button key={opt.value} onClick={() => setSort(opt.value)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold transition-all whitespace-nowrap ${sort === opt.value ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{opt.icon}{opt.label}</button>
+            <button key={opt.value} onClick={() => setSort(opt.value)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold transition-all whitespace-nowrap ${sort === opt.value ? 'bg-indigo-500 text-white! shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{opt.icon}{opt.label}</button>
           ))}
         </div>
         <div className="flex items-center gap-1 p-1 bg-white/[0.04] rounded-2xl shrink-0">
@@ -179,7 +179,7 @@ export default function FeedPage() {
       {/* Tabs */}
       <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1 -mx-1 px-1">
         {[{ key: 'all', label: 'Всё', icon: <Sparkles size={13} /> }, { key: 'products', label: 'Товары', icon: <Grid3X3 size={13} /> }, { key: 'posts', label: 'Посты', icon: <FileText size={13} /> }, { key: 'ads', label: 'Реклама', icon: <Megaphone size={13} /> }].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.key ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{tab.icon}{tab.label}</button>
+          <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.key ? 'bg-indigo-500 text-white! shadow-lg shadow-indigo-500/25' : 'text-white/50 hover:text-white hover:bg-white/[0.06]'}`}>{tab.icon}{tab.label}</button>
         ))}
       </div>
 

@@ -53,6 +53,7 @@ export default function ChatPage() {
   const [newChatPhone, setNewChatPhone] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Map<string, boolean>>(new Map());
+  const [pendingFiles, setPendingFiles] = useState<Array<{ url: string; name: string; type: string; size: number; previewUrl?: string }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -162,15 +163,22 @@ export default function ChatPage() {
   };
 
   const sendMessage = async () => {
-    if (!messageText.trim() || !selectedUser || !socket) return;
+    if ((!messageText.trim() && pendingFiles.length === 0) || !selectedUser || !socket) return;
 
     const text = messageText.trim();
+    const file = pendingFiles[0];
     setMessageText('');
+    setPendingFiles([]);
 
-    socket.emit('sendMessage', { receiverId: selectedUser.userId, text }, (res: { error?: string; reason?: string } | null) => {
+    socket.emit('sendMessage', {
+      receiverId: selectedUser.userId,
+      text: text || undefined,
+      file,
+    }, (res: { error?: string; reason?: string } | null) => {
       if (res?.error === 'moderated') {
         toast.error('Сообщение заблокировано модерацией' + (res.reason ? ': ' + res.reason : ''));
         setMessageText(text);
+        if (file) setPendingFiles([file]);
       }
     });
   };
@@ -186,21 +194,33 @@ export default function ChatPage() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !socket || !selectedUser) return;
+    if (!file || !selectedUser) return;
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
       const { data } = await api.post('/chat/upload', formData);
-      socket.emit('sendMessage', {
-        receiverId: selectedUser.userId,
-        file: { url: data.url, name: data.name, type: data.type, size: data.size },
-      });
+      const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
+      setPendingFiles(prev => [...prev, {
+        url: data.url,
+        name: data.name,
+        type: data.type,
+        size: data.size,
+        previewUrl,
+      }]);
     } catch { toast.error('Не удалось загрузить файл'); }
     finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const removePendingFile = (url: string) => {
+    setPendingFiles(prev => {
+      const f = prev.find(x => x.url === url);
+      if (f?.previewUrl) URL.revokeObjectURL(f.previewUrl);
+      return prev.filter(x => x.url !== url);
+    });
   };
 
   const formatTime = (d?: string) => {
@@ -409,29 +429,53 @@ export default function ChatPage() {
           </div>
 
           {/* Input */}
-          <div className="flex items-center gap-2 px-4 py-3 border-t border-white/[0.06] bg-[#111118] shrink-0">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="w-10 h-10 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center text-white/50 hover:text-white transition-all shrink-0"
-            >
-              {uploading ? <div className="w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" /> : <Paperclip size={18} />}
-            </button>
-            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx,.txt,.zip" />
-            <input
-              value={messageText}
-              onChange={e => setMessageText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-              placeholder="Сообщение..."
-              className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-indigo-500/40 transition-all"
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!messageText.trim()}
-              className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center hover:bg-indigo-400 disabled:opacity-20 transition-all shrink-0"
-            >
-              <Send size={16} />
-            </button>
+          <div className="border-t border-white/[0.06] bg-[#111118] shrink-0">
+            {/* Pending attachments */}
+            {pendingFiles.length > 0 && (
+              <div className="flex items-center gap-2 px-4 pt-3 overflow-x-auto">
+                {pendingFiles.map(f => (
+                  <div key={f.url} className="relative shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-white/[0.06] border border-white/[0.1] group">
+                    {f.previewUrl ? (
+                      <img src={f.previewUrl} alt={f.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-2xl">
+                        {f.type?.includes('pdf') ? '📄' : f.type?.includes('zip') ? '📦' : '📎'}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => removePendingFile(f.url)}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2 px-4 py-3">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-10 h-10 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center text-white/50 hover:text-white transition-all shrink-0"
+              >
+                {uploading ? <div className="w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" /> : <Paperclip size={18} />}
+              </button>
+              <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx,.txt,.zip" />
+              <input
+                value={messageText}
+                onChange={e => setMessageText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                placeholder="Сообщение..."
+                className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-indigo-500/40 transition-all"
+              />
+              <button
+                onClick={sendMessage}
+                disabled={!messageText.trim() && pendingFiles.length === 0}
+                className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center hover:bg-indigo-400 disabled:opacity-20 transition-all shrink-0"
+              >
+                <Send size={16} />
+              </button>
+            </div>
           </div>
         </div>
       ) : (

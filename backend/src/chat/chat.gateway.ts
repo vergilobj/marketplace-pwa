@@ -83,18 +83,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!userId) return;
 
     const text = data.text?.trim();
-    if (!text) {
-      return { error: 'text_required', reason: 'Текст обязателен' };
+    const file = data.file;
+
+    if (!text && !file) {
+      return { error: 'text_required', reason: 'Текст или файл обязателен' };
     }
 
-    // Серверная модерация ДО сохранения
-    const moderation = await this.chatService.moderate(text);
-    if (moderation.blocked) {
-      client.emit('messageError', {
-        error: 'moderated',
-        reason: moderation.reason,
-      });
-      return { error: 'moderated', reason: moderation.reason };
+    // Серверная модерация ДО сохранения (только для текстовых)
+    if (text) {
+      const moderation = await this.chatService.moderate(text);
+      if (moderation.blocked) {
+        client.emit('messageError', {
+          error: 'moderated',
+          reason: moderation.reason,
+        });
+        return { error: 'moderated', reason: moderation.reason };
+      }
     }
 
     // Save to DB
@@ -102,12 +106,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       data: {
         senderId: userId,
         receiverId: data.receiverId,
-        text,
+        text: text || null,
         ciphertext: data.ciphertext ?? null,
-        fileUrl: data.file?.url || null,
-        fileName: data.file?.name || null,
-        fileType: data.file?.type || null,
-        fileSize: data.file?.size || null,
+        fileUrl: file?.url || null,
+        fileName: file?.name || null,
+        fileType: file?.type || null,
+        fileSize: file?.size || null,
       },
       include: {
         sender: { select: { id: true, name: true } },
@@ -120,18 +124,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(receiverSocketId).emit('newMessage', msg);
     } else {
       // Офлайн — push + внутреннее уведомление
+      const preview = text || '📎 Файл';
       try {
         await this.notificationsService.createNotification(
           data.receiverId,
           'chat',
-          text,
+          preview,
           msg.id,
         );
         try {
           await this.notificationsService.sendToUser(
             data.receiverId,
             { en: 'Новое сообщение' },
-            { en: `${msg.sender?.name || userId}: ${text}` },
+            { en: `${msg.sender?.name || userId}: ${preview}` },
             { screen: 'chat', senderId: userId },
           );
         } catch (err) {

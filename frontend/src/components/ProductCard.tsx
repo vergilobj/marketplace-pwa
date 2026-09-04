@@ -21,7 +21,7 @@ export default function ProductCard({ product }: { product: any }) {
     >
       <div className="relative overflow-hidden h-48 bg-[#111115] shrink-0">
         {product.media?.[0] ? (
-          <img src={product.media[0]} alt={product.title} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+          <img src={product.media[0]} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center"><ShoppingCart size={32} className="text-white/10" /></div>
         )}
@@ -38,7 +38,7 @@ export default function ProductCard({ product }: { product: any }) {
         </div>
 
         <div className="absolute bottom-3 left-3">
-          <span className="px-3 py-1.5 rounded-xl bg-black/70 backdrop-blur-xl text-base font-bold text-white shadow-lg">{price}</span>
+          <span className="px-3 py-1.5 rounded-xl bg-black/70 backdrop-blur-xl text-base font-bold text-white! shadow-lg">{price}</span>
         </div>
       </div>
 

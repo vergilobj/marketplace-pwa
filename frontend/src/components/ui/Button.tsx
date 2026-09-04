@@ -12,18 +12,22 @@ const Button: React.FC<ButtonProps> = ({
   className,
   ...props
 }) => {
-  const base = 'inline-flex items-center justify-center px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed';
+  const base =
+    'inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold text-sm transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100';
 
   const variants = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-500/25',
-    secondary: 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600',
-    ghost: 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800',
+    primary:
+      'text-white bg-[linear-gradient(135deg,#FF579B_0%,#9C6AFF_50%,#1DB4FF_100%)] hover:scale-[1.02] shadow-[0_16px_40px_rgba(255,87,155,0.24)]',
+    secondary:
+      'text-[var(--color-text)] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] backdrop-blur hover:border-[rgba(255,87,155,0.5)] hover:text-[#FF579B]',
+    ghost:
+      'text-[var(--color-muted)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--color-text)]',
   };
 
   return (
     <button
-      className={`${base} ${variants[variant]} ${className}`}
-      disabled={loading}
+      className={`${base} ${variants[variant]} ${className || ''}`}
+      disabled={loading || props.disabled}
       {...props}
     >
       {loading ? (
