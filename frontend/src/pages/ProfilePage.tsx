@@ -18,7 +18,7 @@ export default function ProfilePage() {
   }, []);
 
   const handleSave = async () => { try { await updateProfile(form); const p = await getProfile(); setProfile(p); setEditing(false); toast.success('Профиль обновлён'); } catch { toast.error('Ошибка'); } };
-  const handleLogout = () => { localStorage.clear(); navigate('/login'); };
+  const handleLogout = () => { window.OneSignal?.logout()?.catch(() => {}); localStorage.clear(); navigate('/login'); };
 
   if (loading) return <div className="flex justify-center py-32"><div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 animate-pulse" /></div>;
 

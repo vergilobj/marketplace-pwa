@@ -33,7 +33,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { cart } = useApp();
-  const { isAuthenticated, isAdmin, isSeller } = useAuth();
+  const { isAuthenticated, isAdmin, isSeller, user } = useAuth();
 
   const profileMenuRef = useClickAway(() => setProfileMenuOpen(false));
 
@@ -51,8 +51,18 @@ export default function Layout() {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userId');
+    window.OneSignal?.logout()?.catch(() => {});
     navigate('/login');
   };
+
+  // Привязка external_user_id к устройству для push-уведомлений
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      window.OneSignal?.login(String(user.id))?.catch(() => {});
+    } else {
+      window.OneSignal?.logout()?.catch(() => {});
+    }
+  }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
