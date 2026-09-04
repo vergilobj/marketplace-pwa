@@ -8,38 +8,38 @@ datasource db {
 }
 
 model User {
-  id            String     @id @default(uuid())
-  phone         String     @unique
+  id            String   @id @default(uuid())
+  phone         String   @unique
   name          String?
-  role          UserRole   @default(BUYER)
+  role          UserRole @default(BUYER)
   invitedById   String?
-  invitedBy     User?      @relation("UserInvited", fields: [invitedById], references: [id])
-  invitedUsers  User[]     @relation("UserInvited")
-  referralCode  String     @unique
-  bonusBalance  Float      @default(0)
-  isApproved    Boolean    @default(false)
+  invitedBy     User?    @relation("UserInvited", fields: [invitedById], references: [id])
+  invitedUsers  User[]   @relation("UserInvited")
+  referralCode  String   @unique
+  bonusBalance  Float    @default(0)
+  isApproved    Boolean  @default(false)
   passwordHash  String?
-  cometChatUid  String?    @unique
+  cometChatUid  String?  @unique
   chatPublicKey String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  sentInvites    Invite[]        @relation("InviteOwner")
-  usedInvite     Invite?         @relation("InviteUsedBy")
-  products       Product[]
-  ordersBuyer    Order[]         @relation("Buyer")
-  ordersSeller   Order[]         @relation("Seller")
-  referralOrders Order[]         @relation("Referral")
-  postsAuthored  Post[]          @relation("PostAuthor")
-  postsOwnedAd   Post[]          @relation("PostAdOwner")
-  likes          Like[]
-  comments       Comment[]
-  notifications  Notification[]
+  sentInvites        Invite[]            @relation("InviteOwner")
+  usedInvite         Invite?             @relation("InviteUsedBy")
+  products           Product[]
+  ordersBuyer        Order[]             @relation("Buyer")
+  ordersSeller       Order[]             @relation("Seller")
+  referralOrders     Order[]             @relation("Referral")
+  postsAuthored      Post[]              @relation("PostAuthor")
+  postsOwnedAd       Post[]              @relation("PostAdOwner")
+  likes              Like[]
+  comments           Comment[]
+  notifications      Notification[]
   withdrawalRequests WithdrawalRequest[]
-  sentMessages     ChatMessage[]    @relation("Sender")
-  receivedMessages ChatMessage[]    @relation("Receiver")
-  avatar        String?
-  auditLogs     AuditLog[]
+  sentMessages       ChatMessage[]       @relation("Sender")
+  receivedMessages   ChatMessage[]       @relation("Receiver")
+  avatar             String?
+  auditLogs          AuditLog[]
 }
 
 enum UserRole {
@@ -50,14 +50,14 @@ enum UserRole {
 }
 
 model Invite {
-  code       String   @id @default(uuid())
-  ownerId    String
-  owner      User     @relation("InviteOwner", fields: [ownerId], references: [id])
-  usedById   String?  @unique
-  usedBy     User?    @relation("InviteUsedBy", fields: [usedById], references: [id])
-  isUsed     Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  expiresAt  DateTime?
+  code      String    @id @default(uuid())
+  ownerId   String
+  owner     User      @relation("InviteOwner", fields: [ownerId], references: [id])
+  usedById  String?   @unique
+  usedBy    User?     @relation("InviteUsedBy", fields: [usedById], references: [id])
+  isUsed    Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
 }
 
 model Product {
@@ -91,8 +91,8 @@ model Order {
   paidAt         DateTime?
   createdAt      DateTime    @default(now())
 
-  post           Post?
-  transactions   Transaction[]
+  post         Post?
+  transactions Transaction[]
 }
 
 enum OrderStatus {
@@ -104,25 +104,25 @@ enum OrderStatus {
 }
 
 model Post {
-  id            String    @id @default(uuid())
-  title         String
-  content       String?
-  link          String?
-  media         Json?
-  videoUrl      String?
-  authorId      String
-  author        User      @relation("PostAuthor", fields: [authorId], references: [id])
-  isAd          Boolean   @default(false)
-  adOwnerId     String?
-  adOwner       User?     @relation("PostAdOwner", fields: [adOwnerId], references: [id])
-  adExpireDate  DateTime?
-  isPinned      Boolean   @default(false)
-  isHidden      Boolean   @default(false)
-  orderId       String?   @unique
-  order         Order?    @relation(fields: [orderId], references: [id])
-  createdAt     DateTime  @default(now())
-  likes         Like[]
-  comments      Comment[]
+  id           String    @id @default(uuid())
+  title        String
+  content      String?
+  link         String?
+  media        Json?
+  videoUrl     String?
+  authorId     String
+  author       User      @relation("PostAuthor", fields: [authorId], references: [id])
+  isAd         Boolean   @default(false)
+  adOwnerId    String?
+  adOwner      User?     @relation("PostAdOwner", fields: [adOwnerId], references: [id])
+  adExpireDate DateTime?
+  isPinned     Boolean   @default(false)
+  isHidden     Boolean   @default(false)
+  orderId      String?   @unique
+  order        Order?    @relation(fields: [orderId], references: [id])
+  createdAt    DateTime  @default(now())
+  likes        Like[]
+  comments     Comment[]
 }
 
 model Like {
@@ -151,15 +151,34 @@ model Setting {
   value String
 }
 
+enum PaymentProvider {
+  NOWPAYMENTS
+  PAYMOD
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  SWEPT
+  FAILED
+}
+
 model Transaction {
-  id          String   @id @default(uuid())
-  orderId     String
-  order       Order    @relation(fields: [orderId], references: [id])
-  type        String
-  amount      Float
-  status      String
-  payload     Json?
-  createdAt   DateTime @default(now())
+  id             String          @id @default(uuid())
+  orderId        String
+  order          Order           @relation(fields: [orderId], references: [id])
+  type           String
+  amount         Float
+  status         String
+  payload        Json?
+  provider       PaymentProvider @default(NOWPAYMENTS)
+  clientRef      String?         @unique
+  depositAddress String?
+  chain          String?
+  token          String?
+  txHash         String?         @unique
+  amountRaw      String?
+  createdAt      DateTime        @default(now())
 }
 
 model ModerationLog {
@@ -174,45 +193,57 @@ model Notification {
   id        String   @id @default(uuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id])
-  type      String   // "order", "like", "comment"
+  type      String // "order", "like", "comment"
   message   String
   relatedId String?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 }
 
+enum PayoutStatus {
+  PENDING
+  SUBMITTED
+  CONFIRMED
+  FAILED
+}
+
 model WithdrawalRequest {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  amount    Float
-  status    String   @default("pending") // pending, approved, rejected
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String           @id @default(uuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id])
+  amount         Float
+  status         String           @default("pending") // pending, approved, rejected
+  provider       PaymentProvider? @default(PAYMOD)
+  idempotencyKey String?          @unique
+  payoutTxHash   String?
+  payoutStatus   PayoutStatus     @default(PENDING)
+  payoutError    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 }
 
 model ChatMessage {
-  id        String   @id @default(uuid())
-  senderId  String
-  sender    User     @relation("Sender", fields: [senderId], references: [id])
+  id         String   @id @default(uuid())
+  senderId   String
+  sender     User     @relation("Sender", fields: [senderId], references: [id])
   receiverId String
-  receiver  User     @relation("Receiver", fields: [receiverId], references: [id])
-  text      String?
+  receiver   User     @relation("Receiver", fields: [receiverId], references: [id])
+  text       String?
   ciphertext String?
-  fileUrl   String?
-  fileName  String?
-  fileType  String?
-  fileSize  Int?
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  fileUrl    String?
+  fileName   String?
+  fileType   String?
+  fileSize   Int?
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
 }
 
 model AuditLog {
   id        String   @id @default(uuid())
   userId    String?
   user      User?    @relation(fields: [userId], references: [id])
-  action    String   // 'login', 'register', 'create_order', 'delete_post', etc.
-  entity    String?  // 'user', 'order', 'post', 'product'
+  action    String // 'login', 'register', 'create_order', 'delete_post', etc.
+  entity    String? // 'user', 'order', 'post', 'product'
   entityId  String?
   ip        String?
   userAgent String?

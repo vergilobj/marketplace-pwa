@@ -1,0 +1,36 @@
+# /etc/systemd/system/paymod.service
+# Paymod crypto sidecar — приём депозитов ERC-20 и выплаты из казны.
+#
+# Установка:
+#   sudo cp paymod.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now paymod
+#   sudo systemctl status paymod
+#
+# Проверка живости (без подписи):
+#   curl http://127.0.0.1:8100/v1/health
+
+[Unit]
+Description=paymod crypto sidecar
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=paymod
+Group=paymod
+WorkingDirectory=/opt/marketplace/paymod
+EnvironmentFile=/opt/marketplace/paymod/.env
+# PAYMOD_DIR указывает на копию Python-модуля paymod (chain.py, db.py, ...)
+# Её же подставляет WorkingDirectory; при иной раскладке задать явно:
+# Environment=PAYMOD_DIR=/opt/marketplace/paymod
+ExecStart=/opt/marketplace/paymod/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8100
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+# Читаем только свой каталог; .env уже chmod 600 user=paymod.
+ReadWritePaths=/opt/marketplace/paymod
+
+[Install]
+WantedBy=multi-user.target

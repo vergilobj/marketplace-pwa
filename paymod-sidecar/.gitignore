@@ -1,0 +1,15 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Секреты (никогда не коммитить)
+.env
+
+# SQLite (рантайм-данные)
+*.db
+*.db-wal
+*.db-shm
+
+# Логи
+*.log
