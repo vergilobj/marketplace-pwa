@@ -2,117 +2,109 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ============================================================
+   agentbox.click — чистая дизайн-система
+   Тёмный терминал/бокс, лайм-сигнал, видимые бордеры.
+   Никаких SparkEra-розового, Claude-светлого, градиентов pink/lilac/blue.
+   ============================================================ */
+
 @theme {
-  /* ===== Claude/Anthropic — терракотовый акцент (заглушка лайм/электрик токенов) ===== */
-  --color-indigo-300: #e08a6a;
-  --color-indigo-400: #d97757;
-  --color-indigo-500: #d97757;
-  --color-indigo-600: #c4553d;
-  --color-indigo-700: #a8462f;
+  /* === АКЦЕНТЫ: ремап Tailwind-утилит на палитру agentbox === */
+  /* indigo → лайм (primary/CTA) */
+  --color-indigo-300: #d6ee9c;
+  --color-indigo-400: #c9f267;
+  --color-indigo-500: #c9f267;
+  --color-indigo-600: #b3e04a;
+  --color-indigo-700: #9cc936;
 
-  --color-blue-400: #d97757;
-  --color-blue-500: #d97757;
-  --color-blue-600: #c4553d;
-  --color-blue-700: #a8462f;
+  /* blue → электрик (вторичный) */
+  --color-blue-300: #c1f1ff;
+  --color-blue-400: #8ee8ff;
+  --color-blue-500: #8ee8ff;
+  --color-blue-600: #5fd8fa;
+  --color-blue-700: #3fbcdd;
 
-  /* фиолетовый → тёплый нейтральный серый (заглушка) */
-  --color-purple-300: #e5e3da;
-  --color-purple-400: #d1cfc5;
-  --color-purple-500: #b0b0a8;
-  --color-purple-600: #8a8a82;
-  --color-purple-700: #6e6e6a;
+  /* purple → фиолет (третичный) */
+  --color-purple-300: #d4c8f2;
+  --color-purple-400: #b7a7e6;
+  --color-purple-500: #b7a7e6;
+  --color-purple-600: #9d88d8;
+  --color-purple-700: #8570c0;
 
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-heading: 'Manrope', 'Inter', system-ui, -apple-system, sans-serif;
+  /* === ШРИФТЫ: строгий гротеск + моноширинные метки === */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace;
 
-  /* умеренные радиусы — без капсул и 22px+ */
+  /* === РАДИУСЫ: щедрые, но не капсулы повсюду === */
   --radius-sm: 10px;
-  --radius-md: 12px;
-  --radius-lg: 14px;
-  --radius-xl: 16px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-2xl: 22px;
 }
 
 /* ============================================================
-   Claude/Anthropic Design System — тёплый кремовый, строгий
+   Токены темы — ТЁМНАЯ ПО УМОЛЧАНИЮ
    ============================================================ */
 :root {
-  /* Акценты (заглушка неоновой палитры) */
-  --signal: #d97757;
-  --electric: #d97757;
-  --violet: #b0b0a8;
+  /* Палитра agentbox */
+  --night: #0b0e0d;
+  --night-2: #131713;
+  --night-3: #141914;
+  --paper: #fbfbf8;
+  --paper-2: #f4f3ee;
+  --muted: #6f766f;
+  --signal: #c9f267;
+  --signal-ink: #0b0e0d;   /* тёмный текст на лайме */
+  --electric: #8ee8ff;
+  --violet: #b7a7e6;
 
-  /* Базовая СВЕТЛАЯ тема (дефолт) */
-  --bg: #f5f4ee;
-  --bg-alt: #ecebe3;
-  --bg-tint: #faf9f5;
-  --card: #ffffff;
-  --ink: #1f1e1d;
-  --ink-soft: #6e6e6a;
-  --muted: #6e6e6a;
-  --faint: #b0b0a8;
-  --line: rgba(0, 0, 0, 0.08);
-  --line-strong: rgba(0, 0, 0, 0.14);
+  /* Семантические алиасы */
+  --bg: var(--night);
+  --bg-alt: var(--night-2);
+  --bg-tint: var(--night-3);
+  --card: var(--night-2);
+  --ink: var(--paper);
+  --ink-soft: var(--paper-2);
+  --muted-fg: var(--muted);
+  --faint: #4a514a;
 
-  --color-bg: #f5f4ee;
-  --color-surface: #ffffff;
-  --color-card: #ffffff;
-  --color-border: rgba(0, 0, 0, 0.08);
-  --color-text: #1f1e1d;
-  --color-muted: #6e6e6a;
-  --color-faint: #b0b0a8;
-  --color-accent: #d97757;
+  /* Бордеры — ВИДИМЫЕ, нейтральные */
+  --line: rgba(251, 251, 248, 0.08);
+  --line-strong: rgba(251, 251, 248, 0.14);
 
-  /* Фон — тёплый кремовый, без цветных радиальных градиентов */
+  /* Тайлвиндовые токены цветов */
+  --color-bg: var(--night);
+  --color-surface: var(--night-2);
+  --color-card: var(--night-3);
+  --color-border: rgba(251, 251, 248, 0.1);
+  --color-text: var(--paper);
+  --color-muted: var(--muted);
+  --color-faint: #4a514a;
+  --color-accent: var(--signal);
+
+  /* Фон — матовый чёрный, теплый, без цветных градиентов */
   --bg-dark-gradient:
-    linear-gradient(160deg, #faf9f5 0%, #f5f4ee 55%, #efeee6 100%);
+    linear-gradient(160deg, #0b0e0d 0%, #0d100f 55%, #0a0d0c 100%);
   --bg-glow: var(--bg-dark-gradient);
 
-  /* Радиусы — сдержанные */
+  /* Радиусы */
   --r-sm: 10px;
-  --r-md: 12px;
-  --r-lg: 14px;
-  --r-xl: 16px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 22px;
   --r-full: 999px;
 
-  /* Тени — нейтральные, без цветного свечения */
-  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.09);
-  --shadow-signal: 0 8px 24px rgba(217, 119, 87, 0.18);
-  --shadow-electric: 0 8px 24px rgba(0, 0, 0, 0.08);
+  /* Тени — НЕЙТРАЛЬНЫЕ, мягкие, без цветного свечения */
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.55);
+  --shadow-signal: 0 8px 28px rgba(201, 242, 103, 0.16);
+  --shadow-electric: 0 8px 28px rgba(142, 232, 255, 0.14);
+  --shadow-violet: 0 8px 28px rgba(183, 167, 230, 0.14);
 
   --ease: cubic-bezier(.22, .61, .36, 1);
-}
-
-/* ============================================================
-   Тёмная тема (переключатель, опционально)
-   ============================================================ */
-html.dark {
-  --bg: #141413;
-  --bg-alt: #1a1a18;
-  --bg-tint: #1e1e1b;
-  --card: #1f1e1d;
-  --ink: #f5f4ee;
-  --ink-soft: #b0aea5;
-  --muted: #87867f;
-  --faint: #5e5d59;
-  --line: rgba(245, 244, 238, 0.08);
-  --line-strong: rgba(245, 244, 238, 0.14);
-
-  --color-bg: #141413;
-  --color-surface: #1a1a18;
-  --color-card: #1f1e1d;
-  --color-border: rgba(245, 244, 238, 0.08);
-  --color-text: #f5f4ee;
-  --color-muted: #87867f;
-  --color-faint: #5e5d59;
-  --color-accent: #d97757;
-
-  --bg-dark-gradient: linear-gradient(160deg, #141413 0%, #1a1a18 100%);
-  --bg-glow: var(--bg-dark-gradient);
-
-  --shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
-  --shadow-signal: 0 8px 24px rgba(217, 119, 87, 0.2);
 }
 
 /* ============================================================
@@ -125,13 +117,12 @@ html.dark {
     background: var(--bg-glow);
     background-attachment: fixed;
     color: var(--color-text);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    color-scheme: light;
+    color-scheme: dark;
     transition: background .3s var(--ease), color .3s var(--ease);
   }
-  html.dark body { color-scheme: dark; }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
@@ -139,81 +130,66 @@ html.dark {
     letter-spacing: -0.02em;
   }
 
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.18);
-    border-radius: 10px;
-  }
-  html.dark ::-webkit-scrollbar-thumb {
-    background: rgba(245, 244, 238, 0.2);
+  /* Глобально ВИДИМЫЕ бордеры (утилиты border-* перекрывают это) */
+  *, ::before, ::after {
+    border-color: rgba(251, 251, 248, 0.1);
   }
 
-  ::selection { background: rgba(217, 119, 87, 0.22); }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(251, 251, 248, 0.16);
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(251, 251, 248, 0.28); }
+
+  ::selection { background: rgba(201, 242, 103, 0.28); color: var(--paper); }
 }
 
 /* ============================================================
-   Компонентные утилиты (Claude — строгий светлый нейтральный)
+   Компонентные утилиты — тёмные, с видимыми бордерами
    ============================================================ */
 @layer utilities {
-  /* Стеклянная панель — нейтральный светлый вид, без цвета */
+  /* Стеклянная панель — тёмное матовое стекло */
   .glass,
   .glass-panel {
-    background: rgba(255, 255, 255, 0.78);
+    background: rgba(19, 23, 19, 0.78);
     backdrop-filter: blur(20px) saturate(100%);
     -webkit-backdrop-filter: blur(20px) saturate(100%);
-    border: 1px solid rgba(0, 0, 0, 0.06);
-  }
-  html.dark .glass,
-  html.dark .glass-panel {
-    background: rgba(31, 30, 29, 0.78);
-    border: 1px solid rgba(245, 244, 238, 0.08);
+    border: 1px solid rgba(251, 251, 248, 0.1);
   }
 
-  /* Более плотное стекло — модалки, вложенные панели */
+  /* Плотное стекло — модалки, вложенные панели */
   .glass-strong {
-    background: rgba(255, 255, 255, 0.94);
+    background: rgba(19, 23, 19, 0.94);
     backdrop-filter: blur(32px) saturate(100%);
     -webkit-backdrop-filter: blur(32px) saturate(100%);
-    border: 1px solid rgba(0, 0, 0, 0.08);
-  }
-  html.dark .glass-strong {
-    background: rgba(31, 30, 29, 0.94);
-    border: 1px solid rgba(245, 244, 238, 0.1);
+    border: 1px solid rgba(251, 251, 248, 0.14);
   }
 
-  /* Карточка — белая с нейтральной обводкой и мягкой тенью */
+  /* Карточка — тёмная с видимой обводкой и мягкой нейтральной тенью */
   .glass-card {
-    background: #ffffff;
-    border: 1px solid rgba(0, 0, 0, 0.07);
+    background: var(--night-2);
+    border: 1px solid rgba(251, 251, 248, 0.1);
     border-radius: var(--r-lg);
     box-shadow: var(--shadow);
     transition: transform .35s var(--ease), box-shadow .35s var(--ease), border-color .35s var(--ease);
   }
   .glass-card:hover {
-    border-color: rgba(0, 0, 0, 0.13);
+    border-color: rgba(251, 251, 248, 0.2);
     transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.09);
-  }
-  html.dark .glass-card {
-    background: #1f1e1d;
-    border: 1px solid rgba(245, 244, 238, 0.08);
-    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
-  }
-  html.dark .glass-card:hover {
-    border-color: rgba(245, 244, 238, 0.16);
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 14px 42px rgba(0, 0, 0, 0.6);
   }
 
-  /* Акцентный текст — теперь сплошной тёмный, без градиента */
+  /* Акцентный текст — лайм без градиентов */
   .text-gradient {
-    color: var(--color-text);
+    color: var(--signal);
   }
 
-  /* Мягкая акцентная поверхность — терракотовая */
+  /* Акцентная поверхность — лаймовая */
   .spark-surface {
-    background: rgba(217, 119, 87, 0.06);
-    border: 1px solid rgba(217, 119, 87, 0.16);
+    background: rgba(201, 242, 103, 0.06);
+    border: 1px solid rgba(201, 242, 103, 0.2);
   }
 
   /* ===== Кнопки ===== */
@@ -224,7 +200,7 @@ html.dark {
     gap: 8px;
     padding: 10px 20px;
     border-radius: var(--r-md);
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-sans);
     font-weight: 600;
     font-size: 14px;
     transition: all .25s var(--ease);
@@ -232,31 +208,26 @@ html.dark {
     white-space: nowrap;
   }
 
-  /* Основная кнопка — терракотовая с кремовым текстом */
+  /* Основная кнопка — лайм с тёмным текстом */
   .btn-primary {
-    background: var(--color-accent);
-    color: #faf9f5;
-    box-shadow: 0 8px 24px rgba(217, 119, 87, 0.22);
+    background: var(--signal);
+    color: var(--signal-ink);
+    box-shadow: var(--shadow-signal);
   }
-  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(217, 119, 87, 0.3); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(201, 242, 103, 0.24); }
   .btn-primary:active { transform: translateY(0); }
 
-  /* Призрачная кнопка — нейтральная */
+  /* Призрачная кнопка — тёмная нейтральная */
   .btn-ghost,
   .btn-secondary {
-    background: rgba(0, 0, 0, 0.04);
-    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: rgba(251, 251, 248, 0.04);
+    border: 1px solid rgba(251, 251, 248, 0.14);
     color: var(--color-text);
   }
   .btn-ghost:hover,
   .btn-secondary:hover {
-    border-color: rgba(0, 0, 0, 0.25);
-    color: var(--color-accent);
-  }
-  html.dark .btn-ghost,
-  html.dark .btn-secondary {
-    background: rgba(245, 244, 238, 0.04);
-    border-color: rgba(245, 244, 238, 0.14);
+    border-color: rgba(201, 242, 103, 0.5);
+    color: var(--signal);
   }
 
   /* ===== Инпуты ===== */
@@ -264,23 +235,20 @@ html.dark {
     width: 100%;
     padding: 11px 16px;
     border-radius: var(--r-sm);
-    background: #faf9f5;
+    background: rgba(251, 251, 248, 0.04);
     border: 1px solid var(--color-border);
     color: var(--color-text);
     font-size: 14px;
     outline: none;
     transition: all .25s var(--ease);
   }
-  .input-glass::placeholder { color: var(--color-faint); }
+  .input-glass::placeholder { color: var(--faint); }
   .input-glass:focus {
-    border-color: rgba(217, 119, 87, 0.5);
-    box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.12);
-  }
-  html.dark .input-glass {
-    background: rgba(245, 244, 238, 0.04);
+    border-color: rgba(201, 242, 103, 0.55);
+    box-shadow: 0 0 0 3px rgba(201, 242, 103, 0.14);
   }
 
-  /* ===== Анимации (spring) ===== */
+  /* ===== Анимации ===== */
   @keyframes springUp {
     0% { opacity: 0; transform: translateY(6px); }
     100% { opacity: 1; transform: translateY(0); }
@@ -302,134 +270,46 @@ html.dark {
 }
 
 /* ============================================================
-   СВЕТЛАЯ ТЕМА (дефолт) — читаемость текста, нейтрализация фонов
+   Связность Tailwind-утилит на тёмной agentbox-теме
    ============================================================ */
 
-/* Белый текст → тёмный (кроме акцентных кнопок ниже) */
-.text-white { color: #1f1e1d; }
-.text-white\/90 { color: rgba(31,30,29,.9); }
-.text-white\/85 { color: rgba(31,30,29,.85); }
-.text-white\/70 { color: rgba(31,30,29,.7); }
-.text-white\/60 { color: rgba(31,30,29,.6); }
-.text-white\/50 { color: rgba(31,30,29,.5); }
-.text-white\/40 { color: rgba(31,30,29,.4); }
-.text-white\/35 { color: rgba(31,30,29,.35); }
-.text-white\/30 { color: rgba(31,30,29,.3); }
-.text-white\/25 { color: rgba(31,30,29,.25); }
-.text-white\/20 { color: rgba(31,30,29,.2); }
-.text-white\/15 { color: rgba(31,30,29,.15); }
-.text-white\/10 { color: rgba(31,30,29,.1); }
-.text-white\/5 { color: rgba(31,30,29,.05); }
-html.dark .text-white { color: #f5f4ee; }
-html.dark .text-white\/90 { color: rgba(245,244,238,.9); }
-html.dark .text-white\/85 { color: rgba(245,244,238,.85); }
-html.dark .text-white\/70 { color: rgba(245,244,238,.7); }
-html.dark .text-white\/60 { color: rgba(245,244,238,.6); }
-html.dark .text-white\/50 { color: rgba(245,244,238,.5); }
-html.dark .text-white\/40 { color: rgba(245,244,238,.4); }
-html.dark .text-white\/35 { color: rgba(245,244,238,.35); }
-html.dark .text-white\/30 { color: rgba(245,244,238,.3); }
-html.dark .text-white\/25 { color: rgba(245,244,238,.25); }
-html.dark .text-white\/20 { color: rgba(245,244,238,.2); }
-html.dark .text-white\/15 { color: rgba(245,244,238,.15); }
-html.dark .text-white\/10 { color: rgba(245,244,238,.1); }
-html.dark .text-white\/5 { color: rgba(245,244,238,.05); }
+/* Белый текст — оставляем белым (тёмная тема по умолчанию) */
 
-/* Акцентные терракотовые поверхности → кремовый текст (важнее, чем text-white) */
+/* Лаймовые акцентные поверхности — тёмный текст (CTAs, бейджи) */
 .bg-indigo-400,
 .bg-indigo-500,
-.bg-indigo-600 { color: #faf9f5 !important; }
-.text-indigo-400 { color: #d97757 !important; }
-.text-indigo-500 { color: #d97757 !important; }
+.bg-indigo-600 { color: #0b0e0d !important; }
+.text-indigo-400 { color: var(--signal) !important; }
+.text-indigo-500 { color: var(--signal) !important; }
 .text-blue-400,
 .text-blue-500,
-.text-blue-600 { color: #d97757 !important; }
+.text-blue-600 { color: var(--electric) !important; }
 
-/* Тёмные плоские фоны → светлые карточки */
+/* Тёмные плоские фоны — остаются тёмными agentbox */
 .bg-\[\#1a1a24\],
 .bg-\[\#0a0a0f\],
 .bg-\[\#111118\],
 .bg-\[\#0f0f16\],
-.bg-\[\#0b0e0d\] { background-color: #ffffff; }
+.bg-\[\#0b0e0d\] { background-color: var(--night); }
 .bg-\[\#111115\],
 .bg-\[\#1e1e2a\],
-.bg-\[\#22222d\] { background-color: #faf9f5; }
-html.dark .bg-\[\#1a1a24\],
-html.dark .bg-\[\#0a0a0f\],
-html.dark .bg-\[\#111118\],
-html.dark .bg-\[\#0f0f16\],
-html.dark .bg-\[\#0b0e0d\] { background-color: #1f1e1d; }
-html.dark .bg-\[\#111115\],
-html.dark .bg-\[\#1e1e2a\],
-html.dark .bg-\[\#22222d\] { background-color: #1a1a18; }
+.bg-\[\#22222d\] { background-color: var(--night-2); }
 
-/* Полупрозрачные белые фоны → полупрозрачный чёрный */
-.bg-white\/\[0\.02\] { background-color: rgba(0,0,0,.02); }
-.bg-white\/\[0\.03\] { background-color: rgba(0,0,0,.025); }
-.bg-white\/\[0\.04\] { background-color: rgba(0,0,0,.03); }
-.bg-white\/\[0\.06\] { background-color: rgba(0,0,0,.05); }
-.bg-white\/\[0\.08\] { background-color: rgba(0,0,0,.06); }
-.bg-white\/\[0\.10\] { background-color: rgba(0,0,0,.07); }
-.bg-white\/\[0\.12\] { background-color: rgba(0,0,0,.08); }
-.bg-white\/\[0\.15\] { background-color: rgba(0,0,0,.1); }
-html.dark .bg-white\/\[0\.02\] { background-color: rgba(245,244,238,.02); }
-html.dark .bg-white\/\[0\.03\] { background-color: rgba(245,244,238,.03); }
-html.dark .bg-white\/\[0\.04\] { background-color: rgba(245,244,238,.04); }
-html.dark .bg-white\/\[0\.06\] { background-color: rgba(245,244,238,.06); }
-html.dark .bg-white\/\[0\.08\] { background-color: rgba(245,244,238,.08); }
-html.dark .bg-white\/\[0\.10\] { background-color: rgba(245,244,238,.10); }
-html.dark .bg-white\/\[0\.12\] { background-color: rgba(245,244,238,.12); }
-html.dark .bg-white\/\[0\.15\] { background-color: rgba(245,244,238,.15); }
-
-/* Светлые рамки → тёмные */
-.border-white\/\[0\.02\] { border-color: rgba(0,0,0,.04); }
-.border-white\/\[0\.03\] { border-color: rgba(0,0,0,.05); }
-.border-white\/\[0\.04\] { border-color: rgba(0,0,0,.06); }
-.border-white\/\[0\.06\] { border-color: rgba(0,0,0,.08); }
-.border-white\/\[0\.08\] { border-color: rgba(0,0,0,.10); }
-.border-white\/\[0\.10\] { border-color: rgba(0,0,0,.12); }
-.border-white\/\[0\.12\] { border-color: rgba(0,0,0,.14); }
-.border-\[\#111118\] { border-color: rgba(0,0,0,.10); }
-
-/* Тёмные оверлеи на изображениях (бейджи цен, кнопки удаления, лайтбокс)
-   всегда остаются тёмными, а текст на них — белым */
+/* Тёмные оверлеи поверх картинок остаются тёмными, текст белым */
 [class*="bg-black/"] { color: #ffffff !important; }
-html.dark .border-white\/\[0\.02\] { border-color: rgba(245,244,238,.04); }
-html.dark .border-white\/\[0\.03\] { border-color: rgba(245,244,238,.05); }
-html.dark .border-white\/\[0\.04\] { border-color: rgba(245,244,238,.06); }
-html.dark .border-white\/\[0\.06\] { border-color: rgba(245,244,238,.08); }
-html.dark .border-white\/\[0\.08\] { border-color: rgba(245,244,238,.10); }
-html.dark .border-white\/\[0\.10\] { border-color: rgba(245,244,238,.12); }
-html.dark .border-white\/\[0\.12\] { border-color: rgba(245,244,238,.14); }
-html.dark .border-\[\#111118\] { border-color: rgba(245,244,238,.10); }
-html.dark .bg-black { background-color: #141413; }
 
 /* Placeholder'ы */
 input::placeholder,
 textarea::placeholder {
-  color: #b0b0a8;
+  color: #4a514a;
   opacity: 1;
 }
 
-/* Инпуты с тёмным фоном → светлые */
-input.bg-white\/\[0\.04\],
-input.bg-white\/\[0\.06\],
-textarea.bg-white\/\[0\.04\],
-textarea.bg-white\/\[0\.06\] {
-  background-color: #faf9f5;
-}
-html.dark input.bg-white\/\[0\.04\],
-html.dark input.bg-white\/\[0\.06\],
-html.dark textarea.bg-white\/\[0\.04\],
-html.dark textarea.bg-white\/\[0\.06\] {
-  background-color: rgba(245,244,238,.06);
-}
-
-/* Акцентная граница слева (уведомления) — терракотовая */
-.border-l-indigo-500 { border-left-color: #d97757 !important; }
+/* Акцентная граница слева (уведомления) — лаймовая */
+.border-l-indigo-500 { border-left-color: var(--signal) !important; }
 
 /* ============================================================
-   МОБИЛЬНЫЕ ОТСТУПЫ — меньше боковых паддингов на телефоне
+   МОБИЛЬНЫЕ ОТСТУПЫ
    ============================================================ */
 @media (max-width: 640px) {
   main.max-w-7xl {
@@ -456,7 +336,7 @@ html.dark textarea.bg-white\/\[0\.06\] {
   .animate-float { animation: none; }
 }
 
-/* ===== iOS: убрать авто-зум при фокусе на полях ввода ===== */
+/* ===== iOS: убрать авто-зум при фокусе ===== */
 @media (max-width: 767px) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
   textarea,
