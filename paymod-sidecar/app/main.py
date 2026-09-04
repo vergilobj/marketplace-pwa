@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from .auth import HmacAuthMiddleware
 from .background import start_background_tasks
 from .db import SidecarDB
-from .paymod_client import derive_address, pay_erc20
+from .paymod_client import get_or_create_wallet, pay_erc20
 
 logging.basicConfig(
     level=logging.INFO,
@@ -73,19 +73,17 @@ async def health() -> dict:
 
 @app.post("/v1/address")
 async def get_address(req: AddressRequest) -> dict:
-    """Дерive детерминированный адрес для client_ref (идемпотентно)."""
-    existing = await db.get_wallet(req.client_ref)
-    if existing is not None:
-        return {"address": existing["address"]}
+    """Выдаёт детерминированный адрес через paymod.db (кладёт в wallets).
 
-    index = await db.next_index(req.chain)
+    Критично: watcher сканирует только paymod.db.wallets. Выдача через
+    собственную sidecar-таблицу ломает детект депозитов — потому идём
+    строго через paymod.db.create_deposit_wallet (как в agentbox).
+    """
     try:
-        address = derive_address(req.client_ref, req.chain, index)
+        address = await get_or_create_wallet(req.client_ref)
     except Exception as exc:  # noqa: BLE001
-        logger.exception("address derivation failed for %s", req.client_ref)
-        raise HTTPException(status_code=500, detail=f"derivation failed: {exc}") from exc
-
-    await db.save_wallet(req.client_ref, req.chain, req.token, index, address)
+        logger.exception("address creation failed for %s", req.client_ref)
+        raise HTTPException(status_code=500, detail=f"wallet creation failed: {exc}") from exc
     return {"address": address}
 
 

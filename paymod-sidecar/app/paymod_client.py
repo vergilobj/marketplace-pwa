@@ -34,15 +34,21 @@ def _ensure_paymod() -> Any:
     return _paymod
 
 
-def derive_address(client_ref: str, chain: str, index: int) -> str:
-    """Детерминированная HD-деривация адреса по индексу."""
+async def get_or_create_wallet(client_ref: str, ttl_seconds: int | None = None) -> str:
+    """Выдаёт адрес клиенту через paymod.db.create_deposit_wallet (кладёт в wallets).
+
+    ВАЖНО: watcher сканирует именно paymod.db.wallets (wallet_directory).
+    Собственная sidecar-таблица derived_wallets watcher'у не видна — потому
+    выдача адреса обязана идти через paymod, иначе депозиты не детектятся.
+    Идемпотентно по client_ref (уникальный в wallets).
+    """
     paymod = _ensure_paymod()
-    # paymod.wallets.derive_user_wallet(seed, path, index) -> (privkey, address)
-    _, address = paymod.wallets.derive_user_wallet(
-        seed=paymod.config.CONFIG.distributor_seed,
-        derivation_path=paymod.config.CONFIG.user_wallet_derivation_path,
-        index=index,
-    )
+    # Повторный запрос того же client_ref → тот же адрес.
+    directory = await paymod.db.wallet_directory()
+    for row in directory:
+        if row["client_ref"] == client_ref:
+            return row["address"]
+    _, address, _ = await paymod.db.create_deposit_wallet(client_ref, ttl_seconds)
     return address
 
 
