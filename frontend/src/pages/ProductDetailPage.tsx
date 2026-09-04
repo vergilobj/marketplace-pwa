@@ -5,7 +5,8 @@ import { ShoppingCart, MessageCircle, Minus, Plus, Truck, ShieldCheck, RotateCcw
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { getProductById, getSimilarProducts } from '../api/products';
-import { createOrder } from '../api/orders';
+import { createOrder, getOrderPaymentStatus } from '../api/orders';
+import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../hooks/useAuth';
 import Breadcrumbs from '../components/Breadcrumbs';
 import Skeleton from '../components/ui/Skeleton';
@@ -23,6 +24,7 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [similar, setSimilar] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [payment, setPayment] = useState<{ depositAddress?: string; status?: string; orderId?: string } | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -49,9 +51,27 @@ export default function ProductDetailPage() {
   const handleBuy = async () => {
     if (!product) return;
     setBuying(true);
+    setError('');
     try {
       const order = await createOrder(product.id, product.price * quantity);
-      navigate(`/orders?highlight=${order.id}`);
+      // Показываем карточку оплаты с QR прямо на странице товара.
+      const pay = order?.payment || {};
+      if (pay.depositAddress) {
+        setPayment({ depositAddress: pay.depositAddress, status: pay.status || 'PENDING', orderId: order.id });
+        // Поллинг статуса до подтверждения.
+        const poll = setInterval(async () => {
+          try {
+            const st = await getOrderPaymentStatus(order.id);
+            setPayment(prev => prev ? { ...prev, status: st.status } : prev);
+            if (st.status === 'CONFIRMED' || st.status === 'SWEPT') {
+              clearInterval(poll);
+              setTimeout(() => navigate('/orders'), 1200);
+            }
+          } catch { /* продолжаем поллить */ }
+        }, 3000);
+      } else {
+        navigate(`/orders?highlight=${order.id}`);
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка при создании заказа');
     } finally {
@@ -181,6 +201,24 @@ export default function ProductDetailPage() {
             </div>
 
             {error && <p className="text-sm text-red-500">{error}</p>}
+
+            {/* Карточка оплаты USDT с QR */}
+            {payment?.depositAddress && (
+              <div className="mt-4 glass border border-emerald-500/20 rounded-2xl p-5">
+                <p className="text-sm font-bold text-[var(--color-text)] mb-3">Оплатите USDT (BSC) на адрес:</p>
+                <div className="flex justify-center mb-4">
+                  <div className="p-3 bg-white rounded-xl">
+                    <QRCodeSVG value={payment.depositAddress} size={180} />
+                  </div>
+                </div>
+                <code className="block px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-xs text-emerald-300 break-all font-mono">
+                  {payment.depositAddress}
+                </code>
+                <p className="mt-3 text-xs text-white/50">
+                  Статус: {payment.status === 'CONFIRMED' || payment.status === 'SWEPT' ? 'Оплачено ✅' : payment.status || 'PENDING'}
+                </p>
+              </div>
+            )}
 
             {/* Продавец */}
             <div className="flex items-center gap-3 text-sm text-[var(--color-muted)]">

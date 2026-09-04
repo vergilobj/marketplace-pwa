@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { createOrder, getOrderPaymentStatus } from '../api/orders';
+import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
 
 type Payment = {
@@ -140,11 +141,7 @@ export default function CheckoutPage() {
                     {item.title} × {item.quantity}
                   </span>
                   <span className="text-sm font-bold text-white">
-                    {new Intl.NumberFormat('ru-RU', {
-                      style: 'currency',
-                      currency: 'RUB',
-                      minimumFractionDigits: 0,
-                    }).format(item.price * item.quantity)}
+                    {(item.price * item.quantity).toLocaleString('en-US', { maximumFractionDigits: 2 })} USDT
                   </span>
                 </div>
               ))}
@@ -152,11 +149,7 @@ export default function CheckoutPage() {
             <div className="flex justify-between items-center mb-6">
               <span className="text-base font-bold text-white">Итого</span>
               <span className="text-xl font-extrabold text-indigo-400">
-                {new Intl.NumberFormat('ru-RU', {
-                  style: 'currency',
-                  currency: 'RUB',
-                  minimumFractionDigits: 0,
-                }).format(total)}
+                {total.toLocaleString('en-US', { maximumFractionDigits: 2 })} USDT
               </span>
             </div>
             <div className="flex items-center gap-2 text-xs text-white/50 mb-6">
@@ -177,9 +170,14 @@ export default function CheckoutPage() {
         {/* Карточка оплаты USDT (BSC) */}
         {payment?.depositAddress && (
           <div className="mt-6 glass border border-emerald-500/20 rounded-2xl p-5">
-            <p className="text-sm font-bold text-[var(--color-text)] mb-1">
+            <p className="text-sm font-bold text-[var(--color-text)] mb-3">
               Оплатите USDT (BSC) на адрес:
             </p>
+            <div className="flex justify-center mb-4">
+              <div className="p-3 bg-white rounded-xl">
+                <QRCodeSVG value={payment.depositAddress} size={180} />
+              </div>
+            </div>
             <div className="flex items-center gap-2 mt-2">
               <code className="flex-1 px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-xs text-emerald-300 break-all font-mono">
                 {payment.depositAddress}
