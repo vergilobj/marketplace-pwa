@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
-const GS = { background: 'linear-gradient(135deg, #FF579B 0%, #9C6AFF 50%, #1DB4FF 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 type TabType = 'all' | 'posts' | 'products' | 'ads';
@@ -148,7 +148,7 @@ export default function FeedPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="relative overflow-hidden rounded-[34px] mb-10 p-6 sm:p-12"
-        style={{ background: 'linear-gradient(135deg, #FF579B 0%, #9C6AFF 55%, #1DB4FF 100%)' }}
+        style={{ background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 55%, #8ee8ff 100%)' }}
       >
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_50%,rgba(255,255,255,0.15)_0%,transparent_60%)]" />
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
@@ -169,12 +169,12 @@ export default function FeedPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
         <div className="relative flex-1 w-full">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-muted)]" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по ленте..." className="w-full pl-11 pr-10 py-3 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(255,87,155,0.5)] focus:ring-4 focus:ring-[rgba(255,87,155,0.1)] transition-all" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по ленте..." className="w-full pl-11 pr-10 py-3 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(201,242,103,0.5)] focus:ring-4 focus:ring-[rgba(201,242,103,0.1)] transition-all" />
           {search && <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"><X size={16} /></button>}
         </div>
         <div className="flex items-center gap-1.5 p-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-full overflow-x-auto flex-nowrap max-w-full">
           {sortOptions.map(opt => (
-            <button key={opt.value} onClick={() => setSort(opt.value)} className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all whitespace-nowrap ${sort === opt.value ? 'text-white' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.06)]'}`} style={sort === opt.value ? GS : undefined}>{opt.icon}{opt.label}</button>
+            <button key={opt.value} onClick={() => setSort(opt.value)} className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all whitespace-nowrap ${sort === opt.value ? 'text-[#0b0e0d]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.06)]'}`} style={sort === opt.value ? GS : undefined}>{opt.icon}{opt.label}</button>
           ))}
         </div>
         <div className="flex items-center gap-1 p-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-full shrink-0">
@@ -186,7 +186,7 @@ export default function FeedPage() {
       {/* Tabs */}
       <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1 -mx-1 px-1">
         {[{ key: 'all', label: 'Всё', icon: <Sparkles size={13} /> }, { key: 'products', label: 'Товары', icon: <Grid3X3 size={13} /> }, { key: 'posts', label: 'Посты', icon: <FileText size={13} /> }, { key: 'ads', label: 'Реклама', icon: <Megaphone size={13} /> }].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.key ? 'text-white shadow-[0_8px_24px_rgba(255,87,155,0.3)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.06)]'}`} style={activeTab === tab.key ? GS : undefined}>{tab.icon}{tab.label}</button>
+          <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.key ? 'text-white shadow-[0_8px_24px_rgba(201,242,103,0.3)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.06)]'}`} style={activeTab === tab.key ? GS : undefined}>{tab.icon}{tab.label}</button>
         ))}
       </div>
 
@@ -223,7 +223,7 @@ export default function FeedPage() {
 
           {/* Infinite scroll loader */}
           <div ref={loaderRef} className="py-10 flex justify-center">
-            {loadingMore && <Loader2 size={24} className="animate-spin text-[#FF579B]" />}
+            {loadingMore && <Loader2 size={24} className="animate-spin text-[#c9f267]" />}
             {!showLoader && !loadingMore && items.length > 0 && (
               <p className="text-[var(--color-faint)] text-sm">Все загружены</p>
             )}

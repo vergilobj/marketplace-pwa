@@ -65,7 +65,7 @@ export default function AdminPage() {
         { label: 'Пользователи', value: dashboard?.usersCount || 0, icon: <Users size={22} />, color: 'from-indigo-500 to-blue-600' },
         { label: 'Товары', value: dashboard?.productsCount || 0, icon: <ShoppingBag size={22} />, color: 'from-emerald-500 to-teal-600' },
         { label: 'Заказы', value: dashboard?.ordersCount || 0, icon: <Wallet size={22} />, color: 'from-amber-500 to-orange-600' },
-        { label: 'Доход', value: `${(dashboard?.totalRevenue || 0).toLocaleString('ru-RU')} ₽`, icon: <TrendingUp size={22} />, color: 'from-purple-500 to-pink-600' },
+        { label: 'Доход', value: `${(dashboard?.totalRevenue || 0).toLocaleString('ru-RU')} ₽`, icon: <TrendingUp size={22} />, color: 'from-purple-500 to-blue-600' },
       ].map((s, i) => (
         <div key={i} className="glass-card rounded-2xl p-5">
           <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center text-white mb-3`}>{s.icon}</div>

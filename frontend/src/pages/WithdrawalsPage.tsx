@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 
-const GS = { background: 'linear-gradient(135deg, #FF579B 0%, #9C6AFF 50%, #1DB4FF 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
 
 const sc: Record<string, { i: React.ReactNode; v: string; l: string }> = {
   pending: { i: <Clock size={13} />, v: 'warning', l: 'На рассмотрении' },
@@ -110,7 +110,7 @@ export default function WithdrawalsPage() {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Сумма"
-              className="flex-1 px-4 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(255,87,155,0.5)] transition-all"
+              className="flex-1 px-4 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(201,242,103,0.5)] transition-all"
             />
             <button
               onClick={handleReq}
@@ -126,7 +126,7 @@ export default function WithdrawalsPage() {
             value={wallet}
             onChange={(e) => setWallet(e.target.value)}
             placeholder="BSC-адрес кошелька (0x...)"
-            className="w-full px-4 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(255,87,155,0.5)] transition-all font-mono"
+            className="w-full px-4 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(201,242,103,0.5)] transition-all font-mono"
           />
         </div>
       </motion.div>

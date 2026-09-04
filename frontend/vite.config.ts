@@ -13,12 +13,12 @@ export default defineConfig({
       },
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Marketplace PWA',
-        short_name: 'Marketplace',
+        name: 'Базар',
+        short_name: 'Базар',
         description: 'Закрытый маркетплейс с чатом',
         lang: 'ru',
-        theme_color: '#0a0a0f',
-        background_color: '#0a0a0f',
+        theme_color: '#0b0e0d',
+        background_color: '#0b0e0d',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },

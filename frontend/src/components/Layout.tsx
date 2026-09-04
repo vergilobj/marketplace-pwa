@@ -21,7 +21,7 @@ function useClickAway(callback: () => void) {
   return ref;
 }
 
-const GS = { background: 'linear-gradient(135deg, #FF579B 0%, #9C6AFF 50%, #1DB4FF 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
 
 export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -102,10 +102,10 @@ export default function Layout() {
       <header className="sticky top-0 z-50 glass-strong border-b border-[var(--color-border)] shadow-[0_8px_30px_rgba(0,0,0,0.25)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2.5 shrink-0 group">
-            <div style={GS} className="w-8 h-8 rounded-[10px] flex items-center justify-center shadow-[0_8px_20px_rgba(255,87,155,0.35)] group-hover:scale-105 transition-transform">
-              <ShoppingBag size={16} className="text-white" />
+            <div style={GS} className="w-8 h-8 rounded-[10px] flex items-center justify-center shadow-[0_8px_20px_rgba(201,242,103,0.35)] group-hover:scale-105 transition-transform">
+              <ShoppingBag size={16} className="text-[#0b0e0d]" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-gradient">Marketplace</span>
+            <span className="text-xl font-bold tracking-tight text-gradient">Базар</span>
           </Link>
 
           <form onSubmit={handleGlobalSearch} className="hidden md:flex items-center ml-8 flex-1 max-w-lg">
@@ -116,30 +116,30 @@ export default function Layout() {
                 placeholder="Поиск товаров и постов..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] focus:border-[rgba(255,87,155,0.5)] focus:ring-4 focus:ring-[rgba(255,87,155,0.1)] outline-none transition-all text-sm text-[var(--color-text)] placeholder:text-[var(--color-faint)]"
+                className="w-full pl-10 pr-4 py-2 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] focus:border-[rgba(201,242,103,0.5)] focus:ring-4 focus:ring-[rgba(201,242,103,0.1)] outline-none transition-all text-sm text-[var(--color-text)] placeholder:text-[var(--color-faint)]"
               />
             </div>
           </form>
 
           <nav className="hidden md:flex items-center space-x-1.5 ml-4">
-            <button onClick={() => setLightMode(!lightMode)} className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#FF579B] transition-colors" title={lightMode ? 'Тёмная тема' : 'Светлая тема'}>
+            <button onClick={() => setLightMode(!lightMode)} className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors" title={lightMode ? 'Тёмная тема' : 'Светлая тема'}>
               {lightMode ? <Moon size={20} /> : <Sun size={20} />}
             </button>
-            <Link to="/favorites" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#FF579B] transition-colors">
+            <Link to="/favorites" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors">
               <Heart size={20} />
             </Link>
-            <Link to="/cart" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#FF579B] transition-colors relative">
+            <Link to="/cart" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors relative">
               <ShoppingBag size={20} />
               {cart.length > 0 && (
-                <span style={GS} className="absolute -top-0.5 -right-0.5 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{cart.length > 9 ? '9+' : cart.length}</span>
+                <span style={GS} className="absolute -top-0.5 -right-0.5 text-[#0b0e0d] text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{cart.length > 9 ? '9+' : cart.length}</span>
               )}
             </Link>
             {isAuthenticated && (
               <>
-                <Link to="/chat" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#FF579B] transition-colors">
+                <Link to="/chat" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors">
                   <MessageCircle size={20} />
                 </Link>
-                <Link to="/notifications" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#FF579B] transition-colors relative">
+                <Link to="/notifications" className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors relative">
                   <Bell size={20} />
                   {unreadCount > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>
@@ -149,7 +149,7 @@ export default function Layout() {
                 <div className="relative" ref={profileMenuRef}>
                   <button
                     onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                    className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#FF579B] transition-colors"
+                    className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[#c9f267] transition-colors"
                   >
                     <User size={20} />
                   </button>
@@ -176,7 +176,7 @@ export default function Layout() {
               </>
             )}
             {!isAuthenticated && (
-              <Link to="/login" style={GS} className="px-5 py-2 rounded-full text-white text-sm font-semibold hover:scale-[1.04] transition-transform shadow-[0_8px_24px_rgba(255,87,155,0.35)]">Войти</Link>
+              <Link to="/login" style={GS} className="px-5 py-2 rounded-full text-[#0b0e0d] text-sm font-semibold hover:scale-[1.04] transition-transform shadow-[0_8px_24px_rgba(201,242,103,0.35)]">Войти</Link>
             )}
           </nav>
 
@@ -190,7 +190,7 @@ export default function Layout() {
             <form onSubmit={handleGlobalSearch} className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input type="text" placeholder="Поиск..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] focus:border-[rgba(255,87,155,0.5)] outline-none text-sm text-[var(--color-text)] placeholder:text-[var(--color-faint)]" />
+                className="w-full pl-10 pr-4 py-2 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] focus:border-[rgba(201,242,103,0.5)] outline-none text-sm text-[var(--color-text)] placeholder:text-[var(--color-faint)]" />
             </form>
             {mobileLinks.map(item => (
               <Link key={item.to} to={item.to} className="block py-2 text-sm" onClick={() => setMenuOpen(false)}><item.icon size={18} className="inline mr-2" />{item.label}</Link>
@@ -202,7 +202,7 @@ export default function Layout() {
               {isAdmin && <Link to="/admin" className="block py-2 text-sm" onClick={() => setMenuOpen(false)}>Админ</Link>}
               <button onClick={handleLogout} className="block py-2 text-sm text-red-400 w-full text-left">Выйти</button>
             </>)}
-            {!isAuthenticated && <Link to="/login" className="block py-2 text-sm text-[#FF579B]" onClick={() => setMenuOpen(false)}>Войти</Link>}
+            {!isAuthenticated && <Link to="/login" className="block py-2 text-sm text-[#c9f267]" onClick={() => setMenuOpen(false)}>Войти</Link>}
           </div>
         )}
       </header>
@@ -214,36 +214,36 @@ export default function Layout() {
       <footer className="border-t border-[rgba(255,255,255,0.06)] glass py-12 px-4">
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
           <div>
-            <h3 className="font-bold text-lg mb-4">Marketplace</h3>
+            <h3 className="font-bold text-lg mb-4">Базар</h3>
             <p className="text-[var(--color-muted)] text-sm leading-relaxed">Закрытый маркетплейс для проверенных участников.</p>
           </div>
           <div>
             <h4 className="font-semibold text-sm mb-3">Навигация</h4>
             <div className="space-y-2">
-              <Link to="/" className="block text-[var(--color-muted)] text-sm hover:text-[#FF579B] transition-colors">Главная</Link>
-              <Link to="/products" className="block text-[var(--color-muted)] text-sm hover:text-[#FF579B] transition-colors">Товары</Link>
-              <Link to="/favorites" className="block text-[var(--color-muted)] text-sm hover:text-[#FF579B] transition-colors">Избранное</Link>
-              <Link to="/cart" className="block text-[var(--color-muted)] text-sm hover:text-[#FF579B] transition-colors">Корзина</Link>
+              <Link to="/" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Главная</Link>
+              <Link to="/products" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Товары</Link>
+              <Link to="/favorites" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Избранное</Link>
+              <Link to="/cart" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Корзина</Link>
             </div>
           </div>
           <div>
             <h4 className="font-semibold text-sm mb-3">Сервис</h4>
             <div className="space-y-2">
-              <Link to="/privacy" className="block text-[var(--color-muted)] text-sm hover:text-[#FF579B] transition-colors">Приватность</Link>
-              <Link to="/chat" className="block text-[var(--color-muted)] text-sm hover:text-[#FF579B] transition-colors">Чат</Link>
-              <Link to="/referrals" className="block text-[var(--color-muted)] text-sm hover:text-[#FF579B] transition-colors">Рефералы</Link>
+              <Link to="/privacy" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Приватность</Link>
+              <Link to="/chat" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Чат</Link>
+              <Link to="/referrals" className="block text-[var(--color-muted)] text-sm hover:text-[#c9f267] transition-colors">Рефералы</Link>
             </div>
           </div>
           <div>
             <h4 className="font-semibold text-sm mb-3">Контакты</h4>
             <div className="space-y-2">
-              <p className="text-[var(--color-muted)] text-sm">support@marketplace.ru</p>
+              <p className="text-[var(--color-muted)] text-sm">support@bazar.ru</p>
               <p className="text-[var(--color-muted)] text-sm">8 (800) 123-45-67</p>
             </div>
           </div>
         </div>
         <div className="max-w-7xl mx-auto mt-8 pt-8 border-t border-[rgba(255,255,255,0.05)] text-center">
-          <p className="text-[var(--color-faint)] text-xs">2026 Marketplace PWA. Все права защищены.</p>
+          <p className="text-[var(--color-faint)] text-xs">2026 Базар. Все права защищены.</p>
         </div>
       </footer>
 
@@ -251,7 +251,7 @@ export default function Layout() {
         {mobileLinks.map(item => {
           const isActive = location.pathname === item.to;
           return (
-            <Link key={item.to} to={item.to} className={`flex flex-col items-center text-xs ${isActive ? 'text-[#FF579B]' : 'text-[var(--color-muted)]'}`}>
+            <Link key={item.to} to={item.to} className={`flex flex-col items-center text-xs ${isActive ? 'text-[#c9f267]' : 'text-[var(--color-muted)]'}`}>
               <item.icon size={20} /><span className="mt-1">{item.label}</span>
             </Link>
           );

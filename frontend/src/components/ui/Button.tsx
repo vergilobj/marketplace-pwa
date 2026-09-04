@@ -5,7 +5,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
 }
 
-const GS = { background: 'linear-gradient(135deg, #FF579B 0%, #9C6AFF 50%, #1DB4FF 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
 
 const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
@@ -19,9 +19,9 @@ const Button: React.FC<ButtonProps> = ({
 
   const variants: Record<string, string> = {
     primary:
-      'text-white hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(255,87,155,0.38)]',
+      'text-[#0b0e0d] hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(201,242,103,0.38)]',
     secondary:
-      'text-[var(--color-text)] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] backdrop-blur hover:border-[rgba(255,87,155,0.5)] hover:text-[#FF579B]',
+      'text-[var(--color-text)] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] backdrop-blur hover:border-[rgba(201,242,103,0.5)] hover:text-[#c9f267]',
     ghost:
       'text-[var(--color-muted)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--color-text)]',
   };
@@ -29,7 +29,7 @@ const Button: React.FC<ButtonProps> = ({
   return (
     <button
       className={`${base} ${variants[variant]} ${className || ''}`}
-      style={variant === 'primary' ? { ...GS, boxShadow: '0 16px 40px rgba(255,87,155,0.24)' } : undefined}
+      style={variant === 'primary' ? { ...GS, boxShadow: '0 16px 40px rgba(201,242,103,0.24)' } : undefined}
       disabled={loading || props.disabled}
       {...props}
     >

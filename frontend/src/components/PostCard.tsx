@@ -8,7 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
-const GS = { background: 'linear-gradient(135deg, #FF579B 0%, #9C6AFF 50%, #1DB4FF 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
 
 interface Props { post: any; onDelete?: (id: string) => void; onEdit?: (post: any) => void; }
 
@@ -38,7 +38,7 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
       {/* Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div style={GS} className="w-9 h-9 rounded-full text-white text-[11px] font-bold flex items-center justify-center shrink-0 shadow-md">
+          <div style={GS} className="w-9 h-9 rounded-full text-[#0b0e0d] text-[11px] font-bold flex items-center justify-center shrink-0 shadow-md">
             {(post.author?.name || post.adOwner?.name || 'A')[0].toUpperCase()}
           </div>
           <div>
@@ -70,7 +70,7 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
 
       {/* Content */}
       <div className="px-4 pb-4">
-        <h2 className="text-base font-bold mb-2 line-clamp-2 text-[var(--color-text)] group-hover:text-[#FF579B] transition-colors">{post.title}</h2>
+        <h2 className="text-base font-bold mb-2 line-clamp-2 text-[var(--color-text)] group-hover:text-[#c9f267] transition-colors">{post.title}</h2>
         {post.content && <p className="text-sm text-[var(--color-muted)] line-clamp-3 mb-3 leading-relaxed">{post.content}</p>}
         {media.length > 0 && (
           <div className="rounded-xl overflow-hidden mb-3">
@@ -78,7 +78,7 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
           </div>
         )}
         {post.link && (
-          <a href={post.link} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-[#FF579B] hover:text-[#ff7ab0] font-medium">
+          <a href={post.link} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-[#c9f267] hover:text-[#b6e04f] font-medium">
             <ExternalLink size={12} /> Ссылка
           </a>
         )}
@@ -86,7 +86,7 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
 
       {/* Actions */}
       <div className="px-4 pb-4 flex items-center gap-4">
-        <button onClick={handleLike} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${liked ? 'text-[#FF579B] bg-[rgba(255,87,155,0.1)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.04)]'}`}>
+        <button onClick={handleLike} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${liked ? 'text-[#c9f267] bg-[rgba(201,242,103,0.1)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.04)]'}`}>
           <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
           {likes > 0 && likes}
         </button>

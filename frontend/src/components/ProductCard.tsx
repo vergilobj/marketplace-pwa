@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 
-const GS = { background: 'linear-gradient(135deg, #FF579B 0%, #9C6AFF 50%, #1DB4FF 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
 
 export default function ProductCard({ product }: { product: any }) {
   const navigate = useNavigate();
@@ -29,11 +29,11 @@ export default function ProductCard({ product }: { product: any }) {
         )}
 
         <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-2 group-hover:translate-x-0">
-          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }} className={`p-2.5 rounded-full backdrop-blur-xl transition-all ${fav ? 'bg-[#FF579B] text-white shadow-lg shadow-[rgba(255,87,155,0.4)]' : 'bg-black/50 text-white hover:bg-black/70'}`}>
+          <button onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }} className={`p-2.5 rounded-full backdrop-blur-xl transition-all ${fav ? 'bg-[#c9f267] text-[#0b0e0d] shadow-lg shadow-[rgba(201,242,103,0.4)]' : 'bg-black/50 text-white hover:bg-black/70'}`}>
             <Heart size={16} fill={fav ? 'currentColor' : 'none'} />
           </button>
           {!inCart && (
-            <button onClick={(e) => { e.stopPropagation(); addToCart(product); }} style={GS} className="p-2.5 rounded-full text-white backdrop-blur-xl transition-all shadow-lg">
+            <button onClick={(e) => { e.stopPropagation(); addToCart(product); }} style={GS} className="p-2.5 rounded-full text-[#0b0e0d] backdrop-blur-xl transition-all shadow-lg">
               <ShoppingCart size={16} />
             </button>
           )}
@@ -45,26 +45,26 @@ export default function ProductCard({ product }: { product: any }) {
       </div>
 
       <div className="p-4 flex flex-col flex-1">
-        <h3 className="font-semibold text-[15px] text-[var(--color-text)] line-clamp-2 mb-2 group-hover:text-[#FF579B] transition-colors flex-1">{product.title}</h3>
+        <h3 className="font-semibold text-[15px] text-[var(--color-text)] line-clamp-2 mb-2 group-hover:text-[#c9f267] transition-colors flex-1">{product.title}</h3>
         {product.seller?.name && (
           <div className="flex items-center gap-2 mb-3">
-            <span style={GS} className="w-5 h-5 rounded-full text-white text-[9px] font-bold flex items-center justify-center shrink-0">{product.seller.name[0]}</span>
+            <span style={GS} className="w-5 h-5 rounded-full text-[#0b0e0d] text-[9px] font-bold flex items-center justify-center shrink-0">{product.seller.name[0]}</span>
             <span className="text-xs text-[var(--color-muted)] font-medium">{product.seller.name}</span>
           </div>
         )}
 
         {inCart ? (
-          <div className="mt-auto flex items-center justify-between gap-1 bg-[rgba(255,87,155,0.08)] border border-[rgba(255,87,155,0.2)] rounded-full px-2 py-1.5" onClick={e => e.stopPropagation()}>
-            <button onClick={(e) => { e.stopPropagation(); updateQuantity(product.id, -1); }} className="p-1.5 rounded-full hover:bg-[rgba(255,255,255,0.08)] text-[#FF579B] hover:text-[#ff7ab0] transition-all">
+          <div className="mt-auto flex items-center justify-between gap-1 bg-[rgba(201,242,103,0.08)] border border-[rgba(201,242,103,0.2)] rounded-full px-2 py-1.5" onClick={e => e.stopPropagation()}>
+            <button onClick={(e) => { e.stopPropagation(); updateQuantity(product.id, -1); }} className="p-1.5 rounded-full hover:bg-[rgba(255,255,255,0.08)] text-[#c9f267] hover:text-[#b6e04f] transition-all">
               <Minus size={14} />
             </button>
             <span className="text-sm font-bold text-[var(--color-text)] min-w-[24px] text-center">{quantity}</span>
-            <button onClick={(e) => { e.stopPropagation(); addToCart(product); }} className="p-1.5 rounded-full hover:bg-[rgba(255,255,255,0.08)] text-[#FF579B] hover:text-[#ff7ab0] transition-all">
+            <button onClick={(e) => { e.stopPropagation(); addToCart(product); }} className="p-1.5 rounded-full hover:bg-[rgba(255,255,255,0.08)] text-[#c9f267] hover:text-[#b6e04f] transition-all">
               <Plus size={14} />
             </button>
           </div>
         ) : (
-          <button onClick={(e) => { e.stopPropagation(); addToCart(product); }} style={GS} className="mt-auto w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full text-white text-sm font-semibold transition-all shadow-[0_8px_24px_rgba(255,87,155,0.3)] hover:scale-[1.02]">
+          <button onClick={(e) => { e.stopPropagation(); addToCart(product); }} style={GS} className="mt-auto w-full flex items-center justify-center gap-2 px-4 py-3 rounded-full text-[#0b0e0d] text-sm font-semibold transition-all shadow-[0_8px_24px_rgba(201,242,103,0.3)] hover:scale-[1.02]">
             <ShoppingCart size={15} />
             В корзину
           </button>
