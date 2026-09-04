@@ -453,12 +453,12 @@ export default function ChatPage() {
                         isMine
                           ? 'text-[var(--color-text)] rounded-br-md shadow-[0_8px_20px_rgba(201,242,103,0.25)]'
                           : 'glass text-[var(--color-text)] rounded-bl-md'
-                      }`} style={isMine ? { background: 'linear-gradient(135deg, #fbfbf8 0%, #a8b0a8 100%)' } : undefined}>
+                      }`} style={isMine ? { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 100%)' } : undefined}>
                         {msg.text}
                       </div>
                     )}
                     {msg.fileUrl && (
-                      <div className={`px-4 py-2.5 rounded-2xl ${isMine ? 'text-[#0b0e0d] rounded-br-md' : 'glass text-[var(--color-text)] rounded-bl-md'}`} style={isMine ? { background: 'linear-gradient(135deg, #fbfbf8 0%, #a8b0a8 100%)' } : undefined}>
+                      <div className={`px-4 py-2.5 rounded-2xl ${isMine ? 'text-[#0b0e0d] rounded-br-md' : 'glass text-[var(--color-text)] rounded-bl-md'}`} style={isMine ? { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 100%)' } : undefined}>
                         {msg.fileType?.startsWith('image/') ? (
                           <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer">
                             <img src={msg.fileUrl} alt={msg.fileName || 'Image'} className="max-w-[220px] max-h-[220px] rounded-lg object-cover" loading="lazy" />
@@ -540,7 +540,7 @@ export default function ChatPage() {
                 onClick={sendMessage}
                 disabled={!messageText.trim() && pendingFiles.length === 0}
                 className="w-10 h-10 rounded-full text-[#0b0e0d] flex items-center justify-center disabled:opacity-20 transition-all shrink-0 shadow-[0_6px_20px_rgba(201,242,103,0.3)]"
-                style={{ background: 'linear-gradient(135deg, #fbfbf8 0%, #a8b0a8 50%, #a8b0a8 100%)' }}
+                style={{ background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' }}
               >
                 <Send size={16} />
               </button>

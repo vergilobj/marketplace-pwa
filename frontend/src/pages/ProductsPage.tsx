@@ -5,7 +5,7 @@ import { getProducts } from '../api/products';
 import ProductCard from '../components/ProductCard';
 import { useAuth } from '../hooks/useAuth';
 
-const GS = { background: 'linear-gradient(135deg, #fbfbf8 0%, #a8b0a8 50%, #a8b0a8 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #c9f267 0%, #8ee8ff 50%, #8ee8ff 100%)' } as const;
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 const PAGE_SIZE = 20;
@@ -106,7 +106,7 @@ export default function ProductsPage() {
             ))}
           </div>
           <div ref={loaderRef} className="py-10 flex justify-center">
-            {loadingMore && <Loader2 size={24} className="animate-spin text-[#fbfbf8]" />}
+            {loadingMore && <Loader2 size={24} className="animate-spin text-[#c9f267]" />}
             {!hasMore && !loadingMore && products.length > 0 && (
               <p className="text-[var(--color-faint)] text-sm">Все товары загружены</p>
             )}
