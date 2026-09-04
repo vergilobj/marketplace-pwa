@@ -73,7 +73,7 @@ export default function CreateProductPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="Название" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required />
           <Input label="Описание" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-          <Input label="Цена (₽)" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required />
+          <Input label="Цена (USDT)" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required />
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Фотографии</label>

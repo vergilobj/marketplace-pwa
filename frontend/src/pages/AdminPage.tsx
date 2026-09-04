@@ -65,7 +65,7 @@ export default function AdminPage() {
         { label: 'Пользователи', value: dashboard?.usersCount || 0, icon: <Users size={22} />, color: 'from-indigo-500 to-blue-600' },
         { label: 'Товары', value: dashboard?.productsCount || 0, icon: <ShoppingBag size={22} />, color: 'from-emerald-500 to-teal-600' },
         { label: 'Заказы', value: dashboard?.ordersCount || 0, icon: <Wallet size={22} />, color: 'from-amber-500 to-orange-600' },
-        { label: 'Доход', value: `${(dashboard?.totalRevenue || 0).toLocaleString('ru-RU')} ₽`, icon: <TrendingUp size={22} />, color: 'from-purple-500 to-blue-600' },
+        { label: 'Доход', value: `${(dashboard?.totalRevenue || 0).toLocaleString('ru-RU')} USDT`, icon: <TrendingUp size={22} />, color: 'from-purple-500 to-blue-600' },
       ].map((s, i) => (
         <div key={i} className="glass-card rounded-2xl p-5">
           <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center text-[var(--color-text)] mb-3`}>{s.icon}</div>
@@ -160,7 +160,7 @@ export default function AdminPage() {
             <p className="text-xs text-white/35">{t.orderId?.slice(0, 8)} • {t.createdAt ? format(new Date(t.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</p>
           </div>
           <div className="text-right">
-            <p className="text-sm font-bold text-white">{t.amount?.toLocaleString('ru-RU')} ₽</p>
+            <p className="text-sm font-bold text-white">{t.amount?.toLocaleString('ru-RU')} USDT</p>
             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${t.status === 'success' ? 'bg-emerald-400/10 text-emerald-400' : 'bg-amber-400/10 text-amber-400'}`}>{t.status}</span>
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function AdminPage() {
       {withdrawals.map((w: any) => (
         <div key={w.id} className="glass-card rounded-2xl p-4 flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-white">{w.amount?.toLocaleString('ru-RU')} ₽</p>
+            <p className="text-sm font-semibold text-white">{w.amount?.toLocaleString('ru-RU')} USDT</p>
             <p className="text-xs text-white/35">{w.userId?.slice(0, 8)} • {w.createdAt ? format(new Date(w.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -195,7 +195,7 @@ export default function AdminPage() {
       {[
         { key: 'platform_fee_percent', label: 'Комиссия платформы (%)', placeholder: '10' },
         { key: 'referral_percent', label: 'Реферальный процент (%)', placeholder: '5' },
-        { key: 'ad_price', label: 'Цена рекламы (₽/день)', placeholder: '5000' },
+        { key: 'ad_price', label: 'Цена рекламы (USDT/день)', placeholder: '5000' },
         { key: 'stop_words', label: 'Стоп-слова (через запятую)', placeholder: 'спам, casino' },
       ].map(f => {
         const val = settings[f.key] || '';

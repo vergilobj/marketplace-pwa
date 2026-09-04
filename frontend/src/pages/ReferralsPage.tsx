@@ -34,7 +34,7 @@ export default function ReferralsPage() {
 
       <h3 className="text-base font-bold text-[var(--color-text)] mb-4 flex items-center gap-2"><Users size={16}/> Приглашённые</h3>
       {refs.length===0 ? <div className="text-center py-16"><Users size={40} className="mx-auto text-white/10 mb-4"/><p className="text-white/60">Пока нет рефералов</p></div> :
-        <div className="space-y-2">{refs.map((r,i)=><motion.div key={r.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:i*.03}} className="glass-card rounded-2xl p-4 flex items-center justify-between"><div><p className="text-sm font-semibold text-white">{r.buyer?.name||'Пользователь'}</p><p className="text-xs text-white/50">{r.product?.title||'Заказ'} • {r.createdAt?format(new Date(r.createdAt),'d MMM',{locale:ru}):''}</p></div><div className="text-right"><p className="font-bold text-emerald-400 text-sm">+{r.referralBonus||0} ₽</p></div></motion.div>)}</div>}
+        <div className="space-y-2">{refs.map((r,i)=><motion.div key={r.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:i*.03}} className="glass-card rounded-2xl p-4 flex items-center justify-between"><div><p className="text-sm font-semibold text-white">{r.buyer?.name||'Пользователь'}</p><p className="text-xs text-white/50">{r.product?.title||'Заказ'} • {r.createdAt?format(new Date(r.createdAt),'d MMM',{locale:ru}):''}</p></div><div className="text-right"><p className="font-bold text-emerald-400 text-sm">+{r.referralBonus||0} USDT</p></div></motion.div>)}</div>}
     </div>
   );
 }

@@ -61,8 +61,8 @@ export class OrdersService {
 
     // Уведомления покупателю и продавцу + push
     const heading = { en: 'Новый заказ' };
-    const buyerContents = { en: `Ваш заказ на сумму ${amount} ₽ создан` };
-    const sellerContents = { en: `Новый заказ на сумму ${amount} ₽` };
+    const buyerContents = { en: `Ваш заказ на сумму ${amount} USDT создан` };
+    const sellerContents = { en: `Новый заказ на сумму ${amount} USDT` };
 
     await this.notificationsService.createNotification(
       product.sellerId,

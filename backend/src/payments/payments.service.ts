@@ -61,8 +61,8 @@ export class PaymentsService {
 
       const depositAddress = result.raw?.deposit_address;
 
-      // amount — рубли, в paymod передаём сырые атомарные единицы.
-      // Условно 1 ₽ = 1 USDT => amountRaw = round(amount * 1e18).
+      // amount — цена в USDT, в paymod передаём сырые атомарные единицы.
+      // Условно 1 единица цены = 1 USDT => amountRaw = round(amount * 1e18).
       const amountRaw = String(Math.round(order.amount * 1e18));
 
       await this.prisma.transaction.create({
@@ -194,14 +194,14 @@ export class PaymentsService {
       await this.notificationsService.createNotification(
         order.referralUserId,
         'referral',
-        `Начислен реферальный бонус: ${order.referralBonus} ₽`,
+        `Начислен реферальный бонус: ${order.referralBonus} USDT`,
         orderId,
       );
       try {
         await this.notificationsService.sendToUser(
           order.referralUserId,
           { en: 'Реферальный бонус' },
-          { en: `Начислен реферальный бонус: ${order.referralBonus} ₽` },
+          { en: `Начислен реферальный бонус: ${order.referralBonus} USDT` },
           { screen: 'balance' },
         );
       } catch (err) {

@@ -123,10 +123,10 @@ export default function ProductDetailPage() {
           <div className="space-y-6">
             <div>
               <h1 className="text-4xl font-bold tracking-tight">{product.title}</h1>
-              <p className="text-2xl font-bold mt-2 text-gradient">{product.price.toLocaleString()} ₽</p>
+              <p className="text-2xl font-bold mt-2 text-gradient">{product.price.toLocaleString()} USDT</p>
               {quantity > 1 && (
                 <p className="text-sm text-[var(--color-muted)] mt-1">
-                  {product.price.toLocaleString()} ₽ × {quantity} шт. = {(product.price * quantity).toLocaleString()} ₽
+                  {product.price.toLocaleString()} USDT × {quantity} шт. = {(product.price * quantity).toLocaleString()} USDT
                 </p>
               )}
             </div>
@@ -232,7 +232,7 @@ export default function ProductDetailPage() {
                   />
                   <div className="p-3 space-y-1">
                     <h3 className="font-semibold truncate">{s.title}</h3>
-                    <p className="text-lg font-bold text-gradient">{s.price.toLocaleString()} ₽</p>
+                    <p className="text-lg font-bold text-gradient">{s.price.toLocaleString()} USDT</p>
                   </div>
                 </Card>
               </motion.div>

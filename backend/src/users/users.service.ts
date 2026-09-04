@@ -106,7 +106,7 @@ export class UsersService {
     await this.notificationsService.createNotification(
       userId,
       'referral',
-      `Начислен реферальный бонус: ${amount} ₽`,
+      `Начислен реферальный бонус: ${amount} USDT`,
       orderId,
     );
 
@@ -114,7 +114,7 @@ export class UsersService {
       await this.notificationsService.sendToUser(
         userId,
         { en: 'Реферальный бонус' },
-        { en: `Начислен реферальный бонус: ${amount} ₽` },
+        { en: `Начислен реферальный бонус: ${amount} USDT` },
         { screen: 'balance' },
       );
     } catch (err) {
@@ -173,7 +173,7 @@ export class UsersService {
     const totalPending = pendingRequests.reduce((sum, r) => sum + r.amount, 0);
     const available = user.bonusBalance - totalPending;
     if (available < amount)
-      throw new Error(`Insufficient bonus balance. Available: ${available} ₽`);
+      throw new Error(`Insufficient bonus balance. Available: ${available} USDT`);
 
     // Сохраняем адрес вывода и на юзере (если передан) — удобно для следующих выводов.
     if (toAddress) {
@@ -247,8 +247,8 @@ export class UsersService {
       throw new Error('No wallet address for payout');
     }
 
-    // Сумма в ₽ → сырые атомарные единицы USDT (18 decimals).
-    // Условно 1 ₽ = 1 USDT.
+    // Сумма в USDT → сырые атомарные единицы (18 decimals).
+    // Условно 1 единица цены = 1 USDT.
     const amountRaw = String(Math.round(request.amount * 1e18));
 
     try {

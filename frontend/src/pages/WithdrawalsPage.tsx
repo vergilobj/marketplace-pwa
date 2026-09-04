@@ -98,7 +98,7 @@ export default function WithdrawalsPage() {
           <div>
             <p className="text-[var(--color-muted)] text-xs">Доступный баланс</p>
             <p className="text-2xl font-bold text-emerald-400">
-              {balance.toLocaleString('ru-RU')} ₽
+              {balance.toLocaleString('ru-RU')} USDT
             </p>
           </div>
         </div>
@@ -157,7 +157,7 @@ export default function WithdrawalsPage() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-[var(--color-text)]">
-                      {w.amount.toLocaleString('ru-RU')} ₽
+                      {w.amount.toLocaleString('ru-RU')} USDT
                     </p>
                     <p className="text-[11px] text-[var(--color-muted)]">
                       {w.createdAt
