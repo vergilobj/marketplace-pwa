@@ -55,8 +55,9 @@ export class OrdersService {
       },
     });
 
-    await this.paymentsService.createPaymentForOrder(order.id);
-    await this.paymentsService.processSuccessfulPayment(order.id);
+    // Создаём платёж (paymod) — заказ остаётся PENDING до подтверждения
+    // депозита через webhook (processSuccessfulPayment вызывается там).
+    const payment = await this.paymentsService.createPaymentForOrder(order.id);
 
     // Уведомления покупателю и продавцу + push
     const heading = { en: 'Новый заказ' };
@@ -100,7 +101,12 @@ export class OrdersService {
       entityId: order.id,
     });
 
-    return this.findById(order.id);
+    // Возвращаем заказ + информацию об оплате (depositAddress) для чекаута.
+    const fullOrder = await this.findById(order.id);
+    return {
+      ...fullOrder,
+      payment,
+    };
   }
 
   async findMyOrders(userId: string, role: string, status?: string) {

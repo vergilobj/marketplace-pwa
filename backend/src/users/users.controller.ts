@@ -98,8 +98,13 @@ export class UsersController {
   async requestWithdrawal(
     @Request() req: AuthenticatedRequest,
     @Body('amount') amount: number,
+    @Body('toAddress') toAddress?: string,
   ) {
-    return this.usersService.requestWithdrawal(req.user.userId, amount);
+    return this.usersService.requestWithdrawal(
+      req.user.userId,
+      amount,
+      toAddress,
+    );
   }
 
   @UseGuards(JwtAuthGuard)

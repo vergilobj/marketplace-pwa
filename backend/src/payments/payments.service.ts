@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { NowPaymentsProvider } from './nowpayments.provider';
+import { PaymodProvider } from './paymod.provider';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class PaymentsService {
     private prisma: PrismaService,
     private settingsService: SettingsService,
     private nowPayments: NowPaymentsProvider,
+    private paymod: PaymodProvider,
     private notificationsService: NotificationsService,
   ) {}
 
@@ -41,13 +43,61 @@ export class PaymentsService {
       });
     }
 
-    // Create invoice via NowPayments
+    // Выбор провайдера. По умолчанию — paymod (BSC, USDT).
+    const provider =
+      (await this.settingsService.get('payment_provider')) || 'paymod';
+
+    if (provider === 'paymod') {
+      const chain = 'bsc';
+      const token = 'USDT';
+      const clientRef = `mp-txn-${order.id}`;
+
+      // Депозит-адрес (детерминированный) через sidecar.
+      const result = await this.paymod.createPayment(order.amount, order.id, {
+        chain,
+        token,
+        clientRef,
+      });
+
+      const depositAddress = result.raw?.deposit_address;
+
+      // amount — рубли, в paymod передаём сырые атомарные единицы.
+      // Условно 1 ₽ = 1 USDT => amountRaw = round(amount * 1e18).
+      const amountRaw = String(Math.round(order.amount * 1e18));
+
+      await this.prisma.transaction.create({
+        data: {
+          orderId: order.id,
+          type: 'payment',
+          amount: order.amount,
+          status: 'PENDING',
+          payload: result.raw,
+          provider: 'PAYMOD',
+          clientRef,
+          depositAddress,
+          chain,
+          token,
+          amountRaw,
+        },
+      });
+
+      this.logger.log(
+        `Paymod payment created: order=${order.id} addr=${depositAddress}`,
+      );
+
+      return {
+        depositAddress,
+        clientRef,
+        status: 'PENDING',
+      };
+    }
+
+    // Фолбэк — NowPayments (легаси).
     const result = await this.nowPayments.createPayment(order.amount, order.id, {
       currency: 'usd',
       description: `Order ${order.id}`,
     });
 
-    // Store transaction
     await this.prisma.transaction.create({
       data: {
         orderId: order.id,
@@ -55,6 +105,7 @@ export class PaymentsService {
         amount: order.amount,
         status: 'pending',
         payload: result.raw,
+        provider: 'NOWPAYMENTS',
       },
     });
 
@@ -63,6 +114,34 @@ export class PaymentsService {
       transactionId: result.transactionId,
       status: result.status,
     };
+  }
+
+  /** Статус оплаты заказа: PENDING / CONFIRMED / SWEPT (+ depositAddress, txHash). */
+  async getOrderPaymentStatus(orderId: string) {
+    const tx = await this.prisma.transaction.findFirst({
+      where: { orderId, type: 'payment' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!tx) {
+      return { status: 'PENDING', depositAddress: null, txHash: null };
+    }
+    return {
+      status: tx.status,
+      depositAddress: tx.depositAddress,
+      txHash: tx.txHash,
+    };
+  }
+
+  /** Депозитный адрес для оплаты заказа (если создан через paymod). */
+  async getOrderPayAddress(orderId: string) {
+    const tx = await this.prisma.transaction.findFirst({
+      where: { orderId, type: 'payment', provider: 'PAYMOD' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!tx?.depositAddress) {
+      throw new Error('Payment address not found');
+    }
+    return { depositAddress: tx.depositAddress, clientRef: tx.clientRef };
   }
 
   async processSuccessfulPayment(orderId: string) {

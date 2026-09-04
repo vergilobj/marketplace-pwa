@@ -33,6 +33,20 @@ export class PaymentsController {
     return result;
   }
 
+  // Статус оплаты заказа — фронт поллит для отображения PENDING/CONFIRMED/SWEPT.
+  @UseGuards(JwtAuthGuard)
+  @Get('order/:orderId/status')
+  async getOrderStatus(@Param('orderId') orderId: string) {
+    return this.paymentsService.getOrderPaymentStatus(orderId);
+  }
+
+  // Депозитный адрес для оплаты (BSC/USDT).
+  @UseGuards(JwtAuthGuard)
+  @Get('order/:orderId/pay')
+  async getOrderPay(@Param('orderId') orderId: string) {
+    return this.paymentsService.getOrderPayAddress(orderId);
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Get('transactions')

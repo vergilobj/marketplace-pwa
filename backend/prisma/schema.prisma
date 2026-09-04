@@ -21,6 +21,7 @@ model User {
   passwordHash  String?
   cometChatUid  String?  @unique
   chatPublicKey String?
+  walletAddress String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -213,6 +214,7 @@ model WithdrawalRequest {
   user           User             @relation(fields: [userId], references: [id])
   amount         Float
   status         String           @default("pending") // pending, approved, rejected
+  toAddress      String?
   provider       PaymentProvider? @default(PAYMOD)
   idempotencyKey String?          @unique
   payoutTxHash   String?

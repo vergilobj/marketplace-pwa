@@ -5,3 +5,8 @@ export const updateOrderStatus = (id: string, status: string) =>
   api.patch(`/orders/${id}/status`, { status }).then(res => res.data);
 export const createOrder = (productId: string, amount: number) =>
     api.post('/orders', { productId, amount }).then(res => res.data);
+
+export const getOrderPaymentStatus = (orderId: string) =>
+    api.get(`/payments/order/${orderId}/status`).then(res => res.data);
+export const getOrderPayAddress = (orderId: string) =>
+    api.get(`/payments/order/${orderId}/pay`).then(res => res.data);

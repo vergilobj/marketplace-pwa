@@ -3,7 +3,9 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { PaymodService } from '../payments/paymod.service';
 import { UserRole } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class UsersService {
@@ -13,6 +15,7 @@ export class UsersService {
     private prisma: PrismaService,
     private auditService: AuditService,
     private notificationsService: NotificationsService,
+    private paymodService: PaymodService,
   ) {}
 
   async findById(id: string) {
@@ -150,10 +153,20 @@ export class UsersService {
     return { balance: user?.bonusBalance ?? 0 };
   }
 
-  async requestWithdrawal(userId: string, amount: number) {
+  async requestWithdrawal(userId: string, amount: number, toAddress?: string) {
     const user = await this.findById(userId);
     if (!user) throw new Error('User not found');
     if (amount <= 0) throw new Error('Amount must be positive');
+
+    // Валидация BSC-адреса: 0x + 40 hex.
+    if (toAddress !== undefined && toAddress !== null && toAddress !== '') {
+      const trimmed = toAddress.trim();
+      if (!/^0x[0-9a-fA-F]{40}$/.test(trimmed)) {
+        throw new Error('Invalid BSC wallet address (expected 0x + 40 hex)');
+      }
+      toAddress = trimmed;
+    }
+
     const pendingRequests = await this.prisma.withdrawalRequest.findMany({
       where: { userId, status: 'pending' },
     });
@@ -161,8 +174,23 @@ export class UsersService {
     const available = user.bonusBalance - totalPending;
     if (available < amount)
       throw new Error(`Insufficient bonus balance. Available: ${available} ₽`);
+
+    // Сохраняем адрес вывода и на юзере (если передан) — удобно для следующих выводов.
+    if (toAddress) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { walletAddress: toAddress },
+      });
+    }
+
     return this.prisma.withdrawalRequest.create({
-      data: { userId, amount, status: 'pending' },
+      data: {
+        userId,
+        amount,
+        status: 'pending',
+        toAddress: toAddress ?? null,
+        provider: 'PAYMOD',
+      },
     });
   }
 
@@ -189,14 +217,76 @@ export class UsersService {
     const user = await this.findById(request.userId);
     if (!user || user.bonusBalance < request.amount)
       throw new Error('Insufficient balance');
+
+    // Списываем баланс до выплаты (деньги не откатываем в случае FAILED).
     await this.prisma.user.update({
       where: { id: request.userId },
       data: { bonusBalance: { decrement: request.amount } },
     });
-    return this.prisma.withdrawalRequest.update({
+
+    // Помечаем approved и готовим идемпотентный ключ выплаты.
+    const idempotencyKey = uuidv4();
+    await this.prisma.withdrawalRequest.update({
       where: { id: requestId },
-      data: { status: 'approved' },
+      data: { status: 'approved', idempotencyKey },
     });
+
+    // Адрес вывода: с заявки или с профиля.
+    const toAddress = request.toAddress || user.walletAddress;
+    if (!toAddress) {
+      this.logger.error(
+        `Withdrawal ${requestId} has no wallet address to payout to`,
+      );
+      await this.prisma.withdrawalRequest.update({
+        where: { id: requestId },
+        data: {
+          payoutStatus: 'FAILED',
+          payoutError: 'No wallet address',
+        },
+      });
+      throw new Error('No wallet address for payout');
+    }
+
+    // Сумма в ₽ → сырые атомарные единицы USDT (18 decimals).
+    // Условно 1 ₽ = 1 USDT.
+    const amountRaw = String(Math.round(request.amount * 1e18));
+
+    try {
+      const result = await this.paymodService.payout({
+        idempotency_key: idempotencyKey,
+        client_ref: `mp-withdrawal-${request.id}`,
+        to_address: toAddress,
+        amount: amountRaw,
+        token: 'USDT',
+        chain: 'bsc',
+      });
+
+      this.logger.log(
+        `Withdrawal ${request.id} payout submitted: tx=${result.tx_hash} status=${result.status}`,
+      );
+
+      return this.prisma.withdrawalRequest.update({
+        where: { id: requestId },
+        data: {
+          payoutTxHash: result.tx_hash ?? undefined,
+          payoutStatus: result.status?.toLowerCase() === 'failed' ? 'FAILED' : 'SUBMITTED',
+          payoutError: result.error ?? null,
+        },
+      });
+    } catch (err: any) {
+      // Выплата не удалась — статус заявки остаётся approved (деньги списаны).
+      this.logger.error(
+        `Withdrawal ${requestId} payout failed: ${err.message}`,
+      );
+      await this.prisma.withdrawalRequest.update({
+        where: { id: requestId },
+        data: {
+          payoutStatus: 'FAILED',
+          payoutError: err.message || 'payout error',
+        },
+      });
+      throw err;
+    }
   }
 
   async rejectWithdrawal(requestId: string) {
