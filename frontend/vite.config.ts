@@ -26,6 +26,9 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    target: 'es2017',
+  },
   server: {
     port: 5173,
     proxy: {
@@ -44,7 +47,6 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-    // Разрешаем любые поддомены туннелей
     allowedHosts: ['.ngrok-free.app', '.run.pinggy-free.link', '.trycloudflare.com'],
   },
 });
