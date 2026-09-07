@@ -72,9 +72,10 @@ export class PostsController {
     });
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  async findById(@Param('id') id: string) {
-    return this.postsService.findById(id);
+  async findById(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    return this.postsService.findById(id, req.user?.userId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

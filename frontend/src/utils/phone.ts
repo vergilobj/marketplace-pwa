@@ -4,6 +4,7 @@
 export function formatPhone(raw: string): string {
   const d = digits(raw);
   if (d.length === 0) return '';
+  if (d === '7') return '7';
   // ведущий 8 → 7
   const norm = d.startsWith('8') && d.length === 11 ? '7' + d.slice(1) : d;
   const body = norm.startsWith('7') ? norm.slice(1) : norm;
@@ -17,10 +18,10 @@ export function formatPhone(raw: string): string {
 /** Живой ввод: оставляет только цифры и накладывает маску по мере набора. */
 export function maskPhoneInput(v: string): string {
   let d = digits(v);
-  // если юзер стирает +7 (8) — трактуем как 7
+  if (d === '') return '';
+  if (d === '7') return '7';
   if (d.startsWith('8') && d.length <= 11) d = '7' + d.slice(1);
   if (!d.startsWith('7') && d.length > 0 && d.length <= 10) d = '7' + d;
-  // максимум 11 цифр (7 + 10)
   d = d.slice(0, 11);
   return formatPhone(d);
 }

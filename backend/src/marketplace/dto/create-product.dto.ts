@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsArray,
   MaxLength,
+  IsBoolean,
 } from 'class-validator';
 
 export class CreateProductDto {
@@ -27,4 +28,8 @@ export class CreateProductDto {
   @IsArray()
   @IsString({ each: true })
   media?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  isAd?: boolean;
 }

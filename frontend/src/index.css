@@ -3,344 +3,179 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ============================================================
-   agentbox.click — чистая дизайн-система
-   Тёмный терминал/бокс, лайм-сигнал, видимые бордеры.
-   Никаких SparkEra-розового, Claude-светлого, градиентов pink/lilac/blue.
+   Базар — Telegram-стиль
+   Плоские поверхности, голубой акцент #2AABEE,
+   разделители вместо теней, без объёмных карточек.
    ============================================================ */
 
 @theme {
-  /* === АКЦЕНТЫ: ремап Tailwind-утилит на палитру agentbox === */
-  /* indigo → лайм (primary/CTA) */
-  --color-indigo-300: #818cf8;
-  --color-indigo-400: #6366f1;
-  --color-indigo-500: #6366f1;
-  --color-indigo-600: #4f46e5;
-  --color-indigo-700: #4338ca;
+  --color-emerald-400: #86efac;
+  --color-emerald-400: #86efac;
+  --color-green-500: #22c55e;
+  --color-green-600: #16a34a;
+  --color-green-700: #15803d;
 
-  /* blue → электрик (вторичный) */
-  --color-blue-300: #7dd3fc;
-  --color-blue-400: #38bdf8;
-  --color-blue-500: #38bdf8;
-  --color-blue-600: #0ea5e9;
-  --color-blue-700: #0284c7;
+  --color-emerald-400: #86efac;
+  --color-green-500: #22c55e;
+  --color-green-600: #16a34a;
 
-  /* purple → фиолет (третичный) */
-  --color-purple-300: #a78bfa;
-  --color-purple-400: #8b5cf6;
-  --color-purple-500: #8b5cf6;
-  --color-purple-600: #7c3aed;
-  --color-purple-700: #6d28d9;
+  --color-emerald-400: #9b7ee6;
+  --color-green-500: #8a6fd8;
 
-  /* === ШРИФТЫ: строгий гротеск + моноширинные метки === */
-  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-heading: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Fira Code', monospace;
 
-  /* === РАДИУСЫ: щедрые, но не капсулы повсюду === */
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 18px;
-  --radius-xl: 22px;
-  --radius-2xl: 22px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 14px;
 }
 
-/* ============================================================
-   Токены темы — ТЁМНАЯ ПО УМОЛЧАНИЮ
-   ============================================================ */
 :root {
-  /* Палитра agentbox */
-  --night: #0b0e0d;
-  --night-2: #131713;
-  --night-3: #141914;
-  --paper: #fbfbf8;
-  --paper-2: #f4f3ee;
-  --muted: #6f766f;
-  --signal: #6366f1;
-  --signal-ink: #0b0e0d;   /* тёмный текст на лайме */
-  --electric: #38bdf8;
-  --violet: #8b5cf6;
+  /* Telegram тёмная тема */
+  --bg: #0d1512;
+  --bg-2: #111d18;
+  --bg-3: #17251f;
+  --card: #111d18;
+  --card-2: #17251f;
+  --ink: #ffffff;
+  --ink-2: #d9d9d9;
+  --muted: #aaaaaa;
+  --faint: #777777;
+  --accent: #22c55e;
+  --accent-soft: #86efac;
 
-  /* Семантические алиасы */
-  --bg: var(--night);
-  --bg-alt: var(--night-2);
-  --bg-tint: var(--night-3);
-  --card: var(--night-2);
-  --ink: var(--paper);
-  --ink-soft: var(--paper-2);
-  --muted-fg: var(--muted);
-  --faint: #4a514a;
+  --line: #2f2f2f;
+  --line-strong: #3a3a3a;
 
-  /* Бордеры — ВИДИМЫЕ, нейтральные */
-  --line: rgba(251, 251, 248, 0.08);
-  --line-strong: rgba(251, 251, 248, 0.14);
+  --shadow-xs: none;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.3);
 
-  /* Тайлвиндовые токены цветов */
-  --color-bg: var(--night);
-  --color-surface: var(--night-2);
-  --color-card: var(--night-3);
-  --color-border: rgba(251, 251, 248, 0.1);
-  --color-text: var(--paper);
+  --color-bg: var(--bg);
+  --color-surface: var(--bg-2);
+  --color-card: var(--card);
+  --color-border: var(--line);
+  --color-text: var(--ink);
   --color-muted: var(--muted);
-  --color-faint: #4a514a;
-  --color-accent: var(--signal);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
 
-  /* Фон — матовый чёрный, теплый, без цветных градиентов */
-  --bg-dark-gradient:
-    linear-gradient(160deg, #0b0e0d 0%, #0d100f 55%, #0a0d0c 100%);
-  --bg-glow: var(--bg-dark-gradient);
-
-  /* Радиусы */
-  --r-sm: 10px;
-  --r-md: 14px;
-  --r-lg: 18px;
-  --r-xl: 22px;
-  --r-full: 999px;
-
-  /* Тени — НЕЙТРАЛЬНЫЕ, мягкие, без цветного свечения */
-  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.55);
-  --shadow-signal: 0 8px 28px rgba(99, 102, 241, 0.16);
-  --shadow-electric: 0 8px 28px rgba(56, 189, 248, 0.14);
-  --shadow-violet: 0 8px 28px rgba(139, 92, 246, 0.14);
-
-  --ease: cubic-bezier(.22, .61, .36, 1);
+  --ease: cubic-bezier(0.2, 0.6, 0.3, 1);
 }
 
-/* ============================================================
-   Base
-   ============================================================ */
 @layer base {
   html, body, #root { min-height: 100%; }
 
   body {
-    background: var(--bg-glow);
-    background-attachment: fixed;
+    background: var(--bg);
     color: var(--color-text);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
     color-scheme: dark;
-    transition: background .3s var(--ease), color .3s var(--ease);
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
-  /* Глобально ВИДИМЫЕ бордеры (утилиты border-* перекрывают это) */
-  *, ::before, ::after {
-    border-color: rgba(251, 251, 248, 0.1);
-  }
-
-  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    background: rgba(251, 251, 248, 0.16);
-    border-radius: 10px;
-  }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(251, 251, 248, 0.28); }
+  ::-webkit-scrollbar-thumb { background: #444; border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: #555; }
 
-  ::selection { background: rgba(99, 102, 241, 0.28); color: var(--paper); }
+  ::selection { background: rgba(52, 211, 153, 0.4); color: #fff; }
+
+  input::placeholder, textarea::placeholder { color: var(--faint); opacity: 1; }
 }
 
-/* ============================================================
-   Компонентные утилиты — тёмные, с видимыми бордерами
-   ============================================================ */
 @layer utilities {
-  /* Стеклянная панель — тёмное матовое стекло */
-  .glass,
-  .glass-panel {
-    background: rgba(19, 23, 19, 0.78);
-    backdrop-filter: blur(20px) saturate(100%);
-    -webkit-backdrop-filter: blur(20px) saturate(100%);
-    border: 1px solid rgba(251, 251, 248, 0.1);
+  .glass, .glass-panel {
+    background: var(--bg-2);
+    border: none;
   }
-
-  /* Плотное стекло — модалки, вложенные панели */
   .glass-strong {
-    background: rgba(19, 23, 19, 0.94);
-    backdrop-filter: blur(32px) saturate(100%);
-    -webkit-backdrop-filter: blur(32px) saturate(100%);
-    border: 1px solid rgba(251, 251, 248, 0.14);
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--line);
   }
 
-  /* Карточка — тёмная с видимой обводкой и мягкой нейтральной тенью */
   .glass-card {
-    background: var(--night-2);
-    border: 1px solid rgba(251, 251, 248, 0.1);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow);
-    transition: transform .35s var(--ease), box-shadow .35s var(--ease), border-color .35s var(--ease);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: none;
+    transition: background 0.15s var(--ease);
   }
-  .glass-card:hover {
-    border-color: rgba(251, 251, 248, 0.2);
-    transform: translateY(-2px);
-    box-shadow: 0 14px 42px rgba(0, 0, 0, 0.6);
-  }
+  .glass-card:hover { background: var(--card-2); }
 
-  /* Акцентный текст — лайм без градиентов */
-  .text-gradient {
-    color: var(--signal);
-  }
+  .text-gradient { color: var(--accent); }
+  .spark-surface { background: rgba(20, 184, 166, 0.1); border: 1px solid rgba(42, 171, 238, 0.25); }
 
-  /* Акцентная поверхность — лаймовая */
-  .spark-surface {
-    background: rgba(99, 102, 241, 0.06);
-    border: 1px solid rgba(99, 102, 241, 0.2);
-  }
-
-  /* ===== Кнопки ===== */
   .btn-capsule {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 10px 20px;
-    border-radius: var(--r-md);
-    font-family: var(--font-sans);
-    font-weight: 600;
+    padding: 9px 18px;
+    border-radius: var(--radius-md);
+    font-weight: 500;
     font-size: 14px;
-    transition: all .25s var(--ease);
+    transition: background 0.15s var(--ease), color 0.15s var(--ease);
     cursor: pointer;
     white-space: nowrap;
+    border: none;
   }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-soft); }
+  .btn-ghost, .btn-secondary { background: var(--bg-3); color: var(--color-text); }
+  .btn-ghost:hover, .btn-secondary:hover { background: #3a3a3a; }
 
-  /* Основная кнопка — лайм с тёмным текстом */
-  .btn-primary {
-    background: var(--signal);
-    color: var(--signal-ink);
-    box-shadow: var(--shadow-signal);
-  }
-  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(99, 102, 241, 0.24); }
-  .btn-primary:active { transform: translateY(0); }
-
-  /* Призрачная кнопка — тёмная нейтральная */
-  .btn-ghost,
-  .btn-secondary {
-    background: rgba(251, 251, 248, 0.04);
-    border: 1px solid rgba(251, 251, 248, 0.14);
-    color: var(--color-text);
-  }
-  .btn-ghost:hover,
-  .btn-secondary:hover {
-    border-color: rgba(99, 102, 241, 0.5);
-    color: var(--signal);
-  }
-
-  /* ===== Инпуты ===== */
   .input-glass {
     width: 100%;
-    padding: 11px 16px;
-    border-radius: var(--r-sm);
-    background: rgba(251, 251, 248, 0.04);
-    border: 1px solid var(--color-border);
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: var(--bg-3);
+    border: none;
     color: var(--color-text);
     font-size: 14px;
     outline: none;
-    transition: all .25s var(--ease);
+    transition: box-shadow 0.15s var(--ease);
   }
-  .input-glass::placeholder { color: var(--faint); }
-  .input-glass:focus {
-    border-color: rgba(99, 102, 241, 0.55);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14);
-  }
-
-  /* ===== Анимации ===== */
-  @keyframes springUp {
-    0% { opacity: 0; transform: translateY(6px); }
-    100% { opacity: 1; transform: translateY(0); }
-  }
-  .animate-spring-up { animation: springUp .4s ease-out forwards; }
+  .input-glass:focus { box-shadow: 0 0 0 2px var(--accent); }
 
   @keyframes springIn {
-    0% { opacity: 0; transform: scale(.94); }
-    60% { opacity: 1; transform: scale(1.02); }
+    0% { opacity: 0; transform: scale(0.98); }
     100% { opacity: 1; transform: scale(1); }
   }
-  .animate-spring-in { animation: springIn .4s cubic-bezier(.22,.61,.36,1) forwards; }
-
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-6px); }
-  }
-  .animate-float { animation: float 4s ease-in-out infinite; }
+  .animate-spring-in { animation: springIn 0.2s var(--ease) forwards; }
 }
 
-/* ============================================================
-   Связность Tailwind-утилит на тёмной agentbox-теме
-   ============================================================ */
+.bg-emerald-400, .bg-green-500, .bg-green-600 { background: var(--accent) !important; color: #fff !important; }
+.text-emerald-400, .text-green-500, .text-green-500, .text-green-600 { color: var(--accent) !important; }
+.border-l-green-500 { border-left-color: var(--accent) !important; }
 
-/* Белый текст — оставляем белым (тёмная тема по умолчанию) */
+[class*="bg-black/"] { color: #fff !important; }
 
-/* Лаймовые акцентные поверхности — тёмный текст (CTAs, бейджи) */
-.bg-indigo-400,
-.bg-indigo-500,
-.bg-indigo-600 { color: #0b0e0d !important; }
-.text-indigo-400 { color: var(--signal) !important; }
-.text-indigo-500 { color: var(--signal) !important; }
-.text-blue-400,
-.text-blue-500,
-.text-blue-600 { color: var(--electric) !important; }
-
-/* Тёмные плоские фоны — остаются тёмными agentbox */
-.bg-\[\#1a1a24\],
-.bg-\[\#0a0a0f\],
-.bg-\[\#111118\],
-.bg-\[\#0f0f16\],
-.bg-\[\#0b0e0d\] { background-color: var(--night); }
-.bg-\[\#111115\],
-.bg-\[\#1e1e2a\],
-.bg-\[\#22222d\] { background-color: var(--night-2); }
-
-/* Тёмные оверлеи поверх картинок остаются тёмными, текст белым */
-[class*="bg-black/"] { color: #ffffff !important; }
-
-/* Placeholder'ы */
-input::placeholder,
-textarea::placeholder {
-  color: #4a514a;
-  opacity: 1;
-}
-
-/* Акцентная граница слева (уведомления) — лаймовая */
-.border-l-indigo-500 { border-left-color: var(--signal) !important; }
-
-/* ============================================================
-   МОБИЛЬНЫЕ ОТСТУПЫ
-   ============================================================ */
 @media (max-width: 640px) {
-  main.max-w-7xl {
-    padding-left: 8px !important;
-    padding-right: 8px !important;
+  main.max-w-7xl { padding-left: 8px !important; padding-right: 8px !important; }
+  .max-w-6xl, .max-w-5xl, .max-w-4xl, .max-w-3xl, .max-w-2xl {
+    padding-left: 8px !important; padding-right: 8px !important;
   }
-
-  .max-w-6xl,
-  .max-w-5xl,
-  .max-w-4xl,
-  .max-w-3xl,
-  .max-w-2xl {
-    padding-left: 12px !important;
-    padding-right: 12px !important;
-  }
-
-  .p-8 { padding-left: 16px; padding-right: 16px; }
-  .p-10 { padding-left: 16px; padding-right: 16px; }
 }
 
-/* ===== Reduced motion ===== */
-@media (prefers-reduced-motion: reduce) {
-  .animate-spring-up, .animate-spring-in { animation: none; opacity: 1; transform: none; }
-  .animate-float { animation: none; }
-}
-
-/* ===== iOS: убрать авто-зум при фокусе ===== */
 @media (max-width: 767px) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
-  textarea,
-  select {
-    font-size: 16px !important;
-  }
+  textarea, select { font-size: 16px !important; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spring-in { animation: none; opacity: 1; transform: none; }
+}
+
+/* Скрыть скроллбар (горизонтальные витрины) */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

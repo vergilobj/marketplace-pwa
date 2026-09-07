@@ -3,6 +3,7 @@ import { Trash2, ShoppingBag, Heart, Minus, Plus, ArrowLeft, Sparkles } from 'lu
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { formatPrice } from "../utils/format";
+import { resolveMedia } from '../utils/media';
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -13,44 +14,77 @@ export default function CartPage() {
 
   if (cart.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-24 text-center">
-        <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-center"><ShoppingBag size={32} className="text-white/35" /></div>
-        <h1 className="text-2xl font-bold text-[var(--color-text)] mb-2">Корзина пуста</h1>
-        <p className="text-white/60 mb-6">Добавьте товары из каталога</p>
-        <Link to="/" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-[var(--color-text)] font-semibold text-sm hover:from-indigo-400 transition-all shadow-lg shadow-indigo-500/25"><ShoppingBag size={16} /> К покупкам</Link>
+      <div className="relative min-h-screen overflow-x-hidden">
+        <div className="fixed inset-0 pointer-events-none" style={{
+          background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.10) 0%, transparent 60%)'
+        }} />
+        <div className="relative max-w-xl mx-auto px-6 py-24 text-center">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[var(--color-surface)] flex items-center justify-center">
+            <ShoppingBag size={32} className="text-[var(--color-faint)]" />
+          </div>
+          <h1 className="text-4xl font-extrabold tracking-tight text-[var(--color-text)] mb-2">Пусто</h1>
+          <p className="text-[var(--color-muted)] mb-8">Как в твоём кошельке до зарплаты.</p>
+          <Link to="/" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#22c55e] text-[#0d1512] font-bold text-sm hover:bg-[#16a34a] transition-colors shadow-[0_8px_32px_-8px_rgba(34,197,94,0.5)]">
+            <ShoppingBag size={16} /> На базар
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8">
-      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-white/50 hover:text-[var(--color-text)] mb-6 transition-colors text-sm"><ArrowLeft size={16} /> Назад</button>
-      <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">Корзина ({cart.length})</h1>
-      
-      <div className="space-y-3 mb-8">
-        <AnimatePresence>
-          {cart.map((item: any) => (
-            <motion.div key={item.productId} exit={{ opacity: 0, x: 20 }} className="flex items-center gap-4 p-4 glass-card rounded-2xl">
-              <div className="w-16 h-16 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] shrink-0" />
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-[var(--color-text)] truncate">{item.title}</h3>
-                <p className="text-sm text-indigo-400 font-bold">{formatPrice(item.price * item.quantity)}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => updateQuantity(item.productId, -1)} className="p-1.5 rounded-lg bg-white/[0.04] text-white/60 hover:text-[var(--color-text)] hover:bg-white/[0.08] transition-all"><Minus size={14} /></button>
-                <span className="text-sm font-semibold text-[var(--color-text)] w-6 text-center">{item.quantity}</span>
-                <button onClick={() => updateQuantity(item.productId, 1)} className="p-1.5 rounded-lg bg-white/[0.04] text-white/60 hover:text-[var(--color-text)] hover:bg-white/[0.08] transition-all"><Plus size={14} /></button>
-              </div>
-              <button onClick={() => moveToFavorites(item.productId)} className="p-2 rounded-lg text-white/50 hover:text-rose-400 hover:bg-rose-400/5 transition-all"><Heart size={16} /></button>
-              <button onClick={() => removeFromCart(item.productId)} className="p-2 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-400/5 transition-all"><Trash2 size={16} /></button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+    <div className="relative min-h-screen overflow-x-hidden">
+      <div className="fixed inset-0 pointer-events-none" style={{
+        background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.10) 0%, transparent 60%)'
+      }} />
 
-      <div className="glass-card rounded-2xl p-5">
-        <div className="flex justify-between items-center mb-4"><span className="text-white/50 text-sm">Итого</span><span className="text-xl font-bold text-white">{formatted}</span></div>
-        <button onClick={() => navigate('/checkout')} className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-[var(--color-text)] font-semibold text-sm hover:from-indigo-400 transition-all shadow-lg shadow-indigo-500/25"><Sparkles size={16} /> Оформить заказ</button>
+      <div className="relative max-w-2xl mx-auto px-4 sm:px-6 pt-10 pb-32">
+        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
+          <ArrowLeft size={16} /> Назад
+        </button>
+
+        <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Корзина</h1>
+        <div className="mb-6" />
+
+        <div className="space-y-3 mb-8">
+          <AnimatePresence>
+            {cart.map((item: any) => (
+              <motion.div
+                key={item.productId}
+                layout
+                exit={{ opacity: 0, x: 24 }}
+                className="flex items-center gap-4 p-3.5 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)]"
+              >
+                <div className="w-16 h-16 rounded-xl overflow-hidden bg-[var(--bg-3)] shrink-0">
+                  {item.media?.[0]
+                    ? <img src={resolveMedia(item.media[0])} alt={item.title} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center"><ShoppingBag size={20} className="text-[var(--color-faint)]" /></div>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-[var(--color-text)] truncate">{item.title}</div>
+                  <div className="text-sm font-extrabold text-[#22c55e]">{formatPrice(item.price * item.quantity)}</div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => updateQuantity(item.productId, -1)} className="w-8 h-8 rounded-lg border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] flex items-center justify-center transition-all"><Minus size={13} /></button>
+                  <span className="text-sm font-bold text-[var(--color-text)] min-w-[20px] text-center">{item.quantity}</span>
+                  <button onClick={() => updateQuantity(item.productId, 1)} className="w-8 h-8 rounded-lg border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] flex items-center justify-center transition-all"><Plus size={13} /></button>
+                </div>
+                <button onClick={() => moveToFavorites(item.productId)} className="p-2 rounded-lg text-[var(--color-muted)] hover:text-[#22c55e] hover:bg-[#22c55e]/10 transition-all" title="В избранное"><Heart size={16} /></button>
+                <button onClick={() => removeFromCart(item.productId)} className="p-2 rounded-lg text-[var(--color-muted)] hover:text-red-400 hover:bg-red-400/10 transition-all" title="Удалить"><Trash2 size={16} /></button>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+
+        <div className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-5">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-[var(--color-muted)] text-sm">Итого</span>
+            <span className="text-2xl font-extrabold text-[var(--color-text)]">{formatted}</span>
+          </div>
+          <button onClick={() => navigate('/checkout')} className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-[#22c55e] text-[#0d1512] font-extrabold text-sm hover:bg-[#16a34a] transition-colors shadow-[0_8px_32px_-8px_rgba(34,197,94,0.5)]">
+            <Sparkles size={16} /> Оформить заказ
+          </button>
+        </div>
       </div>
     </div>
   );

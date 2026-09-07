@@ -6,6 +6,7 @@ interface CartItem {
   title: string;
   price: number;
   quantity: number;
+  media?: string[];
 }
 
 interface AppContextType {
@@ -45,7 +46,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         );
       }
       toast.success('Добавлено в корзину');
-      return [...prev, { productId: product.id, title: product.title, price: product.price, quantity: 1 }];
+      return [...prev, { productId: product.id, title: product.title, price: product.price, quantity: 1, media: product.media }];
     });
   };
 

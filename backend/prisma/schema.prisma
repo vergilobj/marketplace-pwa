@@ -70,6 +70,7 @@ model Product {
   sellerId    String
   seller      User     @relation(fields: [sellerId], references: [id])
   isActive    Boolean  @default(true)
+  isAd        Boolean  @default(false)
   createdAt   DateTime @default(now())
   orders      Order[]
 }

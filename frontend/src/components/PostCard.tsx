@@ -1,14 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, MoreHorizontal, Megaphone, ExternalLink, Trash2, Edit3 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-
-const GS = { background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 50%, #38bdf8 100%)' } as const;
 
 interface Props { post: any; onDelete?: (id: string) => void; onEdit?: (post: any) => void; }
 
@@ -32,20 +29,19 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
   const time = post.createdAt ? format(new Date(post.createdAt), 'd MMM, HH:mm', { locale: ru }) : '';
 
   return (
-    <motion.div whileHover={{ y: -4 }} onClick={() => navigate(`/posts/${post.id}`)}
-      className="group glass-card overflow-hidden cursor-pointer p-0">
+    <div onClick={() => navigate(`/posts/${post.id}`)}
+      className="group overflow-hidden cursor-pointer rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] hover:border-[#22c55e] transition-colors">
 
-      {/* Header */}
-      <div className="p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div style={GS} className="w-9 h-9 rounded-full text-[#0b0e0d] text-[11px] font-bold flex items-center justify-center shrink-0 shadow-md">
+      <div className="p-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-[#22c55e] text-white text-[11px] font-semibold flex items-center justify-center shrink-0">
             {(post.author?.name || post.adOwner?.name || 'A')[0].toUpperCase()}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-[var(--color-text)]">{post.author?.name || post.adOwner?.name || 'Аноним'}</span>
+              <span className="text-sm font-medium text-[var(--color-text)]">{post.author?.name || post.adOwner?.name || 'Аноним'}</span>
               {post.isAd && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[rgba(255,213,102,0.12)] text-amber-300 text-[10px] font-semibold">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[rgba(255,213,102,0.12)] text-amber-300 text-[10px]">
                   <Megaphone size={10} /> Реклама
                 </span>
               )}
@@ -55,46 +51,44 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
         </div>
         {isAdmin && (
           <div className="relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setMenu(!menu)} className="p-1.5 rounded-full hover:bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
+            <button onClick={() => setMenu(!menu)} className="p-1.5 rounded-md hover:bg-[var(--bg-3)] text-[var(--color-muted)] transition-colors">
               <MoreHorizontal size={16} />
             </button>
             {menu && (
-              <div className="absolute right-0 top-full mt-2 w-32 glass-strong rounded-xl shadow-2xl py-1 z-10 border border-[rgba(255,255,255,0.08)]">
-                {onEdit && <button onClick={() => { onEdit(post); setMenu(false); }} className="flex items-center gap-2 px-3 py-2 text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.05)] w-full"><Edit3 size={12} /> Ред.</button>}
-                {onDelete && <button onClick={() => { onDelete(post.id); setMenu(false); }} className="flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-[rgba(255,255,255,0.05)] w-full"><Trash2 size={12} /> Удалить</button>}
+              <div className="absolute right-0 top-full mt-1.5 w-32 bg-[var(--card-2)] rounded-lg py-1 z-10 border border-[var(--color-border)]">
+                {onEdit && <button onClick={() => { onEdit(post); setMenu(false); }} className="flex items-center gap-2 px-3 py-2 text-xs text-[var(--color-muted)] hover:bg-[var(--bg-3)] w-full"><Edit3 size={12} /> Ред.</button>}
+                {onDelete && <button onClick={() => { onDelete(post.id); setMenu(false); }} className="flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-[var(--bg-3)] w-full"><Trash2 size={12} /> Удалить</button>}
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Content */}
-      <div className="px-4 pb-4">
-        <h2 className="text-base font-bold mb-2 line-clamp-2 text-[var(--color-text)] group-hover:text-[#6366f1] transition-colors">{post.title}</h2>
-        {post.content && <p className="text-sm text-[var(--color-muted)] line-clamp-3 mb-3 leading-relaxed">{post.content}</p>}
+      <div className="px-3.5 pb-3.5">
+        <h2 className="text-[15px] font-semibold mb-1.5 line-clamp-2 text-[var(--color-text)]">{post.title}</h2>
+        {post.content && <p className="text-[13px] text-[var(--color-muted)] line-clamp-3 mb-2.5 leading-relaxed">{post.content}</p>}
         {media.length > 0 && (
-          <div className="rounded-xl overflow-hidden mb-3">
-            <img src={media[0]} alt={post.title} className="w-full h-52 object-cover group-hover:scale-[1.03] transition-transform duration-500" loading="lazy" />
+          <div className="rounded-lg overflow-hidden mb-2.5">
+            <img src={media[0]} alt={post.title} className="w-full h-48 object-cover" loading="lazy" />
           </div>
         )}
         {post.link && (
-          <a href={post.link} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-[#6366f1] hover:text-[#4f46e5] font-medium">
+          <a href={post.link} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-[#22c55e] font-medium">
             <ExternalLink size={12} /> Ссылка
           </a>
         )}
       </div>
 
-      {/* Actions */}
-      <div className="px-4 pb-4 flex items-center gap-4">
-        <button onClick={handleLike} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${liked ? 'text-[#6366f1] bg-[rgba(201,242,103,0.1)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.04)]'}`}>
+      <div className="px-3.5 pb-3 flex items-center gap-3 border-t border-[var(--color-border)] pt-2.5">
+        <button onClick={handleLike} className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-colors ${liked ? 'text-[#22c55e]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}>
           <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
           {likes > 0 && likes}
         </button>
-        <button onClick={e => { e.stopPropagation(); navigate(`/posts/${post.id}`); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.04)] transition-all">
+        <button onClick={e => { e.stopPropagation(); navigate(`/posts/${post.id}`); }} className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
           <MessageCircle size={14} />
           {post.commentCount > 0 && post.commentCount}
         </button>
       </div>
-    </motion.div>
+    </div>
   );
 }

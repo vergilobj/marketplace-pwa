@@ -51,6 +51,7 @@ export class ProductsService {
         orderBy.push({ orders: { _count: 'desc' } });
         break;
       default:
+        orderBy.push({ isAd: 'desc' });
         orderBy.push({ createdAt: 'desc' });
         break;
     }

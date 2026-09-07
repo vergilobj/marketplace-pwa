@@ -1,26 +1,18 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getFeed } from '../api/posts';
 import { getProducts } from '../api/products';
-import PostCard from '../components/PostCard';
-import ProductCard from '../components/ProductCard';
-import { Search, X, Sparkles, FileText, Grid3X3, Megaphone, Clock, Flame, TrendingUp, List, ArrowRight, Zap, Loader2 } from 'lucide-react';
+import { Search, X, Loader2, Heart, MessageCircle, ShoppingCart, Plus, Minus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useApp } from '../context/AppContext';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-
-const GS = { background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 50%, #38bdf8 100%)' } as const;
+import { formatPrice } from '../utils/format';
+import { resolveMedia } from '../utils/media';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 type TabType = 'all' | 'posts' | 'products' | 'ads';
-
-const sortOptions: { value: SortType; label: string; icon: React.ReactNode }[] = [
-  { value: 'newest', label: 'Новые', icon: <Clock size={13} /> },
-  { value: 'popular', label: 'Популярные', icon: <Flame size={13} /> },
-  { value: 'price_asc', label: 'Дешевле', icon: <TrendingUp size={13} /> },
-  { value: 'price_desc', label: 'Дороже', icon: <TrendingUp size={13} className="rotate-180" /> },
-];
 
 const PAGE_SIZE = 20;
 
@@ -28,33 +20,76 @@ export default function FeedPage() {
   const navigate = useNavigate();
   const [sp] = useSearchParams();
   const { isAdmin, isSeller, isAuthenticated } = useAuth();
+  const { cart, addToCart, updateQuantity } = useApp();
   const [posts, setPosts] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [totalPosts, setTotalPosts] = useState(0);
+  const [totalProducts, setTotalProducts] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [sort, setSort] = useState<SortType>('newest');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [search, setSearch] = useState(() => sp.get('search') || '');
 
-  // Pagination state
   const [postsPage, setPostsPage] = useState(1);
   const [productsPage, setProductsPage] = useState(1);
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
   const loaderRef = useRef<HTMLDivElement>(null);
 
-  // Reset on sort/tab change
   useEffect(() => {
-    setPosts([]);
-    setProducts([]);
-    setPostsPage(1);
-    setProductsPage(1);
-    setHasMorePosts(true);
-    setHasMoreProducts(true);
-    setLoading(true);
+    // Восстанавливаем закэшированные данные мгновенно, без «быстрой прогрузки»
+    const cached = sessionStorage.getItem('feed_cache');
+    let restored = false;
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed.posts?.length || parsed.products?.length) {
+          setPosts(parsed.posts || []);
+          setProducts(parsed.products || []);
+          setTotalPosts(parsed.totalPosts || parsed.posts?.length || 0);
+          setTotalProducts(parsed.totalProducts || parsed.products?.length || 0);
+          setPostsPage(parsed.postsPage || 2);
+          setProductsPage(parsed.productsPage || 2);
+          setHasMorePosts(parsed.hasMorePosts ?? true);
+          setHasMoreProducts(parsed.hasMoreProducts ?? true);
+          setLoading(false);
+          restored = true;
+        }
+      } catch {}
+    }
+    if (!restored) {
+      setPosts([]);
+      setProducts([]);
+      setPostsPage(1);
+      setProductsPage(1);
+      setHasMorePosts(true);
+      setHasMoreProducts(true);
+      setLoading(true);
+    }
     loadInitial();
   }, [sort, activeTab]);
+
+  // Восстановление скролла после рендера
+  useEffect(() => {
+    const savedScroll = sessionStorage.getItem('feed_scroll');
+    if (savedScroll && !loading && posts.length > 0) {
+      requestAnimationFrame(() => {
+        window.scrollTo(0, parseInt(savedScroll, 10));
+        sessionStorage.removeItem('feed_scroll');
+      });
+    }
+  }, [loading, posts.length]);
+
+  const saveScrollAndNavigate = (to: string) => {
+    sessionStorage.setItem('feed_scroll', String(window.scrollY));
+    // Кэшируем текущие данные, чтобы при возврате не было «быстрой прогрузки»
+    sessionStorage.setItem('feed_cache', JSON.stringify({
+      posts, products, totalPosts, totalProducts,
+      postsPage, productsPage, hasMorePosts, hasMoreProducts,
+    }));
+    navigate(to);
+  };
 
   const loadInitial = async () => {
     try {
@@ -64,6 +99,8 @@ export default function FeedPage() {
       ]);
       setPosts(postRes.items || []);
       setProducts(prodRes.items || []);
+      setTotalPosts(postRes.total || postRes.items?.length || 0);
+      setTotalProducts(prodRes.total || prodRes.items?.length || 0);
       setHasMorePosts(postRes.page < postRes.pages);
       setHasMoreProducts(prodRes.page < prodRes.pages);
       setPostsPage(2);
@@ -81,7 +118,6 @@ export default function FeedPage() {
     try {
       const isPostTab = activeTab === 'posts' || activeTab === 'ads';
       const isProductTab = activeTab === 'products';
-
       if ((isPostTab || activeTab === 'all') && hasMorePosts) {
         const res = await getFeed({ page: postsPage, limit: PAGE_SIZE, sort });
         setPosts(prev => [...prev, ...(res.items || [])]);
@@ -101,7 +137,6 @@ export default function FeedPage() {
     }
   }, [loadingMore, activeTab, sort, postsPage, productsPage, hasMorePosts, hasMoreProducts]);
 
-  // Intersection Observer
   useEffect(() => {
     const el = loaderRef.current;
     if (!el) return;
@@ -123,113 +158,306 @@ export default function FeedPage() {
     try { await api.delete('/posts/' + id); setPosts(p => p.filter(x => x.id !== id)); toast.success('Удалён'); } catch { toast.error('Ошибка'); }
   };
 
-  // Client-side search filter (fast, no API call)
+  const togglePostLike = async (post: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const liked = post.likedByMe || false;
+    const likes = post.likeCount || 0;
+    setPosts(prev => prev.map(p => p.id === post.id ? { ...p, likedByMe: !liked, likeCount: likes + (liked ? -1 : 1) } : p));
+    try {
+      if (liked) { await api.delete(`/social/${post.id}/like`); }
+      else { await api.post(`/social/${post.id}/like`); }
+    } catch { toast.error('Не удалось'); }
+  };
+
   const fp = posts.filter(p => p.title?.toLowerCase().includes(search.toLowerCase()) || p.content?.toLowerCase().includes(search.toLowerCase()));
   const fpr = products.filter(p => p.title?.toLowerCase().includes(search.toLowerCase()));
-
   const ads = fp.filter(p => p.isAd);
   const regular = fp.filter(p => !p.isAd);
 
+  // Смешанная лента с живым ритмом
   const items = (() => {
-    switch (activeTab) {
-      case 'posts': return regular.map(p => ({ ...p, type: 'post' }));
-      case 'products': return fpr.map(p => ({ ...p, type: 'product' }));
-      case 'ads': return ads.map(p => ({ ...p, type: 'post' }));
-      default: return [...ads.map(p => ({ ...p, type: 'post' })), ...regular.map(p => ({ ...p, type: 'post' })), ...fpr.map(p => ({ ...p, type: 'product' }))];
+    const postsArr = regular.map(p => ({ ...p, type: 'post' as const }));
+    const prodArr = fpr.map(p => ({ ...p, type: 'product' as const }));
+    if (activeTab === 'posts') return postsArr;
+    if (activeTab === 'products') return prodArr;
+    if (activeTab === 'ads') return ads.map(p => ({ ...p, type: 'post' as const }));
+    const adsArr = ads.map(p => ({ ...p, type: 'post' as const }));
+    const mixed: any[] = [];
+    let pi = 0, ti = 0;
+    const seq = [2, 1, 3, 2, 1, 4, 2, 3, 1, 2];
+    let i = 0;
+    while (pi < postsArr.length || ti < prodArr.length) {
+      const batch = seq[i % seq.length];
+      if (i % 3 === 2) {
+        for (let k = 0; k < batch && ti < prodArr.length; k++) mixed.push(prodArr[ti++]);
+        if (pi < postsArr.length) mixed.push(postsArr[pi++]);
+      } else {
+        for (let k = 0; k < batch && pi < postsArr.length; k++) mixed.push(postsArr[pi++]);
+        if (ti < prodArr.length) mixed.push(prodArr[ti++]);
+      }
+      i++;
     }
+    return [...adsArr, ...mixed];
   })();
 
   const showLoader = activeTab === 'all' ? (hasMorePosts || hasMoreProducts) : activeTab === 'products' ? hasMoreProducts : hasMorePosts;
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10">
-      {/* Hero — градиентный фон + стекло */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-[34px] mb-10 p-6 sm:p-12"
-        style={{ background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 55%, #38bdf8 100%)' }}
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_50%,rgba(255,255,255,0.15)_0%,transparent_60%)]" />
-        <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
-        <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-purple-400/20 rounded-full blur-3xl" />
-        <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-md text-[var(--color-text)] text-sm font-medium mb-6 border border-white/20 shadow-lg"><Zap size={14} className="text-yellow-200" /> Закрытый маркетплейс</div>
-          <h1 className="text-xl sm:text-3xl lg:text-4xl font-extrabold text-[var(--color-text)] mb-3 tracking-tight leading-[1.15] drop-shadow-md">Покупайте и продавайте в надёжном сообществе</h1>
-          <p className="text-white/85 text-base max-w-lg mb-5">Закрытая площадка для проверенных участников. Товары, чат, реферальная программа — всё в одном месте.</p>
-          <div className="flex flex-wrap gap-3">
-            {isSeller && <button onClick={() => navigate('/products/new')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-slate-900 font-semibold text-sm hover:bg-white/90 transition-all shadow-xl hover:scale-[1.03]"><Sparkles size={16} /> Выставить товар</button>}
-            {isAdmin && <button onClick={() => navigate('/posts/new')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/15 backdrop-blur-md text-[var(--color-text)] font-semibold text-sm border border-white/25 hover:bg-white/25 transition-all"><FileText size={16} /> Новый пост</button>}
-            {!isAuthenticated && <button onClick={() => navigate('/register')} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-slate-900 font-semibold text-sm hover:bg-white/90 transition-all shadow-xl hover:scale-[1.03]">Присоединиться <ArrowRight size={16} /></button>}
+    <div className="relative min-h-screen overflow-x-hidden">
+      {/* Фоновое свечение — зелёное, мягкое */}
+      <div className="fixed inset-0 pointer-events-none" style={{
+        background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.14) 0%, transparent 60%), radial-gradient(ellipse 50% 35% at 85% 110%, rgba(13,148,136,0.10) 0%, transparent 60%)'
+      }} />
+
+      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-20">
+
+        {/* МАНИФЕСТ — дерзкий, с визуалом */}
+        <div className="mb-10">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-8">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-5">
+                <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
+                <span className="text-[11px] uppercase tracking-[0.3em] text-[var(--color-muted)]">только по своим</span>
+              </div>
+              <h1 className="font-extrabold tracking-tight text-[var(--color-text)] leading-[1.05] whitespace-nowrap text-[clamp(3.5rem,11vw,6.5rem)] sm:leading-[0.9] sm:whitespace-normal sm:text-[clamp(3rem,9vw,6rem)]">
+                Твой<span className="sm:hidden"> </span><br className="hidden sm:block" />
+                <span style={{ background: 'linear-gradient(90deg, #22c55e, #34d399)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>рынок.</span>
+              </h1>
+              <p className="mt-5 text-[var(--color-muted)] text-base max-w-md">
+                Закрытая площадка. Товары, канал, чат — для тех, кто внутри.
+              </p>
+
+              {/* Реальные счётчики — из данных */}
+              <div className="mt-8 flex gap-8">
+                <div>
+                  <div className="text-3xl font-extrabold text-[var(--color-text)]">{totalProducts}</div>
+                  <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mt-1">товаров</div>
+                </div>
+                <div>
+                  <div className="text-3xl font-extrabold text-[var(--color-text)]">{totalPosts}</div>
+                  <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mt-1">постов</div>
+                </div>
+                <div>
+                  <div className="text-3xl font-extrabold text-[#22c55e]">закрыто</div>
+                  <div className="text-[11px] uppercase tracking-wider text-[var(--color-muted)] mt-1">по инвайтам</div>
+                </div>
+              </div>
+
+              <div className="mt-7 flex gap-2 flex-wrap">
+                {isSeller && <button onClick={() => navigate('/products/new')} className="btn-capsule btn-primary">Выставить товар</button>}
+                {isAdmin && <button onClick={() => navigate('/posts/new')} className="btn-capsule btn-ghost">Написать в канал</button>}
+                {!isAuthenticated && <button onClick={() => navigate('/register')} className="btn-capsule btn-primary">Вступить</button>}
+              </div>
+            </div>
+
+            <div className="lg:w-96 xl:w-[420px] shrink-0 relative">
+              <img src="/manifest-cart.png" alt="Безопасный чеккаут" className="w-full h-auto" loading="eager" />
+            </div>
           </div>
         </div>
-      </motion.div>
 
-      {/* Unified Toolbar — стекло */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
-        <div className="relative flex-1 w-full">
-          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-muted)]" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по ленте..." className="w-full pl-11 pr-10 py-3 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(201,242,103,0.5)] focus:ring-4 focus:ring-[rgba(201,242,103,0.1)] transition-all" />
-          {search && <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"><X size={16} /></button>}
+        {/* ПОИСК — минималистичный */}
+        <div className="mb-8">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)]" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Искать среди своих…" className="w-full pl-10 pr-4 py-3 rounded-xl bg-[var(--color-surface)] text-[var(--color-text)] text-sm outline-none border border-[var(--color-border)] focus:border-[#22c55e] transition-colors" />
+            {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)] hover:text-[var(--color-text)]"><X size={16} /></button>}
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 p-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-full overflow-x-auto flex-nowrap max-w-full">
-          {sortOptions.map(opt => (
-            <button key={opt.value} onClick={() => setSort(opt.value)} className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all whitespace-nowrap ${sort === opt.value ? 'text-[#0b0e0d]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.06)]'}`} style={sort === opt.value ? GS : undefined}>{opt.icon}{opt.label}</button>
+
+        {/* ТАБЫ + СОРТИРОВКА */}
+        <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {[{ key: 'all', label: 'Всё' }, { key: 'posts', label: 'Канал' }, { key: 'products', label: 'Товары' }, { key: 'ads', label: 'Реклама' }].map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${activeTab === tab.key ? 'bg-[#22c55e] text-white' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}>{tab.label}</button>
           ))}
+          <div className="ml-auto flex gap-1.5">
+            {(['newest','popular','price_asc','price_desc'] as SortType[]).map(s => {
+              const labels: Record<SortType,string> = { newest:'Свежее', popular:'Хайп', price_asc:'Дешевле', price_desc:'Дороже' };
+              return <button key={s} onClick={() => setSort(s)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-colors ${sort === s ? 'text-[#22c55e] border border-[#22c55e]' : 'text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)]'}`}>{labels[s]}</button>;
+            })}
+          </div>
         </div>
-        <div className="flex items-center gap-1 p-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-full shrink-0">
-          <button onClick={() => setViewMode('grid')} className={`p-2 rounded-full transition-all ${viewMode === 'grid' ? 'bg-[rgba(255,255,255,0.08)] text-[var(--color-text)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}><Grid3X3 size={15} /></button>
-          <button onClick={() => setViewMode('list')} className={`p-2 rounded-full transition-all ${viewMode === 'list' ? 'bg-[rgba(255,255,255,0.08)] text-[var(--color-text)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}><List size={15} /></button>
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-1 -mx-1 px-1">
-        {[{ key: 'all', label: 'Всё', icon: <Sparkles size={13} /> }, { key: 'products', label: 'Товары', icon: <Grid3X3 size={13} /> }, { key: 'posts', label: 'Посты', icon: <FileText size={13} /> }, { key: 'ads', label: 'Реклама', icon: <Megaphone size={13} /> }].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.key ? 'text-[var(--color-text)] shadow-[0_8px_24px_rgba(201,242,103,0.3)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[rgba(255,255,255,0.06)]'}`} style={activeTab === tab.key ? GS : undefined}>{tab.icon}{tab.label}</button>
-        ))}
-      </div>
-
-      {/* Content */}
-      {loading ? (
-        <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5' : 'space-y-5'}>
-          {Array.from({ length: 6 }).map((_, idx) => (
-            <div key={idx} className="rounded-2xl overflow-hidden">
-              <div className="skeleton h-52 rounded-2xl mb-3" />
-              <div className="skeleton h-4 w-3/4 rounded-lg mb-2" />
-              <div className="skeleton h-3 w-1/2 rounded-lg" />
-            </div>
-          ))}
-        </div>
-      ) : items.length === 0 ? (
-        <div className="text-center py-24">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[rgba(255,255,255,0.04)] flex items-center justify-center"><Search size={24} className="text-[var(--color-faint)]" /></div>
-          <p className="text-[var(--color-muted)] text-sm">Ничего не найдено</p>
-        </div>
-      ) : (
-        <>
+        {/* ЛЕНТА */}
+        {loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, idx) => <div key={idx} className="h-16 rounded-lg bg-[var(--color-surface)] animate-pulse" />)}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="text-center py-24">
+            <div className="text-[var(--color-faint)] text-sm">Пока тихо. Здесь начнётся твой рынок.</div>
+          </div>
+        ) : (
           <motion.div
-            className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5' : 'space-y-5'}
             initial="hidden"
             animate="show"
             variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
+            className="divide-y divide-[var(--color-border)]"
           >
-            {items.map((item) => (
-              <motion.div key={item.type + '-' + item.id} variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }}>
-                {item.type === 'post' ? <PostCard post={item} onDelete={isAdmin ? delPost : undefined} /> : <ProductCard product={item} />}
-              </motion.div>
-            ))}
-          </motion.div>
+            {items.map((item) => {
+              if (item.type === 'product') {
+                const inCart = !!cart.find((i: any) => i.productId === item.id);
+                const qty = cart.find((i: any) => i.productId === item.id)?.quantity || 1;
 
-          {/* Infinite scroll loader */}
-          <div ref={loaderRef} className="py-10 flex justify-center">
-            {loadingMore && <Loader2 size={24} className="animate-spin text-[#6366f1]" />}
-            {!showLoader && !loadingMore && items.length > 0 && (
-              <p className="text-[var(--color-faint)] text-sm">Все загружены</p>
-            )}
-          </div>
-        </>
-      )}
+                // Рекламный товар — вертикальная карточка: картинка сверху, инфо + кнопка снизу
+                if (item.isAd) {
+                  return (
+                    <motion.div
+                      key={'p-' + item.id}
+                      variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+                      transition={{ duration: 0.2 }}
+                      onClick={() => saveScrollAndNavigate(`/products/${item.id}`)}
+                      className="py-4 my-3 cursor-pointer group"
+                    >
+                      <div className="rounded-2xl overflow-hidden border border-[var(--color-border)] transition-all duration-200 group-hover:border-[#22c55e]/40 group-hover:shadow-[0_0_0_1px_rgba(34,197,94,0.08),0_8px_32px_-12px_rgba(34,197,94,0.35)]">
+                        {/* Картинка сверху на всю ширину */}
+                        <div className="relative aspect-[16/10] w-full bg-[var(--color-surface)]">
+                          {item.media?.[0]
+                            ? <img src={resolveMedia(item.media[0])} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
+                            : <div className="w-full h-full flex items-center justify-center"><ShoppingBagIcon /></div>}
+                          <span className="absolute top-2.5 left-2.5 bg-[#22c55e] text-[#0d1512] text-[10px] font-extrabold uppercase px-2 py-1 rounded-full shadow-[0_0_12px_rgba(34,197,94,0.4)]">Реклама</span>
+                        </div>
+
+                        {/* Инфо + кнопка */}
+                        <div className="p-3.5">
+                          <div className="text-[15px] font-bold text-[var(--color-text)] leading-snug group-hover:text-[#22c55e] transition-colors">{item.title}</div>
+                          <div className="text-[11px] text-[var(--color-muted)] mt-0.5">{item.seller?.name}</div>
+                          {item.description && (
+                            <div className="text-[12px] text-[var(--color-muted)] line-clamp-2 mt-1.5">{item.description}</div>
+                          )}
+
+                          <div className="mt-3 flex items-center justify-between gap-3">
+                            <div className="text-lg font-extrabold text-[#22c55e] whitespace-nowrap">{formatPrice(item.price)}</div>
+                            {!inCart ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); addToCart(item); }}
+                                className="shrink-0 h-10 px-5 rounded-xl bg-[#22c55e] text-white text-sm font-bold flex items-center gap-1.5 transition-colors hover:bg-[#16a34a]"
+                              >
+                                <ShoppingCart size={16} /> В корзину
+                              </button>
+                            ) : (
+                              <div className="shrink-0 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                                <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }} className="w-9 h-9 rounded-xl border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Minus size={15} /></button>
+                                <span className="text-base font-bold text-[var(--color-text)] min-w-[22px] text-center">{qty}</span>
+                                <button onClick={(e) => { e.stopPropagation(); addToCart(item); }} className="w-9 h-9 rounded-xl border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Plus size={15} /></button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                }
+
+                // Обычный товар — компактная строка
+                return (
+                  <motion.div key={'p-' + item.id} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }} transition={{ duration: 0.2 }} onClick={() => saveScrollAndNavigate(`/products/${item.id}`)} className="py-3.5 flex items-center gap-3.5 cursor-pointer group">
+                    <div className="w-14 h-14 rounded-xl bg-[var(--color-surface)] shrink-0 overflow-hidden flex items-center justify-center">
+                      {item.media?.[0] ? <img src={resolveMedia(item.media[0])} alt={item.title} className="w-full h-full object-cover" loading="lazy" /> : <ShoppingBagIcon />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-[var(--color-text)] truncate group-hover:text-[#22c55e] transition-colors">{item.title}</div>
+                      <div className="text-[11px] text-[var(--color-muted)] truncate">{item.seller?.name}</div>
+                    </div>
+                    <div className="text-sm font-bold text-[#22c55e] whitespace-nowrap">{formatPrice(item.price)}</div>
+                    {!inCart ? (
+                      <button onClick={(e) => { e.stopPropagation(); addToCart(item); }} className="shrink-0 w-8 h-8 rounded-lg bg-[#22c55e] text-white transition-colors flex items-center justify-center"><ShoppingCart size={14} /></button>
+                    ) : (
+                      <div className="shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                        <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }} className="w-7 h-7 rounded-lg border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Minus size={13} /></button>
+                        <span className="text-sm font-bold text-[var(--color-text)] min-w-[18px] text-center">{qty}</span>
+                        <button onClick={(e) => { e.stopPropagation(); addToCart(item); }} className="w-7 h-7 rounded-lg border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Plus size={13} /></button>
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              }
+              return (
+                <motion.div key={'po-' + item.id} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }} transition={{ duration: 0.2 }} onClick={() => saveScrollAndNavigate(`/posts/${item.id}`)} className={`py-5 cursor-pointer group ${item.isAd ? 'my-3 px-3.5 rounded-2xl border border-[var(--color-border)] transition-all duration-200 hover:border-[#22c55e]/40 hover:bg-gradient-to-br hover:from-[#22c55e]/12 hover:via-transparent hover:to-[#14b8a6]/10 hover:shadow-[0_0_0_1px_rgba(34,197,94,0.08),0_8px_32px_-12px_rgba(34,197,94,0.35)]' : ''}`}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[9px] font-bold text-[#0d1512] ${item.isAd ? 'bg-gradient-to-br from-[#22c55e] to-[#14b8a6]' : 'bg-[#22c55e] text-white'}`}>{(item.author?.name || item.adOwner?.name || 'A')[0].toUpperCase()}</div>
+                    <span className="text-xs text-[var(--color-muted)]">{item.author?.name || item.adOwner?.name || 'Аноним'}</span>
+                    {item.isAd && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#22c55e] text-[#0d1512] text-[9px] font-extrabold uppercase tracking-wide shadow-[0_0_12px_rgba(34,197,94,0.4)]">Реклама</span>}
+                  </div>
+                  <div className="text-[15px] font-bold text-[var(--color-text)] group-hover:text-[#22c55e] transition-colors">{item.title}</div>
+                  {item.content && <div className="text-[12px] text-[var(--color-muted)] line-clamp-2 mt-1">{item.content}</div>}
+
+                  {/* Фото поста — карусель на всю ширину */}
+                  {Array.isArray(item.media) && item.media.length > 0 && (
+                    <PostMedia media={item.media} title={item.title} />
+                  )}
+
+                  <div className="flex items-center gap-2 mt-2.5">
+                    <button onClick={(e) => togglePostLike(item, e)} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${item.likedByMe ? 'text-[#22c55e] bg-[rgba(34,197,94,0.1)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)]'}`}>
+                      <Heart size={14} fill={item.likedByMe ? 'currentColor' : 'none'} />
+                      {item.likeCount > 0 && item.likeCount}
+                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); saveScrollAndNavigate(`/posts/${item.id}`); }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] transition-colors">
+                      <MessageCircle size={14} />
+                      {item.commentCount > 0 && item.commentCount}
+                    </button>
+                    {isAdmin && <button onClick={(e) => { e.stopPropagation(); delPost(item.id); }} className="ml-auto text-[10px] text-red-400 hover:underline">удалить</button>}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        )}
+
+        <div ref={loaderRef} className="py-8 flex justify-center">
+          {loadingMore && <Loader2 size={20} className="animate-spin text-[#22c55e]" />}
+          {!showLoader && !loadingMore && items.length > 0 && <span className="text-[var(--color-faint)] text-xs">Всё показали</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShoppingBagIcon() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--color-faint)]"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>;
+}
+
+// Карусель фото поста: листание стрелками + индикаторы, картинка на всю ширину
+function PostMedia({ media, title }: { media: string[]; title: string }) {
+  const [idx, setIdx] = useState(0);
+  if (!media || media.length === 0) return null;
+  const count = media.length;
+  const go = (n: number) => setIdx((idx + n + count) % count);
+  return (
+    <div className="mt-2.5 relative -mx-4 sm:mx-0">
+      <div className="relative w-full overflow-hidden rounded-none sm:rounded-xl">
+        <img
+          src={resolveMedia(media[idx])}
+          alt={`${title} ${idx + 1}`}
+          className="w-full h-auto max-h-[480px] object-cover"
+          loading="lazy"
+          onClick={(e) => e.stopPropagation()}
+        />
+        {count > 1 && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); go(-1); }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 backdrop-blur text-white flex items-center justify-center hover:bg-black/75 transition-colors"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); go(1); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 backdrop-blur text-white flex items-center justify-center hover:bg-black/75 transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
+            <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1.5">
+              {media.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 rounded-full transition-all ${i === idx ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

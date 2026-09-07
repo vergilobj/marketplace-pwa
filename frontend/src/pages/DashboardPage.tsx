@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, Newspaper, MessageCircle, User, ArrowRight } from 'lucide-react';
-import Card from '../components/ui/Card';
 
 export default function DashboardPage() {
   const [userName, setUserName] = useState('');
@@ -10,37 +9,45 @@ export default function DashboardPage() {
   }, []);
 
   const actions = [
-    { to: '/products', icon: ShoppingBag, label: 'Товары', desc: 'Покупайте и продавайте', grad: 'linear-gradient(135deg, #6366f1, #38bdf8)' },
-    { to: '/posts', icon: Newspaper, label: 'Лента', desc: 'Новости и реклама', grad: 'linear-gradient(135deg, #38bdf8, #38bdf8)' },
-    { to: '/chat', icon: MessageCircle, label: 'Чат', desc: 'Общайтесь с продавцами', grad: 'linear-gradient(135deg, #38bdf8, #6366f1)' },
-    { to: '/profile', icon: User, label: 'Профиль', desc: 'Ваши данные и заказы', grad: 'linear-gradient(135deg, #6366f1, #38bdf8)' },
+    { to: '/products', icon: ShoppingBag, label: 'Товары', desc: 'Покупай и продавай' },
+    { to: '/posts', icon: Newspaper, label: 'Лента', desc: 'Новости и реклама' },
+    { to: '/chat', icon: MessageCircle, label: 'Чат', desc: 'Свои рядом' },
+    { to: '/profile', icon: User, label: 'Профиль', desc: 'Ты и заказы' },
   ];
 
   return (
-    <div className="space-y-12">
-      <div className="text-center pt-4">
-        <h1 className="text-4xl font-bold tracking-tight">
-          Добро пожаловать, <span className="text-gradient">{userName || '...'}</span>
-        </h1>
-        <p className="mt-4 text-lg text-[var(--color-muted)]">
-          Ваш закрытый маркетплейс с чатом и новостями.
-        </p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-        {actions.map(({ to, icon: Icon, label, desc, grad }) => (
-          <Link key={to} to={to} className="group">
-            <Card className="flex items-center gap-5 cursor-pointer group-hover:border-[rgba(201,242,103,0.4)]">
-              <div className="p-3 rounded-2xl flex-shrink-0 shadow-lg" style={{ background: grad }}>
-                <Icon className="w-6 h-6 text-white" />
+    <div className="relative min-h-screen overflow-x-hidden">
+      <div className="fixed inset-0 pointer-events-none" style={{
+        background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.10) 0%, transparent 60%)'
+      }} />
+
+      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-20">
+        <div className="mb-10">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
+            <span className="text-[11px] uppercase tracking-[0.3em] text-[var(--color-muted)]">ты внутри</span>
+          </div>
+          <h1 className="text-4xl font-extrabold leading-[1.05] tracking-tight text-[var(--color-text)]">
+            Добро пожаловать,<br />
+            <span style={{ background: 'linear-gradient(90deg, #22c55e, #34d399)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>{userName || 'свой'}</span>
+          </h1>
+          <p className="mt-4 text-[var(--color-muted)] text-base">Закрытый рынок с чатом и новостями — всё для тех, кто внутри.</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {actions.map(({ to, icon: Icon, label, desc }) => (
+            <Link key={to} to={to} className="group flex items-center gap-4 p-5 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[#22c55e]/40 transition-colors">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center text-[#22c55e] shrink-0" style={{ background: 'rgba(34,197,94,0.1)' }}>
+                <Icon size={20} />
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-lg">{label}</h3>
-                <p className="text-[var(--color-muted)] text-sm">{desc}</p>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-[var(--color-text)]">{label}</div>
+                <div className="text-[var(--color-muted)] text-sm">{desc}</div>
               </div>
-              <ArrowRight className="w-5 h-5 text-[var(--color-faint)] group-hover:text-[#6366f1] group-hover:translate-x-1 transition-all" />
-            </Card>
-          </Link>
-        ))}
+              <ArrowRight size={18} className="text-[var(--color-faint)] group-hover:text-[#22c55e] group-hover:translate-x-1 transition-all shrink-0" />
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );

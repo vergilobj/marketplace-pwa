@@ -1,22 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, MessageCircle, Minus, Plus, Truck, ShieldCheck, RotateCcw } from 'lucide-react';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
+import { ShoppingCart, MessageCircle, Minus, Plus, ArrowLeft, ChevronLeft, ChevronRight, Heart } from 'lucide-react';
 import { getProductById, getSimilarProducts } from '../api/products';
 import { createOrder, getOrderPaymentStatus } from '../api/orders';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../hooks/useAuth';
-import Breadcrumbs from '../components/Breadcrumbs';
-import Skeleton from '../components/ui/Skeleton';
-
-const GS = { background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 50%, #38bdf8 100%)' } as const;
+import { useApp } from '../context/AppContext';
+import { resolveMedia } from '../utils/media';
+import toast from 'react-hot-toast';
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { addToCart, toggleFavorite, isFavorite } = useApp();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
@@ -25,6 +23,12 @@ export default function ProductDetailPage() {
   const [similar, setSimilar] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [payment, setPayment] = useState<{ depositAddress?: string; status?: string; orderId?: string } | null>(null);
+  const [activeImg, setActiveImg] = useState(0);
+  const similarRef = useRef<HTMLDivElement>(null);
+
+  const scrollSimilar = (dir: number) => {
+    similarRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -54,11 +58,9 @@ export default function ProductDetailPage() {
     setError('');
     try {
       const order = await createOrder(product.id, product.price * quantity);
-      // Показываем карточку оплаты с QR прямо на странице товара.
       const pay = order?.payment || {};
       if (pay.depositAddress) {
         setPayment({ depositAddress: pay.depositAddress, status: pay.status || 'PENDING', orderId: order.id });
-        // Поллинг статуса до подтверждения.
         const poll = setInterval(async () => {
           try {
             const st = await getOrderPaymentStatus(order.id);
@@ -81,205 +83,198 @@ export default function ProductDetailPage() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto space-y-8">
-        <Skeleton className="h-6 w-48" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <Skeleton className="h-96 rounded-[34px]" />
-          <div className="space-y-4">
-            <Skeleton className="h-10 w-3/4" />
-            <Skeleton className="h-6 w-1/2" />
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-12 w-40" />
-          </div>
-        </div>
+      <div className="flex justify-center py-32">
+        <div className="w-10 h-10 rounded-2xl bg-[var(--color-surface)] animate-pulse" />
       </div>
     );
   }
 
-  if (error && !product) return <p className="text-center py-10 text-red-500">{error}</p>;
+  if (error && !product) {
+    return (
+      <div className="max-w-xl mx-auto px-6 py-24 text-center">
+        <p className="text-[var(--color-muted)]">{error}</p>
+      </div>
+    );
+  }
+
+  const media = Array.isArray(product.media) ? product.media : [];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      <Breadcrumbs items={[{ label: 'Главная', to: '/' }, { label: product.title }]} />
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 pb-20">
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
+        <ArrowLeft size={16} /> Назад
+      </button>
 
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Галерея */}
-          <div className="space-y-4">
-            <motion.div
-              className="rounded-[34px] overflow-hidden bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.07)] relative group"
-              whileHover={{ scale: 1.02 }}
-            >
-              <motion.img
-                src={product.media?.[0] || '/placeholder.jpg'}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        {/* Галерея */}
+        <div>
+          {/* Основное фото */}
+          <div className="rounded-2xl overflow-hidden bg-[var(--color-surface)] border border-[var(--color-border)] aspect-square mb-3">
+            {media[activeImg] ? (
+              <img
+                src={resolveMedia(media[activeImg])}
                 alt={product.title}
-                className="w-full h-96 object-cover cursor-pointer"
-                onClick={() => setSelectedImage(product.media?.[0] || '/placeholder.jpg')}
+                className="w-full h-full object-cover cursor-zoom-in"
+                onClick={() => setSelectedImage(resolveMedia(media[activeImg]))}
               />
-              {product.media?.length > 1 && (
-                <div className="absolute bottom-4 left-4 right-4 flex gap-2 overflow-x-auto">
-                  {product.media.map((url: string, idx: number) => (
-                    <motion.img
-                      key={idx}
-                      src={url}
-                      whileHover={{ scale: 1.1 }}
-                      className="w-16 h-16 rounded-xl object-cover border-2 border-white/80 cursor-pointer opacity-80 hover:opacity-100 transition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedImage(url);
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          </div>
-
-          {/* Информация */}
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-4xl font-bold tracking-tight">{product.title}</h1>
-              <p className="text-2xl font-bold mt-2 text-gradient">{product.price.toLocaleString()} USDT</p>
-              {quantity > 1 && (
-                <p className="text-sm text-[var(--color-muted)] mt-1">
-                  {product.price.toLocaleString()} USDT × {quantity} шт. = {(product.price * quantity).toLocaleString()} USDT
-                </p>
-              )}
-            </div>
-
-            <p className="text-[var(--color-muted)] leading-relaxed">{product.description}</p>
-
-            {/* Выбор количества */}
-            <div className="flex items-center gap-4 p-3 glass rounded-2xl">
-              <span className="text-sm font-medium text-[var(--color-muted)]">Количество:</span>
-              <div className="flex items-center gap-2">
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="p-2 rounded-full bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] shadow"
-                >
-                  <Minus size={16} />
-                </motion.button>
-                <span className="w-8 text-center font-bold">{quantity}</span>
-                <motion.button
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="p-2 rounded-full bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] shadow"
-                >
-                  <Plus size={16} />
-                </motion.button>
-              </div>
-            </div>
-
-            {/* Кнопки действий */}
-            <div className="flex gap-3">
-              <motion.div whileTap={{ scale: 0.97 }}>
-                <Button
-                  variant="primary"
-                  onClick={handleBuy}
-                  loading={buying}
-                  className="px-8 py-4 text-lg rounded-full"
-                >
-                  <ShoppingCart size={22} className="mr-2" /> Купить сейчас
-                </Button>
-              </motion.div>
-              {isAuthenticated && (
-                <motion.div whileTap={{ scale: 0.97 }}>
-                  <Button
-                    variant="secondary"
-                    onClick={() => navigate(`/chat?uid=${product.sellerId}&product=${product.id}`)}
-                    className="px-6 py-4 rounded-full"
-                  >
-                    <MessageCircle size={20} className="mr-2" /> Задать вопрос
-                  </Button>
-                </motion.div>
-              )}
-            </div>
-
-            {error && <p className="text-sm text-red-500">{error}</p>}
-
-            {/* Карточка оплаты USDT с QR */}
-            {payment?.depositAddress && (
-              <div className="mt-4 glass border border-emerald-500/20 rounded-2xl p-5">
-                <p className="text-sm font-bold text-[var(--color-text)] mb-3">Оплатите USDT (BSC) на адрес:</p>
-                <div className="flex justify-center mb-4">
-                  <div className="p-3 bg-white rounded-xl">
-                    <QRCodeSVG value={payment.depositAddress} size={180} />
-                  </div>
-                </div>
-                <code className="block px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-xs text-emerald-300 break-all font-mono">
-                  {payment.depositAddress}
-                </code>
-                <p className="mt-3 text-xs text-white/50">
-                  Статус: {payment.status === 'CONFIRMED' || payment.status === 'SWEPT' ? 'Оплачено ✅' : payment.status || 'PENDING'}
-                </p>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-[var(--color-faint)]">
+                <ShoppingCart size={40} />
               </div>
             )}
-
-            {/* Продавец */}
-            <div className="flex items-center gap-3 text-sm text-[var(--color-muted)]">
-              <div style={GS} className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--color-text)] font-bold">
-                {product.seller?.name?.[0] || '?'}
-              </div>
-              <span>Продавец: <span className="font-medium text-[var(--color-text)]">{product.seller?.name || 'Неизвестный'}</span></span>
-            </div>
-
-            {/* Преимущества */}
-            <div className="grid grid-cols-3 gap-2 text-center text-sm mt-4">
-              <div className="flex flex-col items-center gap-1 p-3 glass rounded-2xl">
-                <Truck size={20} className="text-emerald-400" />
-                <span className="text-[var(--color-muted)]">Быстрая доставка</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 p-3 glass rounded-2xl">
-                <ShieldCheck size={20} className="text-[#38bdf8]" />
-                <span className="text-[var(--color-muted)]">Гарантия возврата</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 p-3 glass rounded-2xl">
-                <RotateCcw size={20} className="text-[#38bdf8]" />
-                <span className="text-[var(--color-muted)]">14 дней на обмен</span>
-              </div>
-            </div>
           </div>
+
+          {/* Таумбнейлы */}
+          {media.length > 1 && (
+            <div className="flex flex-wrap gap-2">
+              {media.map((url: string, idx: number) => (
+                <button
+                  key={idx}
+                  onClick={() => setActiveImg(idx)}
+                  className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                    idx === activeImg ? 'border-[#22c55e]' : 'border-[var(--color-border)] hover:border-[#22c55e]/40'
+                  }`}
+                >
+                  <img src={resolveMedia(url)} alt="" className="w-full h-full object-cover" loading="lazy" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      </motion.div>
 
-      {/* Похожие товары */}
-      {similar.length > 0 && (
-        <section>
-          <h2 className="text-2xl font-bold mb-4">Похожие товары</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {similar.map((s: any) => (
-              <motion.div
-                key={s.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4 }}
-                className="cursor-pointer"
-                onClick={() => navigate(`/products/${s.id}`)}
-              >
-                <Card className="hover:shadow-xl transition-shadow p-4">
-                  <img
-                    src={s.media?.[0] || '/placeholder.jpg'}
-                    alt={s.title}
-                    className="w-full h-40 object-cover rounded-2xl"
-                  />
-                  <div className="p-3 space-y-1">
-                    <h3 className="font-semibold truncate">{s.title}</h3>
-                    <p className="text-lg font-bold text-gradient">{s.price.toLocaleString()} USDT</p>
-                  </div>
-                </Card>
-              </motion.div>
-            ))}
+        {/* Инфо */}
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold text-[var(--color-text)] leading-tight">{product.title}</h1>
+
+          <div className="flex items-baseline gap-3 mt-3">
+            <span className="text-3xl lg:text-4xl font-extrabold text-[var(--color-text)]">
+              {product.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+            </span>
+            <span className="text-lg font-bold text-[#22c55e]">USDT</span>
           </div>
-        </section>
+
+          {product.seller?.name && (
+            <div className="flex items-center gap-2 mt-4 text-sm text-[var(--color-muted)]">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#22c55e] to-[#34d399] flex items-center justify-center text-[#0d1512] font-extrabold text-xs">
+                {(product.seller.name || '?')[0].toUpperCase()}
+              </div>
+              <span>Продавец: <span className="text-[var(--color-text)] font-medium">{product.seller.name}</span></span>
+            </div>
+          )}
+
+          {/* Количество */}
+          <div className="flex items-center gap-4 mt-6">
+            <span className="text-sm text-[var(--color-muted)]">Количество:</span>
+            <div className="inline-flex items-center gap-3 px-2 py-1.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]">
+              <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-9 h-9 rounded-lg hover:bg-[var(--bg-3)] flex items-center justify-center text-[var(--color-text)] transition-colors">
+                <Minus size={16} />
+              </button>
+              <span className="w-8 text-center font-bold text-[var(--color-text)]">{quantity}</span>
+              <button onClick={() => setQuantity(quantity + 1)} className="w-9 h-9 rounded-lg hover:bg-[var(--bg-3)] flex items-center justify-center text-[var(--color-text)] transition-colors">
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Кнопки */}
+          <div className="flex items-stretch gap-2 mt-6">
+            <button
+              onClick={handleBuy}
+              disabled={buying}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-[#22c55e] text-[#0d1512] font-bold text-sm hover:bg-[#16a34a] transition-colors disabled:opacity-50"
+            >
+              <ShoppingCart size={17} /> {buying ? 'Оформление...' : 'Купить'}
+            </button>
+            <button
+              onClick={() => addToCart(product)}
+              className="shrink-0 w-12 flex items-center justify-center rounded-xl border border-[var(--color-border)] text-[var(--color-text)] hover:border-[#22c55e]/40 hover:bg-[var(--color-surface)] transition-colors"
+              title="В корзину"
+            >
+              <ShoppingCart size={18} />
+            </button>
+            <button
+              onClick={() => { toggleFavorite(product.id); toast.success(isFavorite(product.id) ? 'Убрано из избранного' : 'В избранном'); }}
+              className={`shrink-0 w-12 flex items-center justify-center rounded-xl border transition-colors ${isFavorite(product.id) ? 'border-[#22c55e] text-[#22c55e] bg-[#22c55e]/10' : 'border-[var(--color-border)] text-[var(--color-text)] hover:border-[#22c55e]/40 hover:bg-[var(--color-surface)]'}`}
+              title="В избранное"
+            >
+              <Heart size={18} fill={isFavorite(product.id) ? 'currentColor' : 'none'} />
+            </button>
+            {isAuthenticated && (
+              <button
+                onClick={() => navigate(`/chat?uid=${product.sellerId}&product=${product.id}`)}
+                className="shrink-0 w-12 flex items-center justify-center rounded-xl border border-[var(--color-border)] text-[var(--color-text)] hover:border-[#22c55e]/40 hover:bg-[var(--color-surface)] transition-colors"
+                title="Спросить продавца"
+              >
+                <MessageCircle size={18} />
+              </button>
+            )}
+          </div>
+
+          {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
+        </div>
+      </div>
+
+      {/* Оплата QR */}
+      {payment?.depositAddress && (
+        <div className="mt-6 rounded-2xl bg-[var(--color-surface)] border border-[#22c55e]/20 p-5">
+          <p className="text-sm font-bold text-[var(--color-text)] mb-3">Оплата USDT (BSC):</p>
+          <div className="flex justify-center mb-4">
+            <div className="p-3 bg-white rounded-xl">
+              <QRCodeSVG value={payment.depositAddress} size={180} />
+            </div>
+          </div>
+          <code className="block px-3 py-2.5 rounded-lg bg-[var(--bg-3)] border border-[var(--color-border)] text-xs text-[#34d399] break-all font-mono">
+            {payment.depositAddress}
+          </code>
+          <p className="mt-3 text-xs text-[var(--color-muted)]">
+            Статус: {payment.status === 'CONFIRMED' || payment.status === 'SWEPT' ? 'Оплачено ✅' : payment.status || 'PENDING'}
+          </p>
+        </div>
       )}
 
-      {/* Модальное окно для просмотра фото */}
+      {/* Описание — на всю ширину, под контентом */}
+      {product.description && (
+        <div className="mt-8">
+          <h2 className="text-lg font-bold text-[var(--color-text)] mb-3">Описание</h2>
+          <p className="text-sm text-[var(--color-muted)] leading-relaxed">{product.description}</p>
+        </div>
+      )}
+
+      {/* Похожие — горизонтальная карусель со стрелками */}
+      {similar.length > 0 && (
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-[var(--color-text)]">Похожие товары</h2>
+            <div className="flex gap-1.5">
+              <button onClick={() => scrollSimilar(-1)} className="w-8 h-8 rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[#22c55e]/40 flex items-center justify-center transition-colors">
+                <ChevronLeft size={16} />
+              </button>
+              <button onClick={() => scrollSimilar(1)} className="w-8 h-8 rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[#22c55e]/40 flex items-center justify-center transition-colors">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+          <div ref={similarRef} className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar">
+            {similar.map((s: any) => (
+              <div
+                key={s.id}
+                onClick={() => { navigate(`/products/${s.id}`); window.scrollTo({ top: 0 }); }}
+                className="shrink-0 w-36 rounded-2xl overflow-hidden cursor-pointer bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[#22c55e]/40 transition-colors group"
+              >
+                <div className="aspect-square bg-[var(--bg-3)] overflow-hidden">
+                  {s.media?.[0] && <img src={resolveMedia(s.media[0])} alt={s.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />}
+                </div>
+                <div className="p-2.5">
+                  <div className="text-[13px] font-medium text-[var(--color-text)] truncate mb-0.5">{s.title}</div>
+                  <div className="text-[13px] font-bold text-[#22c55e]">{s.price.toLocaleString('en-US', { maximumFractionDigits: 2 })} USDT</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Модалка фото */}
       <AnimatePresence>
         {selectedImage && (
           <motion.div

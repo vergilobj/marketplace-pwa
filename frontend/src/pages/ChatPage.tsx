@@ -304,19 +304,21 @@ export default function ChatPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[80vh]">
-        <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+        <div className="w-8 h-8 rounded-full border-2 border-green-500 border-t-transparent animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-[transparent]">
+    <div className="flex h-[calc(100vh-80px)] max-w-5xl mx-auto rounded-2xl overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)]">
       {/* Sidebar */}
-      <div className={`${selectedUser ? 'hidden md:flex' : 'flex'} md:flex flex-col w-full md:w-80 lg:w-96 border-r border-[rgba(255,255,255,0.07)] glass shrink-0 rounded-l-[26px]`}>
+      <div className={`${selectedUser ? 'hidden md:flex' : 'flex'} md:flex flex-col w-full md:w-80 lg:w-96 border-r border-[var(--color-border)] shrink-0`}>
         {/* Header */}
-        <div className="p-4 border-b border-white/[0.06]">
+        <div className="p-4 border-b border-[var(--color-border)] bg-[var(--bg-2)]">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-lg font-bold text-white">Сообщения</h1>
+            <h1 className="text-lg font-extrabold tracking-tight leading-tight">
+              <span style={{ background: 'linear-gradient(90deg, #22c55e, #34d399)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Сообщения</span>
+            </h1>
             <button
               onClick={() => setShowNewChat(!showNewChat)}
               className="w-8 h-8 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/60 hover:text-[var(--color-text)] transition-all"
@@ -335,12 +337,12 @@ export default function ChatPage() {
                   onChange={e => setNewChatPhone(maskPhoneInput(e.target.value))}
                   onKeyDown={e => e.key === 'Enter' && startNewChat()}
                   placeholder="+7 (999) 123-45-67"
-                  className="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-[var(--color-text)] placeholder:text-white/20 outline-none focus:border-indigo-500/40"
+                  className="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-[var(--color-text)] placeholder:text-white/20 outline-none focus:border-green-500/40"
                 />
                 <button
                   onClick={startNewChat}
                   disabled={!newChatPhone.trim()}
-                  className="px-3 py-2 rounded-lg bg-indigo-500 text-[var(--color-text)] text-sm font-semibold hover:bg-indigo-400 disabled:opacity-30 transition-all"
+                  className="px-3 py-2 rounded-lg bg-green-500 text-[var(--color-text)] text-sm font-semibold hover:bg-emerald-400 disabled:opacity-30 transition-all"
                 >
                   <UserPlus size={16} />
                 </button>
@@ -355,7 +357,7 @@ export default function ChatPage() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Поиск..."
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-[var(--color-text)] placeholder:text-white/20 outline-none focus:border-indigo-500/30 transition-all"
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-sm text-[var(--color-text)] placeholder:text-white/20 outline-none focus:border-green-500/30 transition-all"
             />
           </div>
         </div>
@@ -368,17 +370,17 @@ export default function ChatPage() {
               <button
                 key={c.userId}
                 onClick={() => selectConversation({ userId: c.userId, name: c.name })}
-                className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.04] transition-all text-left border-b border-white/[0.02] ${selectedUser?.userId === c.userId ? 'bg-indigo-500/10 border-l-[3px] border-l-indigo-500' : ''}`}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.04] transition-all text-left border-b border-white/[0.02] ${selectedUser?.userId === c.userId ? 'bg-green-500/10 border-l-[3px] border-l-green-500' : ''}`}
               >
                 <div className="relative shrink-0">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[var(--color-text)] font-bold text-base">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-[var(--color-text)] font-bold text-base">
                     {(c.name || '?')[0].toUpperCase()}
                   </div>
                   {isOnline && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[var(--color-card)]" />
                   )}
                   {c.unread > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-indigo-500 text-[var(--color-text)] text-[10px] font-bold flex items-center justify-center border-2 border-[var(--color-card)]">{c.unread > 9 ? '9+' : c.unread}</span>
+                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-green-500 text-[var(--color-text)] text-[10px] font-bold flex items-center justify-center border-2 border-[var(--color-card)]">{c.unread > 9 ? '9+' : c.unread}</span>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -411,11 +413,11 @@ export default function ChatPage() {
       {selectedUser ? (
         <div className="flex-1 flex flex-col min-w-0">
           {/* Chat header */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-[rgba(255,255,255,0.07)] glass-strong shrink-0">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--color-border)] bg-[var(--bg-2)] shrink-0">
             <button onClick={() => setSelectedUser(null)} className="md:hidden text-white/50 hover:text-white">
               <ArrowLeft size={20} />
             </button>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[var(--color-text)] font-bold text-sm shrink-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-[var(--color-text)] font-bold text-sm shrink-0">
               {(selectedUser.name || '?')[0].toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
@@ -449,16 +451,16 @@ export default function ChatPage() {
                       <p className="text-[10px] text-white/30 ml-2 mb-0.5">{msg.sender?.name || 'Пользователь'}</p>
                     )}
                     {msg.text && (
-                      <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words shadow-lg ${
+                      <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
                         isMine
-                          ? 'text-[var(--color-text)] rounded-br-md shadow-[0_8px_20px_rgba(201,242,103,0.25)]'
-                          : 'glass text-[var(--color-text)] rounded-bl-md'
-                      }`} style={isMine ? { background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 100%)' } : undefined}>
+                          ? 'bg-[#22c55e] text-[#0d1512] rounded-br-md'
+                          : 'bg-[var(--bg-3)] text-[var(--color-text)] rounded-bl-md'
+                      }`}>
                         {msg.text}
                       </div>
                     )}
                     {msg.fileUrl && (
-                      <div className={`px-4 py-2.5 rounded-2xl ${isMine ? 'text-[#0b0e0d] rounded-br-md' : 'glass text-[var(--color-text)] rounded-bl-md'}`} style={isMine ? { background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 100%)' } : undefined}>
+                      <div className={`px-4 py-2.5 rounded-2xl ${isMine ? 'text-[#0b0e0d] rounded-br-md' : 'glass text-[var(--color-text)] rounded-bl-md'}`} style={isMine ? { background: 'linear-gradient(135deg, #22c55e 0%, #34d399 100%)' } : undefined}>
                         {msg.fileType?.startsWith('image/') ? (
                           <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer">
                             <img src={msg.fileUrl} alt={msg.fileName || 'Image'} className="max-w-[220px] max-h-[220px] rounded-lg object-cover" loading="lazy" />
@@ -497,7 +499,7 @@ export default function ChatPage() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-[rgba(255,255,255,0.07)] glass-strong shrink-0">
+          <div className="border-t border-[var(--color-border)] bg-[var(--bg-2)] shrink-0">
             {/* Pending attachments */}
             {pendingFiles.length > 0 && (
               <div className="flex items-center gap-2 px-4 pt-3 overflow-x-auto">
@@ -526,7 +528,7 @@ export default function ChatPage() {
                 disabled={uploading}
                 className="w-10 h-10 rounded-full bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.08)] flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-text)] transition-all shrink-0"
               >
-                {uploading ? <div className="w-4 h-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" /> : <Paperclip size={18} />}
+                {uploading ? <div className="w-4 h-4 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" /> : <Paperclip size={18} />}
               </button>
               <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx,.txt,.zip" />
               <input
@@ -534,13 +536,13 @@ export default function ChatPage() {
                 onChange={e => setMessageText(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                 placeholder="Сообщение..."
-                className="flex-1 px-4 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(201,242,103,0.5)] transition-all"
+                className="flex-1 px-4 py-2.5 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-sm text-[var(--color-text)] placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(34,197,94,0.5)] transition-all"
               />
               <button
                 onClick={sendMessage}
                 disabled={!messageText.trim() && pendingFiles.length === 0}
-                className="w-10 h-10 rounded-full text-[#0b0e0d] flex items-center justify-center disabled:opacity-20 transition-all shrink-0 shadow-[0_6px_20px_rgba(201,242,103,0.3)]"
-                style={{ background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 50%, #38bdf8 100%)' }}
+                className="w-10 h-10 rounded-full text-[#0b0e0d] flex items-center justify-center disabled:opacity-20 transition-all shrink-0 shadow-[0_6px_20px_rgba(34,197,94,0.3)]"
+                style={{ background: 'linear-gradient(135deg, #22c55e 0%, #34d399 50%, #34d399 100%)' }}
               >
                 <Send size={16} />
               </button>

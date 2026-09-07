@@ -164,10 +164,25 @@ export class PostsService {
     };
   }
 
-  async findById(id: string) {
-    const post = await this.prisma.post.findUnique({ where: { id } });
+  async findById(id: string, userId?: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { id },
+      include: {
+        author: { select: { id: true, name: true } },
+        adOwner: { select: { id: true, name: true } },
+        _count: { select: { likes: true, comments: true } },
+        likes: userId ? { where: { userId }, take: 1 } : false,
+      },
+    });
     if (!post) throw new NotFoundException('Post not found');
-    return post;
+    return {
+      ...post,
+      likeCount: post._count?.likes ?? 0,
+      commentCount: post._count?.comments ?? 0,
+      likedByMe: userId ? post.likes?.length > 0 : false,
+      likes: undefined,
+      _count: undefined,
+    };
   }
 
   async delete(id: string) {

@@ -44,7 +44,7 @@ export default function CreateAdPage() {
               value={form.content}
               onChange={e => setForm({ ...form, content: e.target.value })}
               rows={3}
-              className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+              className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-[#22c55e] focus:ring-2 focus:ring-[#22c55e]/20 outline-none"
               required
             />
           </div>

@@ -5,7 +5,7 @@ import { login } from '../api/auth';
 import { formatPhone, maskPhoneInput, unformatPhone } from '../utils/phone';
 import { LogIn, ArrowLeft, Sparkles } from 'lucide-react';
 
-const GS = { background: 'linear-gradient(135deg, #6366f1 0%, #38bdf8 50%, #38bdf8 100%)' } as const;
+const GS = { background: 'linear-gradient(135deg, #22c55e 0%, #34d399 50%, #34d399 100%)' } as const;
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -27,8 +27,8 @@ export default function LoginPage() {
     <div className="min-h-[80vh] flex items-center justify-center px-4 relative">
       {/* градиентный фон-подложка */}
       <div className="absolute inset-0 -z-10 pointer-events-none overflow-hidden rounded-[34px]">
-        <div className="absolute top-0 left-1/4 w-72 h-72 rounded-full blur-3xl opacity-30" style={{ background: 'radial-gradient(circle, #6366f1, transparent 70%)' }} />
-        <div className="absolute bottom-0 right-1/4 w-72 h-72 rounded-full blur-3xl opacity-30" style={{ background: 'radial-gradient(circle, #38bdf8, transparent 70%)' }} />
+        <div className="absolute top-0 left-1/4 w-72 h-72 rounded-full blur-3xl opacity-30" style={{ background: 'radial-gradient(circle, #22c55e, transparent 70%)' }} />
+        <div className="absolute bottom-0 right-1/4 w-72 h-72 rounded-full blur-3xl opacity-30" style={{ background: 'radial-gradient(circle, #34d399, transparent 70%)' }} />
       </div>
 
       <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
@@ -36,20 +36,20 @@ export default function LoginPage() {
 
         <div className="glass-card rounded-[34px] p-8 shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
           <div className="text-center mb-8">
-            <div style={GS} className="w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-[0_16px_40px_rgba(201,242,103,0.35)]"><LogIn size={24} className="text-[#0b0e0d]" /></div>
+            <div style={GS} className="w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-[0_16px_40px_rgba(34,197,94,0.35)]"><LogIn size={24} className="text-[#0b0e0d]" /></div>
             <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">С возвращением</h1>
             <p className="text-[var(--color-muted)] text-sm">Войдите в свой аккаунт</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div><label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Телефон</label><input value={formatPhone(form.phone)} onChange={e => setForm({ ...form, phone: maskPhoneInput(e.target.value) })} placeholder="+7 (999) 123-45-67" className="w-full px-4 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(201,242,103,0.5)] focus:ring-4 focus:ring-[rgba(201,242,103,0.1)] transition-all" required /></div>
-            <div><label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Пароль</label><input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Ваш пароль" className="w-full px-4 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(201,242,103,0.5)] focus:ring-4 focus:ring-[rgba(201,242,103,0.1)] transition-all" required /></div>
+            <div><label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Телефон</label><input value={formatPhone(form.phone)} onChange={e => setForm({ ...form, phone: maskPhoneInput(e.target.value) })} placeholder="+7 (999) 123-45-67" className="w-full px-4 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(34,197,94,0.5)] focus:ring-4 focus:ring-[rgba(34,197,94,0.1)] transition-all" required /></div>
+            <div><label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Пароль</label><input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Ваш пароль" className="w-full px-4 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(34,197,94,0.5)] focus:ring-4 focus:ring-[rgba(34,197,94,0.1)] transition-all" required /></div>
             {error && <p className="text-sm font-medium text-red-400 bg-red-400/5 rounded-xl px-4 py-2.5">{error}</p>}
-            <button type="submit" disabled={loading} style={GS} className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-full text-[#0b0e0d] font-semibold text-sm transition-all shadow-[0_16px_40px_rgba(201,242,103,0.3)] disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]">{loading ? '...' : <><Sparkles size={16} /> Войти</>}</button>
+            <button type="submit" disabled={loading} style={GS} className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-full text-[#0b0e0d] font-semibold text-sm transition-all shadow-[0_16px_40px_rgba(34,197,94,0.3)] disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]">{loading ? '...' : <><Sparkles size={16} /> Войти</>}</button>
           </form>
 
           <div className="mt-6 pt-6 border-t border-[rgba(255,255,255,0.06)] text-center">
-            <p className="text-[var(--color-muted)] text-sm">Нет аккаунта? <Link to="/register" className="text-[#6366f1] hover:text-[#4f46e5] font-semibold">Зарегистрироваться</Link></p>
+            <p className="text-[var(--color-muted)] text-sm">Нет аккаунта? <Link to="/register" className="text-[#22c55e] hover:text-[#16a34a] font-semibold">Зарегистрироваться</Link></p>
           </div>
         </div>
       </motion.div>

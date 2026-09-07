@@ -11,7 +11,7 @@ const Tabs: React.FC<TabsProps> = ({ tabs, active, onChange }) => (
       <button
         key={tab}
         onClick={() => onChange(tab)}
-        className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all ${active === tab ? 'bg-white dark:bg-gray-700 shadow text-blue-600' : 'text-gray-500'}`}
+        className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all ${active === tab ? 'bg-white dark:bg-gray-700 shadow text-green-600' : 'text-gray-500'}`}
       >
         {tab}
       </button>

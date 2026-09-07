@@ -30,7 +30,7 @@ const MyProductsPage = lazy(() => import('./pages/MyProductsPage'));
 const ProductsPage = lazy(() => import('./pages/ProductsPage'));
 
 function Lazy({ children }: { children: React.ReactNode }) {
-  return <Suspense fallback={<div className="flex justify-center py-20"><div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" /></div>}>{children}</Suspense>;
+  return <Suspense fallback={<div className="flex justify-center py-20"><div className="w-8 h-8 rounded-full border-2 border-green-500 border-t-transparent animate-spin" /></div>}>{children}</Suspense>;
 }
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) {
