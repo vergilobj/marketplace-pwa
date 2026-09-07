@@ -52,12 +52,12 @@ export default function Layout() {
         <div className="max-w-3xl mx-auto flex items-center gap-2 h-16 px-3.5 rounded-2xl bg-[rgba(17,25,24,0.72)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] shadow-[0_8px_32px_-8px_rgba(0,0,0,0.5)] relative">
           {/* Логотип */}
           <Link to="/" className={`${searchOpen ? 'hidden' : 'flex'} items-center gap-2.5 shrink-0 group`}>
-            <img src="/logo.png" alt="Базар" className="w-9 h-9 rounded-xl object-cover group-hover:scale-105 transition-transform" />
+            <img src="/logo.webp" alt="Базар" className="w-9 h-9 rounded-xl object-cover group-hover:scale-105 transition-transform" />
             <span className="text-lg font-extrabold tracking-tight text-[var(--color-text)]">Базар</span>
           </Link>
 
-          {/* Плавно выезжающее поле поиска — absolute-оверлей на весь хидер */}
-          <div className={`absolute inset-0 flex items-center px-4 transition-all duration-300 ease-out ${searchOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          {/* Плавно выезжающее поле поиска — оверлей поверх всего хидера */}
+          <div className={`absolute inset-0 flex items-center px-4 bg-[rgba(17,25,24,0.95)] backdrop-blur-xl rounded-2xl transition-all duration-300 ease-out z-10 ${searchOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
             <form onSubmit={handleGlobalSearch} className="relative w-full">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--color-faint)]" size={17} />
               <input
@@ -110,15 +110,15 @@ export default function Layout() {
           {/* Кнопка поиска — справа, тянет вправо */}
           <button
             onClick={() => setSearchOpen(!searchOpen)}
-            className={`shrink-0 ml-auto sm:ml-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${searchOpen ? 'bg-[#22c55e] text-[#0b0e0d]' : 'bg-[rgba(255,255,255,0.04)] text-[var(--color-muted)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[#22c55e]'}`}
+            className={`shrink-0 ml-auto sm:ml-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${searchOpen ? 'opacity-0 pointer-events-none' : ''} ${searchOpen ? 'bg-[#22c55e] text-[#0b0e0d]' : 'bg-[rgba(255,255,255,0.04)] text-[var(--color-muted)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[#22c55e]'}`}
             title="Поиск"
           >
-            {searchOpen ? <X size={18} /> : <Search size={18} />}
+            <Search size={18} />
           </button>
 
           {/* Войти — крайняя справа, видна всегда */}
           {!isAuthenticated && (
-            <Link to="/login" style={GS} className="shrink-0 px-4 h-10 rounded-full text-[#0b0e0d] text-sm font-bold hover:scale-[1.04] transition-transform flex items-center justify-center whitespace-nowrap">Войти</Link>
+            <Link to="/login" style={GS} className={`shrink-0 px-4 h-10 rounded-full text-[#0b0e0d] text-sm font-bold hover:scale-[1.04] transition-all flex items-center justify-center whitespace-nowrap ${searchOpen ? 'opacity-0 pointer-events-none' : ''}`}>Войти</Link>
           )}
         </div>
       </header>
@@ -130,7 +130,7 @@ export default function Layout() {
       <footer className="mt-12 border-t border-[rgba(255,255,255,0.06)] px-4 pt-12 pb-24 md:pb-12">
         <div className="max-w-3xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Базар" className="w-12 h-12 rounded-2xl object-cover" />
+            <img src="/logo.webp" alt="Базар" className="w-12 h-12 rounded-2xl object-cover" />
             <div>
               <div className="text-xl font-extrabold tracking-tight text-[var(--color-text)]">Базар</div>
               <div className="text-[12px] text-[var(--color-muted)]">закрытая площадка. только для своих.</div>

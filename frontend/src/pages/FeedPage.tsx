@@ -251,7 +251,7 @@ export default function FeedPage() {
             </div>
 
             <div className="lg:w-96 xl:w-[420px] shrink-0 relative">
-              <img src="/manifest-cart.png" alt="Безопасный чеккаут" className="w-full h-auto" loading="eager" />
+              <img src="/manifest-cart.webp" alt="Безопасный чеккаут" className="w-full h-auto" loading="eager" />
             </div>
           </div>
         </div>
