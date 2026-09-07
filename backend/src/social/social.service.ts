@@ -18,7 +18,7 @@ export class SocialService {
 
   async likePost(userId: string, postId: string) {
     const post = await this.prisma.post.findUnique({ where: { id: postId } });
-    if (!post) throw new NotFoundException('Post not found');
+    if (!post) throw new NotFoundException('Пост не найден');
 
     try {
       await this.prisma.like.create({ data: { userId, postId } });
@@ -32,7 +32,7 @@ export class SocialService {
       }
       return { liked: true };
     } catch (e) {
-      if (e.code === 'P2002') throw new ConflictException('Already liked');
+      if (e.code === 'P2002') throw new ConflictException('Уже лайкнуто');
       throw e;
     }
   }
@@ -41,7 +41,7 @@ export class SocialService {
     const like = await this.prisma.like.findUnique({
       where: { userId_postId: { userId, postId } },
     });
-    if (!like) throw new NotFoundException('Like not found');
+    if (!like) throw new NotFoundException('Лайк не найден');
     await this.prisma.like.delete({ where: { id: like.id } });
     return { liked: false };
   }
@@ -55,7 +55,7 @@ export class SocialService {
 
   async addComment(userId: string, postId: string, text: string) {
     const post = await this.prisma.post.findUnique({ where: { id: postId } });
-    if (!post) throw new NotFoundException('Post not found');
+    if (!post) throw new NotFoundException('Пост не найден');
 
     const comment = await this.prisma.comment.create({
       data: { userId, postId, text },
@@ -96,9 +96,9 @@ export class SocialService {
     const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
     });
-    if (!comment) throw new NotFoundException('Comment not found');
+    if (!comment) throw new NotFoundException('Комментарий не найден');
     if (comment.userId !== userId && userRole !== 'ADMIN') {
-      throw new ForbiddenException('You can only edit your own comments');
+      throw new ForbiddenException('Редактировать можно только свои комментарии');
     }
     const updated = await this.prisma.comment.update({
       where: { id: commentId },
@@ -118,9 +118,9 @@ export class SocialService {
     const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
     });
-    if (!comment) throw new NotFoundException('Comment not found');
+    if (!comment) throw new NotFoundException('Комментарий не найден');
     if (comment.userId !== userId && userRole !== 'ADMIN') {
-      throw new ForbiddenException('You can only delete your own comments');
+      throw new ForbiddenException('Удалять можно только свои комментарии');
     }
     await this.prisma.comment.delete({ where: { id: commentId } });
     await this.auditService.log({

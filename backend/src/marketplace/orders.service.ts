@@ -29,7 +29,7 @@ export class OrdersService {
       include: { seller: true },
     });
     if (!product || !product.isActive) {
-      throw new BadRequestException('Product not available');
+      throw new BadRequestException('Товар недоступен');
     }
 
     const amount = dto.amount || product.price;
@@ -137,7 +137,7 @@ export class OrdersService {
         referralUser: { select: { id: true, name: true } },
       },
     });
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order) throw new NotFoundException('Заказ не найден');
     return order;
   }
 
@@ -150,15 +150,15 @@ export class OrdersService {
     const order = await this.findById(orderId);
 
     if (role === 'SELLER' && order.sellerId !== userId) {
-      throw new ForbiddenException('Not your order');
+      throw new ForbiddenException('Это не ваш заказ');
     }
     if (role === 'BUYER' && order.buyerId !== userId) {
-      throw new ForbiddenException('Not your order');
+      throw new ForbiddenException('Это не ваш заказ');
     }
 
     if (dto.status === 'PAID') {
       if (role !== 'ADMIN')
-        throw new ForbiddenException('Only admin can mark as paid');
+        throw new ForbiddenException('Отмечать оплаченным может только админ');
       order.paidAt = new Date();
       // Уведомление покупателю
       await this.notificationsService.createNotification(

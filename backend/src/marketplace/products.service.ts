@@ -76,7 +76,7 @@ export class ProductsService {
       where: { id },
       include: { seller: { select: { id: true, name: true } } },
     });
-    if (!product) throw new NotFoundException('Product not found');
+    if (!product) throw new NotFoundException('Товар не найден');
     return product;
   }
 
@@ -102,7 +102,7 @@ export class ProductsService {
   async update(id: string, sellerId: string, dto: UpdateProductDto) {
     const product = await this.findById(id);
     if (product.sellerId !== sellerId) {
-      throw new ForbiddenException('You can only edit your own products');
+      throw new ForbiddenException('Редактировать можно только свои товары');
     }
     const updated = await this.prisma.product.update({ where: { id }, data: dto });
     await this.auditService.log({
@@ -117,7 +117,7 @@ export class ProductsService {
   async remove(id: string, sellerId: string) {
     const product = await this.findById(id);
     if (product.sellerId !== sellerId) {
-      throw new ForbiddenException('You can only deactivate your own products');
+      throw new ForbiddenException('Деактивировать можно только свои товары');
     }
     const updated = await this.prisma.product.update({
       where: { id },
@@ -202,7 +202,7 @@ export class ProductsService {
 
   async adminUpdate(id: string, dto: UpdateProductDto) {
     const product = await this.prisma.product.findUnique({ where: { id } });
-    if (!product) throw new NotFoundException('Product not found');
+    if (!product) throw new NotFoundException('Товар не найден');
     return this.prisma.product.update({
       where: { id },
       data: dto,

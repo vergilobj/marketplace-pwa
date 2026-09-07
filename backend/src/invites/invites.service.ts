@@ -27,7 +27,7 @@ export class InvitesService {
         where: { code: customCode },
       });
       if (existing) {
-        throw new BadRequestException('Invite code already exists');
+        throw new BadRequestException('Такой код приглашения уже есть');
       }
       invite = await this.prisma.invite.create({
         data: { code: customCode, ownerId },
@@ -45,7 +45,7 @@ export class InvitesService {
         }
       }
       if (!invite) {
-        throw new BadRequestException('Could not generate a unique invite code');
+        throw new BadRequestException('Не удалось сгенерировать уникальный код');
       }
     }
 

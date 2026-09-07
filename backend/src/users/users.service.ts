@@ -155,7 +155,7 @@ export class UsersService {
 
   async requestWithdrawal(userId: string, amount: number, toAddress?: string) {
     const user = await this.findById(userId);
-    if (!user) throw new Error('User not found');
+    if (!user) throw new Error('Пользователь не найден');
     if (amount <= 0) throw new Error('Amount must be positive');
 
     // Валидация BSC-адреса: 0x + 40 hex.

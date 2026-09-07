@@ -33,7 +33,7 @@ export class UsersController {
   @Get('me')
   async getProfile(@Request() req: AuthenticatedRequest) {
     const user = await this.usersService.findById(req.user.userId);
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException('Пользователь не найден');
 
     const { passwordHash: _passwordHash, ...result } = user;
     return result;
@@ -168,7 +168,7 @@ export class UsersController {
   @Get(':id')
   async getUserById(@Param('id') id: string) {
     const user = await this.usersService.findById(id);
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException('Пользователь не найден');
     const { passwordHash: _ph, ...result } = user;
     return result;
   }

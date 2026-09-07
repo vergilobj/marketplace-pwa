@@ -21,7 +21,7 @@ export class PaymentsService {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
-    if (!order) throw new Error('Order not found');
+    if (!order) throw new Error('Заказ не найден');
     if (order.status !== 'PENDING')
       throw new Error('Order already paid or cancelled');
 

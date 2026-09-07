@@ -31,7 +31,7 @@ export class AuthController {
   @Post('refresh')
   async refresh(@Body('refreshToken') refreshToken: string) {
     if (!refreshToken) {
-      throw new UnauthorizedException('Refresh token required');
+      throw new UnauthorizedException('Требуется токен обновления');
     }
     const decoded = JSON.parse(
       Buffer.from(refreshToken.split('.')[1], 'base64').toString(),

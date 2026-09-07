@@ -78,7 +78,7 @@ export class PostsService {
       where: { role: 'ADMIN' },
     });
     if (!platformUser)
-      throw new BadRequestException('Platform admin not found');
+      throw new BadRequestException('Администратор платформы не найден');
     const order = await this.prisma.order.create({
       data: {
         buyerId: sellerId,
@@ -174,7 +174,7 @@ export class PostsService {
         likes: userId ? { where: { userId }, take: 1 } : false,
       },
     });
-    if (!post) throw new NotFoundException('Post not found');
+    if (!post) throw new NotFoundException('Пост не найден');
     return {
       ...post,
       likeCount: post._count?.likes ?? 0,
@@ -313,7 +313,7 @@ export class PostsService {
 
   async toggleVisibility(id: string) {
     const post = await this.prisma.post.findUnique({ where: { id } });
-    if (!post) throw new NotFoundException('Post not found');
+    if (!post) throw new NotFoundException('Пост не найден');
     const updated = await this.prisma.post.update({
       where: { id },
       data: { isHidden: !post.isHidden },
@@ -339,11 +339,11 @@ export class PostsService {
     },
   ) {
     const post = await this.prisma.post.findUnique({ where: { id } });
-    if (!post) throw new NotFoundException('Post not found');
+    if (!post) throw new NotFoundException('Пост не найден');
 
     // Разрешить редактирование только автору или админу
     if (post.authorId !== userId && userRole !== 'ADMIN') {
-      throw new ForbiddenException('You can only edit your own posts');
+      throw new ForbiddenException('Редактировать можно только свои посты');
     }
 
     const updated = await this.prisma.post.update({

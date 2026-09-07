@@ -29,7 +29,7 @@ export class AuthService {
     const existingUser = await this.prisma.user.findUnique({
       where: { phone: dto.phone },
     });
-    if (existingUser) throw new ConflictException('Phone already registered');
+    if (existingUser) throw new ConflictException('Телефон уже зарегистрирован');
 
     const invite = await this.prisma.invite.findUnique({
       where: { code: dto.inviteCode },
@@ -39,7 +39,7 @@ export class AuthService {
       invite.isUsed ||
       (invite.expiresAt && invite.expiresAt < new Date())
     ) {
-      throw new BadRequestException('Invalid or expired invite code');
+      throw new BadRequestException('Неверный или истёкший код приглашения');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -87,7 +87,7 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, hash);
 
     if (!user || !valid) {
-      throw new UnauthorizedException('Invalid phone or password');
+      throw new UnauthorizedException('Неверный телефон или пароль');
     }
 
     await this.auditService.log({
@@ -109,7 +109,7 @@ export class AuthService {
         secret: this.config.get('JWT_REFRESH_SECRET'),
       });
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException('Неверный токен обновления');
     }
 
     return this.generateTokens(user);
