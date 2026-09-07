@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { register } from '../api/auth';
 import { maskPhoneInput, unformatPhone } from '../utils/phone';
-import { UserPlus, ArrowLeft, Sparkles, Gift } from 'lucide-react';
+import { Crown, Eye, EyeOff, ArrowLeft, Gift, ArrowRight } from 'lucide-react';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -12,6 +12,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ phone: '', name: '', password: '', inviteCode: inviteFromUrl });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setError('');
@@ -33,22 +34,38 @@ export default function RegisterPage() {
       <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
         <Link to="/" className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-8 transition-colors text-sm"><ArrowLeft size={16} /> На главную</Link>
 
-        <div className="glass-card rounded-[34px] p-8 shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
+        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[28px] p-8">
           <div className="text-center mb-8">
-            <div style={{ background: 'linear-gradient(135deg, #34d399 0%, #22c55e 100%)' }} className="w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-[0_16px_40px_rgba(34,197,94,0.35)]"><UserPlus size={24} className="text-[#0b0e0d]" /></div>
-            <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Создать аккаунт</h1>
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#14b8a6] flex items-center justify-center shadow-[0_12px_36px_-8px_rgba(34,197,94,0.6)]">
+              <Crown size={28} className="text-[#0b0e0d]" />
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-[var(--color-text)] mb-1">Создать аккаунт</h1>
             <p className="text-[var(--color-muted)] text-sm flex items-center justify-center gap-1.5"><Gift size={14} className="text-[#34d399]" /> Требуется код приглашения</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {[{ label: 'Телефон', val: 'phone', ph: '+7 (999) 123-45-67' }, { label: 'Имя', val: 'name', ph: 'Ваше имя' }, { label: 'Пароль', val: 'password', ph: 'Минимум 6 символов', type: 'password' }, { label: 'Код приглашения', val: 'inviteCode', ph: 'Введите инвайт-код' }].map(f => (
-              <div key={f.val}><label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">{f.label}</label><input type={f.type || 'text'} value={(form as any)[f.val]} onChange={e => setForm({ ...form, [f.val]: f.val === 'phone' ? maskPhoneInput(e.target.value) : e.target.value })} placeholder={f.ph} className="w-full px-4 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[rgba(34,197,94,0.5)] focus:ring-4 focus:ring-[rgba(34,197,94,0.1)] transition-all" required /></div>
+            {[{ label: 'Телефон', val: 'phone', ph: '+7 (999) 123-45-67' }, { label: 'Имя', val: 'name', ph: 'Ваше имя' }, { label: 'Код приглашения', val: 'inviteCode', ph: 'Введите инвайт-код' }].map(f => (
+              <div key={f.val}><label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">{f.label}</label><input type="text" value={(form as any)[f.val]} onChange={e => setForm({ ...form, [f.val]: f.val === 'phone' ? maskPhoneInput(e.target.value) : e.target.value })} placeholder={f.ph} className="w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors" required /></div>
             ))}
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Пароль</label>
+              <div className="relative">
+                <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Минимум 6 символов" className="w-full px-4 py-3 pr-12 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors" required />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
             {error && <p className="text-sm font-medium text-red-400 bg-red-400/5 rounded-xl px-4 py-2.5">{error}</p>}
-            <button type="submit" disabled={loading} style={{ background: 'linear-gradient(135deg, #34d399 0%, #22c55e 100%)' }} className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-full text-[#0b0e0d] font-semibold text-sm transition-all shadow-[0_16px_40px_rgba(34,197,94,0.3)] disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]">{loading ? '...' : <><Sparkles size={16} /> Зарегистрироваться</>}</button>
+
+            <button type="submit" disabled={loading} className="mt-2 w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#22c55e] text-[#0b0e0d] font-extrabold text-base hover:bg-[#16a34a] transition-colors shadow-[0_12px_32px_-8px_rgba(34,197,94,0.5)] disabled:opacity-50">
+              {loading ? 'Создаём...' : <><span>Зарегистрироваться</span><ArrowRight size={18} /></>}
+            </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-[rgba(255,255,255,0.06)] text-center">
+          <div className="mt-6 pt-6 border-t border-[var(--color-border)] text-center">
             <p className="text-[var(--color-muted)] text-sm">Уже есть аккаунт? <Link to="/login" className="text-[#22c55e] hover:text-[#16a34a] font-semibold">Войти</Link></p>
           </div>
         </div>
