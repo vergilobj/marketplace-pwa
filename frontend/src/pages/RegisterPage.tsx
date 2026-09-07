@@ -13,9 +13,16 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+
+  const borderFor = (filled: boolean) =>
+    attempted && !filled ? 'border-red-400/60' : 'border-[var(--color-border)]';
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); setLoading(true); setError('');
+    e.preventDefault();
+    setAttempted(true);
+    if (!form.phone || !form.name || !form.password || !form.inviteCode) return;
+    setLoading(true); setError('');
     try {
       const { accessToken, refreshToken } = await register(unformatPhone(form.phone), form.name, form.password, form.inviteCode);
       localStorage.setItem('accessToken', accessToken); localStorage.setItem('refreshToken', refreshToken);
@@ -45,17 +52,22 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {[{ label: 'Телефон', val: 'phone', ph: '+7 (999) 123-45-67' }, { label: 'Имя', val: 'name', ph: 'Ваше имя' }, { label: 'Код приглашения', val: 'inviteCode', ph: 'Введите инвайт-код' }].map(f => (
-              <div key={f.val}><label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">{f.label}</label><input type="text" value={(form as any)[f.val]} onChange={e => setForm({ ...form, [f.val]: f.val === 'phone' ? maskPhoneInput(e.target.value) : e.target.value })} placeholder={f.ph} className="w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors" required /></div>
+              <div key={f.val}>
+                <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">{f.label}</label>
+                <input type="text" value={(form as any)[f.val]} onChange={e => setForm({ ...form, [f.val]: f.val === 'phone' ? maskPhoneInput(e.target.value) : e.target.value })} placeholder={f.ph} className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!(form as any)[f.val])}`} />
+                {attempted && !(form as any)[f.val] && <p className="text-xs text-red-400 mt-1">Заполни поле</p>}
+              </div>
             ))}
 
             <div>
               <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Пароль</label>
               <div className="relative">
-                <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Минимум 6 символов" className="w-full px-4 py-3 pr-12 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors" required />
+                <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Минимум 6 символов" className={`w-full px-4 py-3 pr-12 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.password)}`} />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {attempted && !form.password && <p className="text-xs text-red-400 mt-1">Заполни поле</p>}
             </div>
 
             {error && <p className="text-sm font-medium text-red-400 bg-red-400/5 rounded-xl px-4 py-2.5">{error}</p>}
