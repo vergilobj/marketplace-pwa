@@ -1,5 +1,5 @@
 import { useNavigate, Link } from 'react-router-dom';
-import { Trash2, ShoppingBag, Heart, Minus, Plus, ArrowLeft, Sparkles } from 'lucide-react';
+import { Trash2, ShoppingBag, Heart, Minus, Plus, ArrowLeft, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { formatPrice } from "../utils/format";
@@ -81,8 +81,8 @@ export default function CartPage() {
             <span className="text-[var(--color-muted)] text-sm">Итого</span>
             <span className="text-2xl font-extrabold text-[var(--color-text)]">{formatted}</span>
           </div>
-          <button onClick={() => navigate('/checkout')} className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-[#22c55e] text-[#0d1512] font-extrabold text-sm hover:bg-[#16a34a] transition-colors shadow-[0_8px_32px_-8px_rgba(34,197,94,0.5)]">
-            <Sparkles size={16} /> Оформить заказ
+          <button onClick={() => navigate('/checkout')} className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#22c55e] text-[#0d1512] font-extrabold text-base hover:bg-[#16a34a] transition-colors shadow-[0_12px_32px_-8px_rgba(34,197,94,0.5)]">
+            <span>Оформить заказ</span><ArrowRight size={18} />
           </button>
         </div>
       </div>
