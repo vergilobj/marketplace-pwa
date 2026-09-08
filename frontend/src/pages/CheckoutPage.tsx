@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ShoppingBag, ShieldCheck, ArrowLeft, Copy, Check, Loader2, ArrowRight } from 'lucide-react';
+import { ShoppingBag, ShieldCheck, ArrowLeft, Copy, Check, Loader2, ArrowRight, Clock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { createOrder, getOrderPaymentStatus } from '../api/orders';
 import { QRCodeSVG } from 'qrcode.react';
 import toast from 'react-hot-toast';
 
 type Payment = { depositAddress?: string | null; clientRef?: string | null; status?: string; };
+
+const PAYMENT_WINDOW_MS = 15 * 60 * 1000;
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -16,11 +18,33 @@ export default function CheckoutPage() {
   const [payment, setPayment] = useState<Payment | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const total = cart.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
+  // Таймер 15 минут на оплату
+  useEffect(() => {
+    if (!expiresAt) return;
+    const tick = () => {
+      const left = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+      setTimeLeft(left);
+      if (left <= 0) {
+        // счёт истёк — сбрасываем, возвращаем кнопку
+        setPayment(null);
+        setOrderId(null);
+        setExpiresAt(null);
+        toast.error('Время оплаты истекло. Создайте новый счёт.');
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [expiresAt]);
+
+  // Поллинг статуса оплаты
   useEffect(() => {
     if (!orderId || !payment?.depositAddress) return;
     pollRef.current = setInterval(async () => {
@@ -50,7 +74,8 @@ export default function CheckoutPage() {
       setOrderId(lastOrder?.id ?? null);
       if (pay.depositAddress) {
         setPayment({ depositAddress: pay.depositAddress, clientRef: pay.clientRef, status: pay.status || 'PENDING' });
-        toast.success('Заказ оформлен! Оплатите USDT (BSC).');
+        setExpiresAt(Date.now() + PAYMENT_WINDOW_MS);
+        toast.success('Счёт создан. Оплатите USDT (BSC).');
       } else {
         setPayment({ status: pay.status || 'PENDING' });
       }
@@ -69,6 +94,12 @@ export default function CheckoutPage() {
     } catch {
       toast.error('Не удалось скопировать');
     }
+  };
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60).toString().padStart(2, '0');
+    const sec = (s % 60).toString().padStart(2, '0');
+    return `${m}:${sec}`;
   };
 
   if (cart.length === 0 && !payment) {
@@ -98,6 +129,7 @@ export default function CheckoutPage() {
           <h1 className="font-extrabold leading-[1.05] tracking-tight text-[var(--color-text)]" style={{ fontSize: 'clamp(2rem, 6vw, 3.5rem)' }}>
             <span style={{ background: 'linear-gradient(90deg, #22c55e, #34d399)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Оплата</span>
           </h1>
+
           {cart.length > 0 && (
             <>
               <div className="space-y-3 mb-6">
@@ -113,13 +145,26 @@ export default function CheckoutPage() {
                 <span className="text-xl font-extrabold text-[#22c55e]">{total.toLocaleString('en-US', { maximumFractionDigits: 2 })} USDT</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-[var(--color-muted)] mb-6"><ShieldCheck size={14} className="text-[#22c55e]" /> Безопасная оплата через платформу</div>
-              <button onClick={handleOrder} disabled={loading} className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#22c55e] text-[#0d1512] font-extrabold text-base hover:bg-[#16a34a] transition-colors shadow-[0_12px_32px_-8px_rgba(34,197,94,0.5)] disabled:opacity-50"><span>{loading ? 'Оформление...' : 'Оплатить'}</span><ArrowRight size={18} /></button>
+
+              {/* Кнопка — только пока нет активного счёта */}
+              {!payment?.depositAddress && (
+                <button onClick={handleOrder} disabled={loading} className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#22c55e] text-[#0d1512] font-extrabold text-base hover:bg-[#16a34a] transition-colors shadow-[0_12px_32px_-8px_rgba(34,197,94,0.5)] disabled:opacity-50">
+                  <span>{loading ? 'Оформление...' : 'Создать счёт'}</span><ArrowRight size={18} />
+                </button>
+              )}
             </>
           )}
 
           {payment?.depositAddress && (
             <div className="mt-6 rounded-2xl bg-[var(--bg-3)] border border-[#22c55e]/20 p-5">
-              <p className="text-sm font-bold text-[var(--color-text)] mb-3">Оплатите USDT (BSC) на адрес:</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-bold text-[var(--color-text)]">Оплатите USDT (BSC) на адрес:</p>
+                {timeLeft > 0 && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#22c55e]">
+                    <Clock size={14} /> {formatTime(timeLeft)}
+                  </span>
+                )}
+              </div>
               <div className="mb-4 flex justify-center">
                 <div className="w-full bg-white rounded-2xl p-4">
                   <QRCodeSVG value={payment.depositAddress} className="w-full h-auto" />
