@@ -58,7 +58,7 @@ export default function ProfilePage() {
               </div>
               <div>
                 <label className="block text-sm text-[var(--color-muted)] mb-1">Телефон</label>
-                <input value={formatPhone(form.phone)} onChange={e => setForm({ ...form, phone: maskPhoneInput(e.target.value) })} placeholder="+7 (999) 123-45-67" className="w-full px-4 py-2.5 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm outline-none focus:border-[#22c55e]/50 transition-all" />
+                <input value={formatPhone(form.phone)} onChange={e => setForm({ ...form, phone: maskPhoneInput(form.phone, e.target.value) })} placeholder="+7 (999) 123-45-67" className="w-full px-4 py-2.5 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm outline-none focus:border-[#22c55e]/50 transition-all" />
               </div>
               <div className="flex gap-2">
                 <button onClick={handleSave} className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#22c55e] text-[#0d1512] text-sm font-bold transition-colors hover:bg-[#16a34a]"><Save size={14} /> Сохранить</button>

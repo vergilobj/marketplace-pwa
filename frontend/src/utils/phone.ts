@@ -18,9 +18,21 @@ export function formatPhone(raw: string): string {
   return `${prefix}(${b.slice(0, 3)}) ${b.slice(3, 6)}-${b.slice(6, 8)}-${b.slice(8, 10)}`;
 }
 
-/** Живой ввод: возвращает ТОЛЬКО сырые цифры (до 11). Маска — через formatPhone при отображении. */
-export function maskPhoneInput(v: string): string {
-  return digits(v).slice(0, 11);
+/**
+ * Маска с памятью: prev — предыдущее значение, next — то, что браузер отдал.
+ * Если при бэкспейсе удалён формат-символ (скобка/пробел), а цифр не убавилось —
+ * значит надо удалить и последнюю цифру, иначе поле «прыгает» обратно.
+ * Возвращает ТОЛЬКО сырые цифры (до 11). Показ — через formatPhone.
+ */
+export function maskPhoneInput(prev: string, next: string): string {
+  const pd = digits(prev);
+  const nd = digits(next);
+  let d = nd;
+  // стёрли нецифру → убавляем одну цифру
+  if (next.length < prev.length && nd.length === pd.length) {
+    d = nd.slice(0, -1);
+  }
+  return d.slice(0, 11);
 }
 
 /** Снимает маску → сырой "79000000000" для API. */

@@ -58,7 +58,7 @@ export default function LoginPage() {
               <input
                 type="text"
                 value={formatPhone(form.phone)}
-                onChange={e => setForm({ ...form, phone: maskPhoneInput(e.target.value) })}
+                onChange={e => setForm({ ...form, phone: maskPhoneInput(form.phone, e.target.value) })}
                 placeholder="+7 (999) 123-45-67"
                 className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.phone)}`}
               />

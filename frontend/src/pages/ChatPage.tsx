@@ -334,7 +334,7 @@ export default function ChatPage() {
               <div className="flex gap-2">
                 <input
                   value={formatPhone(newChatPhone)}
-                  onChange={e => setNewChatPhone(maskPhoneInput(e.target.value))}
+                  onChange={e => setNewChatPhone(maskPhoneInput(newChatPhone, e.target.value))}
                   onKeyDown={e => e.key === 'Enter' && startNewChat()}
                   placeholder="+7 (999) 123-45-67"
                   className="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-[var(--color-text)] placeholder:text-white/20 outline-none focus:border-green-500/40"

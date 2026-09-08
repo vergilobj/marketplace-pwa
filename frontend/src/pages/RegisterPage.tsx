@@ -54,7 +54,7 @@ export default function RegisterPage() {
             {[{ label: 'Телефон', val: 'phone', ph: '+7 (999) 123-45-67' }, { label: 'Имя', val: 'name', ph: 'Ваше имя' }, { label: 'Код приглашения', val: 'inviteCode', ph: 'Введите инвайт-код' }].map(f => (
               <div key={f.val}>
                 <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">{f.label}</label>
-                <input type="text" value={f.val === 'phone' ? formatPhone((form as any)[f.val]) : (form as any)[f.val]} onChange={e => setForm({ ...form, [f.val]: f.val === 'phone' ? maskPhoneInput(e.target.value) : e.target.value })} placeholder={f.ph} className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!(form as any)[f.val])}`} />
+                <input type="text" value={f.val === 'phone' ? formatPhone((form as any)[f.val]) : (form as any)[f.val]} onChange={e => setForm({ ...form, [f.val]: f.val === 'phone' ? maskPhoneInput((form as any)[f.val], e.target.value) : e.target.value })} placeholder={f.ph} className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!(form as any)[f.val])}`} />
                 {attempted && !(form as any)[f.val] && <p className="text-xs text-red-400 mt-1">Заполни поле</p>}
               </div>
             ))}
