@@ -11,6 +11,7 @@ export function formatPhone(raw: string): string {
   const body = hasPrefix ? norm.slice(1) : norm;
   const b = body.slice(0, 10);
   const prefix = hasPrefix ? '+7 ' : '';
+  if (b.length === 0) return '';
   if (b.length < 3) return prefix + b;
   if (b.length < 6) return `${prefix}(${b.slice(0, 3)}) ${b.slice(3)}`;
   if (b.length < 8) return `${prefix}(${b.slice(0, 3)}) ${b.slice(3, 6)}-${b.slice(6)}`;
