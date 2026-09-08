@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import InputMask from 'react-input-mask';
+import { IMaskInput } from 'react-imask';
 import { login } from '../api/auth';
 import { unformatPhone } from '../utils/phone';
 import { KeyRound, Eye, EyeOff, ArrowLeft, ArrowRight } from 'lucide-react';
@@ -56,10 +56,10 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Телефон</label>
-              <InputMask
-                mask="+7 (999) 999-99-99"
+              <IMaskInput
+                mask="+7 (000) 000-00-00"
                 value={form.phone}
-                onChange={e => setForm({ ...form, phone: e.target.value })}
+                onAccept={(value: string) => setForm({ ...form, phone: value })}
                 placeholder="+7 (999) 123-45-67"
                 className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.phone)}`}
               />
