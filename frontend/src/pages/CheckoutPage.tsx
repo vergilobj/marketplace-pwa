@@ -121,7 +121,9 @@ export default function CheckoutPage() {
             <div className="mt-6 rounded-2xl bg-[var(--bg-3)] border border-[#22c55e]/20 p-5">
               <p className="text-sm font-bold text-[var(--color-text)] mb-3">Оплатите USDT (BSC) на адрес:</p>
               <div className="mb-4 flex justify-center">
-                <QRCodeSVG value={payment.depositAddress} className="w-full max-w-[260px] h-auto" />
+                <div className="w-full max-w-[260px] bg-white rounded-2xl p-4">
+                  <QRCodeSVG value={payment.depositAddress} className="w-full h-auto" />
+                </div>
               </div>
               <div className="relative mt-2">
                 <code className="block w-full pl-3 pr-12 py-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[#34d399] break-all font-mono">{payment.depositAddress}</code>
