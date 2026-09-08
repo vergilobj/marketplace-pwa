@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 
 type Payment = { depositAddress?: string | null; clientRef?: string | null; status?: string; };
 
-const PAYMENT_WINDOW_MS = 1 * 60 * 1000;
+const PAYMENT_WINDOW_MS = 15 * 60 * 1000;
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
