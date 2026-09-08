@@ -61,8 +61,14 @@ export default function CheckoutPage() {
 
   const copyAddress = async () => {
     if (!payment?.depositAddress) return;
-    try { await navigator.clipboard.writeText(payment.depositAddress); setCopied(true); setTimeout(() => setCopied(false), 1500); }
-    catch { toast.error('Не удалось скопировать'); }
+    try {
+      await navigator.clipboard.writeText(payment.depositAddress);
+      setCopied(true);
+      toast.success('Адрес скопирован');
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error('Не удалось скопировать');
+    }
   };
 
   if (cart.length === 0 && !payment) {
@@ -115,9 +121,11 @@ export default function CheckoutPage() {
             <div className="mt-6 rounded-2xl bg-[var(--bg-3)] border border-[#22c55e]/20 p-5">
               <p className="text-sm font-bold text-[var(--color-text)] mb-3">Оплатите USDT (BSC) на адрес:</p>
               <div className="flex justify-center mb-4"><div className="p-3 bg-white rounded-xl"><QRCodeSVG value={payment.depositAddress} size={180} /></div></div>
-              <div className="flex items-center gap-2 mt-2">
-                <code className="flex-1 px-3 py-2.5 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[#34d399] break-all font-mono">{payment.depositAddress}</code>
-                <button onClick={copyAddress} className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-[var(--color-surface)] hover:bg-[var(--bg-3)] text-[var(--color-text)] text-xs font-bold transition-colors shrink-0">{copied ? <Check size={14} className="text-[#22c55e]" /> : <Copy size={14} />}{copied ? 'Готово' : 'Копировать'}</button>
+              <div className="relative mt-2">
+                <code className="block w-full pl-3 pr-12 py-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[#34d399] break-all font-mono">{payment.depositAddress}</code>
+                <button onClick={copyAddress} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-muted)] hover:text-[#22c55e] hover:bg-[var(--bg-3)] transition-colors" title="Копировать адрес">
+                  {copied ? <Check size={16} className="text-[#22c55e]" /> : <Copy size={16} />}
+                </button>
               </div>
               <div className="flex items-center gap-2 mt-4 text-xs text-[var(--color-muted)]"><Loader2 size={14} className="animate-spin text-[#22c55e]" /> Ожидание подтверждения транзакции (BSC)...</div>
               <p className="mt-2 text-[11px] text-[var(--color-faint)]">Статус: {payment.status || 'PENDING'}</p>
