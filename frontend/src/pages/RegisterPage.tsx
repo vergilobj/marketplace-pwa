@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import InputMask from 'react-input-mask';
 import { register } from '../api/auth';
-import { formatPhone, maskPhoneInput, unformatPhone } from '../utils/phone';
+import { unformatPhone } from '../utils/phone';
 import { Crown, Eye, EyeOff, ArrowLeft, Gift, ArrowRight } from 'lucide-react';
 
 export default function RegisterPage() {
@@ -51,13 +52,23 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {[{ label: 'Телефон', val: 'phone', ph: '+7 (999) 123-45-67' }, { label: 'Имя', val: 'name', ph: 'Ваше имя' }, { label: 'Код приглашения', val: 'inviteCode', ph: 'Введите инвайт-код' }].map(f => (
-              <div key={f.val}>
-                <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">{f.label}</label>
-                <input type="text" value={f.val === 'phone' ? formatPhone((form as any)[f.val]) : (form as any)[f.val]} onChange={e => setForm({ ...form, [f.val]: f.val === 'phone' ? maskPhoneInput((form as any)[f.val], e.target.value) : e.target.value })} placeholder={f.ph} className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!(form as any)[f.val])}`} />
-                {attempted && !(form as any)[f.val] && <p className="text-xs text-red-400 mt-1">Заполни поле</p>}
-              </div>
-            ))}
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Телефон</label>
+              <InputMask
+                mask="+7 (999) 999-99-99"
+                value={form.phone}
+                onChange={e => setForm({ ...form, phone: e.target.value })}
+                placeholder="+7 (999) 123-45-67"
+                className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.phone)}`}
+              />
+              {attempted && !form.phone && <p className="text-xs text-red-400 mt-1">Заполни поле</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Имя</label>
+              <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ваше имя" className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.name)}`} />
+              {attempted && !form.name && <p className="text-xs text-red-400 mt-1">Заполни поле</p>}
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Пароль</label>
@@ -68,6 +79,12 @@ export default function RegisterPage() {
                 </button>
               </div>
               {attempted && !form.password && <p className="text-xs text-red-400 mt-1">Заполни поле</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Код приглашения</label>
+              <input type="text" value={form.inviteCode} onChange={e => setForm({ ...form, inviteCode: e.target.value.toUpperCase() })} placeholder="Введите инвайт-код" className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.inviteCode)}`} />
+              {attempted && !form.inviteCode && <p className="text-xs text-red-400 mt-1">Заполни поле</p>}
             </div>
 
             {error && <p className="text-sm font-medium text-red-400 bg-red-400/5 rounded-xl px-4 py-2.5">{error}</p>}

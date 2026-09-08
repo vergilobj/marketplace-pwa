@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import InputMask from 'react-input-mask';
 import { login } from '../api/auth';
-import { formatPhone, maskPhoneInput, unformatPhone } from '../utils/phone';
+import { unformatPhone } from '../utils/phone';
 import { KeyRound, Eye, EyeOff, ArrowLeft, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
@@ -12,6 +13,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [attempted, setAttempted] = useState(false);
+
+  const borderFor = (filled: boolean) =>
+    attempted && !filled ? 'border-red-400/60' : 'border-[var(--color-border)]';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,9 +33,6 @@ export default function LoginPage() {
       setError(err.response?.data?.message || 'Ошибка входа');
     } finally { setLoading(false); }
   };
-
-  const borderFor = (filled: boolean) =>
-    attempted && !filled ? 'border-red-400/60' : 'border-[var(--color-border)]';
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 relative">
@@ -55,10 +56,10 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Телефон</label>
-              <input
-                type="text"
-                value={formatPhone(form.phone)}
-                onChange={e => setForm({ ...form, phone: maskPhoneInput(form.phone, e.target.value) })}
+              <InputMask
+                mask="+7 (999) 999-99-99"
+                value={form.phone}
+                onChange={e => setForm({ ...form, phone: e.target.value })}
                 placeholder="+7 (999) 123-45-67"
                 className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.phone)}`}
               />

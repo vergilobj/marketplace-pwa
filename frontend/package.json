@@ -20,6 +20,7 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-hot-toast": "^2.6.0",
+    "react-input-mask": "^2.0.4",
     "react-player": "^3.4.0",
     "react-router-dom": "^7.15.1",
     "socket.io-client": "^4.8.3"
@@ -32,6 +33,7 @@
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/react-input-mask": "^3.0.6",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
