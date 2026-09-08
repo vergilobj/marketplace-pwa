@@ -4,26 +4,22 @@
 export function formatPhone(raw: string): string {
   const d = digits(raw);
   if (d.length === 0) return '';
-  if (d === '7') return '7';
-  // ведущий 8 → 7
+  // ведущий 8 → 7 только если набрано полных 11 цифр
   const norm = d.startsWith('8') && d.length === 11 ? '7' + d.slice(1) : d;
-  const body = norm.startsWith('7') ? norm.slice(1) : norm;
+  // префикс «+7 » рисуем только если исходно была 7 или 8 — иначе не навязываем
+  const hasPrefix = /^[78]/.test(norm);
+  const body = hasPrefix ? norm.slice(1) : norm;
   const b = body.slice(0, 10);
-  if (b.length < 3) return '+7 ' + b;
-  if (b.length < 6) return `+7 (${b.slice(0, 3)}) ${b.slice(3)}`;
-  if (b.length < 8) return `+7 (${b.slice(0, 3)}) ${b.slice(3, 6)}-${b.slice(6)}`;
-  return `+7 (${b.slice(0, 3)}) ${b.slice(3, 6)}-${b.slice(6, 8)}-${b.slice(8, 10)}`;
+  const prefix = hasPrefix ? '+7 ' : '';
+  if (b.length < 3) return prefix + b;
+  if (b.length < 6) return `${prefix}(${b.slice(0, 3)}) ${b.slice(3)}`;
+  if (b.length < 8) return `${prefix}(${b.slice(0, 3)}) ${b.slice(3, 6)}-${b.slice(6)}`;
+  return `${prefix}(${b.slice(0, 3)}) ${b.slice(3, 6)}-${b.slice(6, 8)}-${b.slice(8, 10)}`;
 }
 
-/** Живой ввод: оставляет только цифры и накладывает маску по мере набора. */
+/** Живой ввод: цифры + маска на лету, БЕЗ навязывания «7» (чтобы поле можно было стереть). */
 export function maskPhoneInput(v: string): string {
-  let d = digits(v);
-  if (d === '') return '';
-  if (d === '7') return '7';
-  if (d.startsWith('8') && d.length <= 11) d = '7' + d.slice(1);
-  if (!d.startsWith('7') && d.length > 0 && d.length <= 10) d = '7' + d;
-  d = d.slice(0, 11);
-  return formatPhone(d);
+  return formatPhone(digits(v).slice(0, 11));
 }
 
 /** Снимает маску → сырой "79000000000" для API. */
