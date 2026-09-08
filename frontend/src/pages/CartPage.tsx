@@ -1,5 +1,5 @@
 import { useNavigate, Link } from 'react-router-dom';
-import { Trash2, ShoppingBag, Heart, Minus, Plus, ArrowLeft, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Minus, Plus, ArrowLeft, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { formatPrice } from "../utils/format";
@@ -7,7 +7,7 @@ import { resolveMedia } from '../utils/media';
 
 export default function CartPage() {
   const navigate = useNavigate();
-  const { cart, removeFromCart, updateQuantity, moveToFavorites } = useApp();
+  const { cart, updateQuantity } = useApp();
 
   const total = cart.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
   const formatted = formatPrice(total);
@@ -53,7 +53,8 @@ export default function CartPage() {
                 key={item.productId}
                 layout
                 exit={{ opacity: 0, x: 24 }}
-                className="flex items-center gap-4 p-3.5 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)]"
+                onClick={() => navigate(`/products/${item.productId}`)}
+                className="flex items-center gap-4 p-3.5 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] cursor-pointer hover:border-[#22c55e]/40 transition-colors"
               >
                 <div className="w-16 h-16 rounded-xl overflow-hidden bg-[var(--bg-3)] shrink-0">
                   {item.media?.[0]
@@ -64,13 +65,11 @@ export default function CartPage() {
                   <div className="text-sm font-bold text-[var(--color-text)] truncate">{item.title}</div>
                   <div className="text-sm font-extrabold text-[#22c55e]">{formatPrice(item.price * item.quantity)}</div>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                   <button onClick={() => updateQuantity(item.productId, -1)} className="w-8 h-8 rounded-lg border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] flex items-center justify-center transition-all"><Minus size={13} /></button>
                   <span className="text-sm font-bold text-[var(--color-text)] min-w-[20px] text-center">{item.quantity}</span>
                   <button onClick={() => updateQuantity(item.productId, 1)} className="w-8 h-8 rounded-lg border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] flex items-center justify-center transition-all"><Plus size={13} /></button>
                 </div>
-                <button onClick={() => moveToFavorites(item.productId)} className="p-2 rounded-lg text-[var(--color-muted)] hover:text-[#22c55e] hover:bg-[#22c55e]/10 transition-all" title="В избранное"><Heart size={16} /></button>
-                <button onClick={() => removeFromCart(item.productId)} className="p-2 rounded-lg text-[var(--color-muted)] hover:text-red-400 hover:bg-red-400/10 transition-all" title="Удалить"><Trash2 size={16} /></button>
               </motion.div>
             ))}
           </AnimatePresence>
