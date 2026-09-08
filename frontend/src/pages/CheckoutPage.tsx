@@ -120,7 +120,9 @@ export default function CheckoutPage() {
           {payment?.depositAddress && (
             <div className="mt-6 rounded-2xl bg-[var(--bg-3)] border border-[#22c55e]/20 p-5">
               <p className="text-sm font-bold text-[var(--color-text)] mb-3">Оплатите USDT (BSC) на адрес:</p>
-              <div className="flex justify-center mb-4"><div className="p-3 bg-white rounded-xl"><QRCodeSVG value={payment.depositAddress} size={180} /></div></div>
+              <div className="mb-4 flex justify-center">
+                <QRCodeSVG value={payment.depositAddress} className="w-full max-w-[260px] h-auto" />
+              </div>
               <div className="relative mt-2">
                 <code className="block w-full pl-3 pr-12 py-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[#34d399] break-all font-mono">{payment.depositAddress}</code>
                 <button onClick={copyAddress} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-muted)] hover:text-[#22c55e] hover:bg-[var(--bg-3)] transition-colors" title="Копировать адрес">
