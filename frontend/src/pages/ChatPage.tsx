@@ -5,7 +5,7 @@ import { Search, Send, ArrowLeft, Paperclip, Plus, X, UserPlus, Flag } from 'luc
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { getOrCreateIdentityKey, exportPublicKeyRaw, importPeerPublicKey, deriveSharedKey, encryptMessage, decryptMessage } from '../utils/crypto';
-import { maskPhoneInput, unformatPhone } from '../utils/phone';
+import { formatPhone, maskPhoneInput, unformatPhone } from '../utils/phone';
 
 interface Conversation {
   userId: string;
@@ -333,7 +333,7 @@ export default function ChatPage() {
               <p className="text-xs text-white/40 mb-2">Новый диалог по номеру телефона</p>
               <div className="flex gap-2">
                 <input
-                  value={newChatPhone}
+                  value={formatPhone(newChatPhone)}
                   onChange={e => setNewChatPhone(maskPhoneInput(e.target.value))}
                   onKeyDown={e => e.key === 'Enter' && startNewChat()}
                   placeholder="+7 (999) 123-45-67"

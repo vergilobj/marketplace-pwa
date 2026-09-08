@@ -17,9 +17,9 @@ export function formatPhone(raw: string): string {
   return `${prefix}(${b.slice(0, 3)}) ${b.slice(3, 6)}-${b.slice(6, 8)}-${b.slice(8, 10)}`;
 }
 
-/** Живой ввод: цифры + маска на лету, БЕЗ навязывания «7» (чтобы поле можно было стереть). */
+/** Живой ввод: возвращает ТОЛЬКО сырые цифры (до 11). Маска — через formatPhone при отображении. */
 export function maskPhoneInput(v: string): string {
-  return formatPhone(digits(v).slice(0, 11));
+  return digits(v).slice(0, 11);
 }
 
 /** Снимает маску → сырой "79000000000" для API. */
