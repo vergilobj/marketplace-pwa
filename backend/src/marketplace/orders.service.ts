@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -185,5 +186,23 @@ export class OrdersService {
     });
 
     return updated;
+  }
+
+  @Cron(CronExpression.EVERY_30_SECONDS)
+  async cancelExpiredOrders() {
+    const cutoff = new Date(Date.now() - 15 * 60 * 1000);
+    const { count } = await this.prisma.order.updateMany({
+      where: {
+        status: 'PENDING',
+        createdAt: { lt: cutoff },
+      },
+      data: { status: 'CANCELLED' },
+    });
+
+    if (count > 0) {
+      this.logger.log(`Отменено просроченных заказов: ${count}`);
+    }
+
+    return { count };
   }
 }
