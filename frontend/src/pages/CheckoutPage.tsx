@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ShoppingBag, Sparkles, ShieldCheck, ArrowLeft, Copy, Check, Loader2 } from 'lucide-react';
+import { ShoppingBag, ShieldCheck, ArrowLeft, Copy, Check, Loader2, ArrowRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { createOrder, getOrderPaymentStatus } from '../api/orders';
 import { QRCodeSVG } from 'qrcode.react';
@@ -107,7 +107,7 @@ export default function CheckoutPage() {
                 <span className="text-xl font-extrabold text-[#22c55e]">{total.toLocaleString('en-US', { maximumFractionDigits: 2 })} USDT</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-[var(--color-muted)] mb-6"><ShieldCheck size={14} className="text-[#22c55e]" /> Безопасная оплата через платформу</div>
-              <button onClick={handleOrder} disabled={loading} className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-[#22c55e] text-[#0d1512] font-extrabold text-sm hover:bg-[#16a34a] transition-colors shadow-[0_8px_32px_-8px_rgba(34,197,94,0.5)] disabled:opacity-50"><Sparkles size={16} /> {loading ? 'Оформление...' : 'Оплатить'}</button>
+              <button onClick={handleOrder} disabled={loading} className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#22c55e] text-[#0d1512] font-extrabold text-base hover:bg-[#16a34a] transition-colors shadow-[0_12px_32px_-8px_rgba(34,197,94,0.5)] disabled:opacity-50"><span>{loading ? 'Оформление...' : 'Оплатить'}</span><ArrowRight size={18} /></button>
             </>
           )}
 

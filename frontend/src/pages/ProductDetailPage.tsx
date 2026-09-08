@@ -181,7 +181,7 @@ export default function ProductDetailPage() {
             <button
               onClick={handleBuy}
               disabled={buying}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-[#22c55e] text-[#0d1512] font-bold text-sm hover:bg-[#16a34a] transition-colors disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-[#22c55e] text-[#0d1512] font-extrabold text-base hover:bg-[#16a34a] transition-colors disabled:opacity-50"
             >
               <ShoppingCart size={17} /> {buying ? 'Оформление...' : 'Купить'}
             </button>
