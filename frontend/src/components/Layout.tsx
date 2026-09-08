@@ -17,6 +17,15 @@ export default function Layout() {
   const { cart } = useApp();
   const { isAuthenticated, user } = useAuth();
 
+  // Скролл наверх при переходе ВПЕРЁД, но не при возврате назад.
+  // Кастомный кэш скролла ленты хранится в sessionStorage под ключом feed_scroll —
+  // при возврате на ленту он восстанавливается, поэтому наверх не скроллим.
+  useEffect(() => {
+    if (!sessionStorage.getItem('feed_scroll')) {
+      window.scrollTo(0, 0);
+    }
+  }, [location.pathname]);
+
   // Привязка external_user_id к устройству для push-уведомлений
   useEffect(() => {
     if (isAuthenticated && user?.id) {
