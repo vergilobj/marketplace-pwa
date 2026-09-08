@@ -190,7 +190,7 @@ export class OrdersService {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async cancelExpiredOrders() {
-    const cutoff = new Date(Date.now() - 15 * 60 * 1000);
+    const cutoff = new Date(Date.now() - 1 * 60 * 1000);
     const { count } = await this.prisma.order.updateMany({
       where: {
         status: 'PENDING',
