@@ -10,3 +10,7 @@ export const getOrderPaymentStatus = (orderId: string) =>
     api.get(`/payments/order/${orderId}/status`).then(res => res.data);
 export const getOrderPayAddress = (orderId: string) =>
     api.get(`/payments/order/${orderId}/pay`).then(res => res.data);
+export const payOrder = (orderId: string) =>
+    api.post(`/payments/order/${orderId}/pay`).then(res => res.data);
+export const getOrderPayStatus = (orderId: string) =>
+    api.get(`/payments/order/${orderId}/status`).then(res => res.data);

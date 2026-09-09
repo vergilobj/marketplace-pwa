@@ -3,10 +3,12 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ModerationService } from '../moderation/moderation.service';
 
 @Injectable()
 export class SocialService {
@@ -14,6 +16,7 @@ export class SocialService {
     private prisma: PrismaService,
     private auditService: AuditService,
     private notificationsService: NotificationsService,
+    private moderationService: ModerationService,
   ) {}
 
   async likePost(userId: string, postId: string) {
@@ -56,6 +59,15 @@ export class SocialService {
   async addComment(userId: string, postId: string, text: string) {
     const post = await this.prisma.post.findUnique({ where: { id: postId } });
     if (!post) throw new NotFoundException('Пост не найден');
+
+    const moderation = await this.moderationService.moderate({
+      text,
+      entityType: 'comment',
+      userId,
+    });
+    if (moderation.verdict === 'block') {
+      throw new BadRequestException(moderation.reason);
+    }
 
     const comment = await this.prisma.comment.create({
       data: { userId, postId, text },

@@ -2,20 +2,32 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { ModerationService } from '../moderation/moderation.service';
 
 @Injectable()
 export class ProductsService {
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
+    private moderationService: ModerationService,
   ) {}
 
   async create(sellerId: string, dto: CreateProductDto) {
+    const moderation = await this.moderationService.moderate({
+      text: [dto.title, dto.description].filter(Boolean).join('\n'),
+      entityType: 'product',
+      userId: sellerId,
+    });
+    if (moderation.verdict === 'block') {
+      throw new BadRequestException(moderation.reason);
+    }
+
     const product = await this.prisma.product.create({
       data: { ...dto, sellerId },
     });

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { NowPaymentsProvider } from './nowpayments.provider';
@@ -114,6 +114,33 @@ export class PaymentsService {
       transactionId: result.transactionId,
       status: result.status,
     };
+  }
+
+  /** Покупатель инициирует оплату: сверка владельца + создание/возврат платежа. */
+  async payOrderAsBuyer(orderId: string, userId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+    if (!order) throw new NotFoundException('Заказ не найден');
+    if (order.buyerId !== userId) {
+      throw new ForbiddenException('Платить может только покупатель заказа');
+    }
+
+    // Если депозит-адрес уже существует — вернуть его без создания дубля.
+    const existing = await this.prisma.transaction.findFirst({
+      where: { orderId, type: 'payment', provider: 'PAYMOD' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existing?.depositAddress) {
+      return {
+        depositAddress: existing.depositAddress,
+        clientRef: existing.clientRef,
+        amount: existing.amount,
+        status: existing.status,
+      };
+    }
+
+    return this.createPaymentForOrder(orderId);
   }
 
   /** Статус оплаты заказа: PENDING / CONFIRMED / SWEPT (+ depositAddress, txHash). */

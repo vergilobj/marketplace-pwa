@@ -10,6 +10,8 @@ import api from '../api/axios';
 import toast from 'react-hot-toast';
 import { formatPrice } from '../utils/format';
 import { resolveMedia } from '../utils/media';
+import BazarChat from '../components/bazar/BazarChat';
+import DictateButton from '../components/DictateButton';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 type TabType = 'all' | 'posts' | 'products' | 'ads';
@@ -256,12 +258,30 @@ export default function FeedPage() {
           </div>
         </div>
 
+        {/* БАЗАР — личный помощник */}
+        <div className="mb-10">
+          <div className="mb-4">
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">Спросить Базара</h2>
+          </div>
+          <div
+            className="rounded-3xl mb-1"
+            style={{ border: '1px solid rgba(34,197,94,0.12)' }}
+          >
+            <div className="rounded-3xl bg-[#0d1210] p-4 sm:p-5">
+              <BazarChat compact />
+            </div>
+          </div>
+        </div>
+
         {/* ПОИСК — минималистичный */}
         <div className="mb-8">
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)]" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Искать среди своих…" className="w-full pl-10 pr-4 py-3 rounded-xl bg-[var(--color-surface)] text-[var(--color-text)] text-sm outline-none border border-[var(--color-border)] focus:border-[#22c55e] transition-colors" />
-            {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)] hover:text-[var(--color-text)]"><X size={16} /></button>}
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Искать среди своих…" className="w-full pl-10 pr-20 py-3 rounded-xl bg-[var(--color-surface)] text-[var(--color-text)] text-sm outline-none border border-[var(--color-border)] focus:border-[#22c55e] transition-colors" />
+            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              <DictateButton size={15} className="w-8 h-8" onResult={(text) => setSearch(text)} />
+              {search && <button onClick={() => setSearch('')} className="text-[var(--color-muted)] hover:text-[var(--color-text)]"><X size={16} /></button>}
+            </div>
           </div>
         </div>
 

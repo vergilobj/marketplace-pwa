@@ -9,10 +9,12 @@ import {
   Headers,
   HttpCode,
   Logger,
+  Request,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import type { AuthenticatedRequest } from '../common/types/authenticated-request.interface';
 import { PaymentsService } from './payments.service';
 import { NowPaymentsProvider } from './nowpayments.provider';
 
@@ -45,6 +47,17 @@ export class PaymentsController {
   @Get('order/:orderId/pay')
   async getOrderPay(@Param('orderId') orderId: string) {
     return this.paymentsService.getOrderPayAddress(orderId);
+  }
+
+  // Публичный эндпоинт: покупатель инициирует оплату заказа.
+  // Создаёт платёж (или возвращает существующий депозит-адрес).
+  @UseGuards(JwtAuthGuard)
+  @Post('order/:orderId/pay')
+  async payOrder(
+    @Param('orderId') orderId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.paymentsService.payOrderAsBuyer(orderId, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

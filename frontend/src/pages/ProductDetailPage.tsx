@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, MessageCircle, Minus, Plus, ArrowLeft, ChevronLeft, ChevronRight, Heart } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, ArrowLeft, ChevronLeft, ChevronRight, Heart, Sparkles } from 'lucide-react';
 import { getProductById, getSimilarProducts } from '../api/products';
 import { createOrder, getOrderPaymentStatus } from '../api/orders';
 import { QRCodeSVG } from 'qrcode.react';
@@ -201,11 +201,12 @@ export default function ProductDetailPage() {
             </button>
             {isAuthenticated && (
               <button
-                onClick={() => navigate(`/chat?uid=${product.sellerId}&product=${product.id}`)}
-                className="shrink-0 w-12 flex items-center justify-center rounded-xl border border-[var(--color-border)] text-[var(--color-text)] hover:border-[#22c55e]/40 hover:bg-[var(--color-surface)] transition-colors"
-                title="Спросить продавца"
+                onClick={() => navigate(`/bazar?productId=${product.id}`)}
+                className="shrink-0 flex items-center justify-center gap-1.5 px-3 rounded-xl border border-[#22c55e]/40 text-[#22c55e] hover:bg-[#22c55e]/10 transition-colors"
+                title="Купить через Базара"
               >
-                <MessageCircle size={18} />
+                <Sparkles size={17} />
+                <span className="text-xs font-bold whitespace-nowrap">Купить через Базара</span>
               </button>
             )}
           </div>

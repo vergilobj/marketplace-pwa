@@ -41,6 +41,13 @@ model User {
   receivedMessages   ChatMessage[]       @relation("Receiver")
   avatar             String?
   auditLogs          AuditLog[]
+  bazarWelcomed      Boolean        @default(false)
+  bazarSessionKey    String?
+  bazarMessages      BazarMessage[]
+  dealsAsBuyer       Deal[]         @relation("DealBuyer")
+  dealsAsSeller      Deal[]         @relation("DealSeller")
+  trustScore         Float          @default(0.5)
+  trustScoreAt       DateTime?
 }
 
 enum UserRole {
@@ -69,10 +76,15 @@ model Product {
   media       String[]
   sellerId    String
   seller      User     @relation(fields: [sellerId], references: [id])
-  isActive    Boolean  @default(true)
-  isAd        Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  orders      Order[]
+  isActive     Boolean     @default(true)
+  isAd         Boolean     @default(false)
+  type         ProductType @default(PHYSICAL)
+  deliveryType String?
+  deliveryInfo Json?
+  tags         String[]    @default([])
+  createdAt    DateTime    @default(now())
+  orders       Order[]
+  deals        Deal[]
 }
 
 model Order {
@@ -95,6 +107,7 @@ model Order {
 
   post         Post?
   transactions Transaction[]
+  deals        Deal[]
 }
 
 enum OrderStatus {
@@ -103,6 +116,84 @@ enum OrderStatus {
   SHIPPED
   COMPLETED
   CANCELLED
+}
+
+enum ProductType {
+  PHYSICAL
+  DIGITAL
+}
+
+enum BazarRole {
+  USER
+  ASSISTANT
+}
+
+model BazarMessage {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      BazarRole @default(USER)
+  text      String?
+  refs      Json?
+  meta      Json?
+  dealId    String?
+  deal      Deal?     @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([dealId, createdAt])
+}
+
+enum DealStatus {
+  NEW
+  CONTACTED
+  NEGOTIATING
+  ACCEPTED
+  CLOSED
+  LOST
+}
+
+enum DealSource {
+  BAZAR_CHAT
+  FEED
+  DIRECT
+}
+
+model Deal {
+  id        String     @id @default(uuid())
+  buyerId   String
+  buyer     User       @relation("DealBuyer", fields: [buyerId], references: [id])
+  sellerId  String
+  seller    User       @relation("DealSeller", fields: [sellerId], references: [id])
+  productId String?
+  product   Product?   @relation(fields: [productId], references: [id])
+  source    DealSource @default(BAZAR_CHAT)
+  status    DealStatus @default(NEW)
+
+  orderId String?
+  order   Order?   @relation(fields: [orderId], references: [id])
+
+  lastMsgAt        DateTime? @updatedAt
+  msgCount         Int       @default(0)
+  sellerLastSeenAt DateTime?
+  buyerLastSeenAt  DateTime?
+  dispute          String?
+  originMsgId      String?
+
+  cashPrice        Float?
+  disputeVerdict   String?
+  disputeResolvedAt DateTime?
+  disputeNote      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages       BazarMessage[]
+  counterOffers  CounterOffer[]
+
+  @@index([buyerId, sellerId])
+  @@index([sellerId, status])
+  @@index([orderId])
 }
 
 model Post {
@@ -252,4 +343,54 @@ model AuditLog {
   userAgent String?
   metadata  Json?
   createdAt DateTime @default(now())
+}
+
+model AutopilotRun {
+  id         String    @id @default(uuid())
+  userId     String
+  kind       String    @default("AUTOPILOT") // AUTOPILOT | NEGOTIATION | ARBITRATION
+  status     String    @default("RUNNING")   // RUNNING | AWAITING_USER | DONE | FAILED | CANCELLED
+  goal       String
+  budget     Float?
+  maxSteps   Int       @default(5)
+  step       Int       @default(0)
+  lastStepAt DateTime?
+  error      String?
+  context    Json?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([userId, kind, status])
+}
+
+model CounterOffer {
+  id        String   @id @default(uuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  byUserId  String
+  amount    Float
+  status    String   @default("PENDING") // PENDING | ACCEPTED | REJECTED
+  createdAt DateTime @default(now())
+
+  @@index([dealId, status])
+}
+
+model ViewEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  @@index([productId, userId])
+  @@index([userId, createdAt])
+}
+
+model ProactiveEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  kind      String   // cold_lead | stuck_negotiation | frequent_views
+  refId     String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, kind, refId])
 }

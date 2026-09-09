@@ -10,7 +10,6 @@ import { InvitesModule } from './invites/invites.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PostsModule } from './posts/posts.module';
-import { ChatModule } from './chat/chat.module';
 
 import { SocialModule } from './social/social.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -18,6 +17,7 @@ import { SettingsModule } from './settings/settings.module';
 import { UploadModule } from './upload/upload.module';
 import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './common/audit/audit.module';
+import { BazarModule } from './bazar/bazar.module';
 
 @Module({
   imports: [
@@ -36,13 +36,13 @@ import { AuditModule } from './common/audit/audit.module';
     MarketplaceModule,
     PaymentsModule,
     PostsModule,
-    ChatModule,
     SocialModule,
     NotificationsModule,
     SettingsModule,
     UploadModule,
     AdminModule,
     AuditModule,
+    BazarModule,
   ],
   providers: [
     {

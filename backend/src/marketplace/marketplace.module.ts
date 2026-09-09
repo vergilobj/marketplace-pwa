@@ -6,9 +6,10 @@ import { OrdersService } from './orders.service';
 import { PaymentsModule } from '../payments/payments.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuditService } from '../common/audit/audit.service';
+import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
-  imports: [PaymentsModule, NotificationsModule],
+  imports: [PaymentsModule, NotificationsModule, ModerationModule],
   controllers: [ProductsController, OrdersController],
   providers: [ProductsService, OrdersService, AuditService],
 })

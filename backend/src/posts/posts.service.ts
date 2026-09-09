@@ -12,6 +12,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateAdDto } from './dto/create-ad.dto';
+import { ModerationService } from '../moderation/moderation.service';
 
 @Injectable()
 export class PostsService {
@@ -22,9 +23,19 @@ export class PostsService {
     private settingsService: SettingsService,
     private paymentsService: PaymentsService,
     private notificationsService: NotificationsService,
+    private moderationService: ModerationService,
   ) {}
 
   async create(authorId: string, dto: CreatePostDto) {
+    const moderation = await this.moderationService.moderate({
+      text: [dto.title, dto.content, dto.link].filter(Boolean).join('\n'),
+      entityType: 'post',
+      userId: authorId,
+    });
+    if (moderation.verdict === 'block') {
+      throw new BadRequestException(moderation.reason);
+    }
+
     const post = await this.prisma.post.create({
       data: { ...dto, authorId },
     });
@@ -60,6 +71,15 @@ export class PostsService {
   }
 
   async createAd(sellerId: string, dto: CreateAdDto) {
+    const moderation = await this.moderationService.moderate({
+      text: [dto.title, dto.content, dto.link].filter(Boolean).join('\n'),
+      entityType: 'ad',
+      userId: sellerId,
+    });
+    if (moderation.verdict === 'block') {
+      throw new BadRequestException(moderation.reason);
+    }
+
     const adPricePerDay =
       (await this.settingsService.getFloat('ad_price')) || 5000;
     const totalAmount = adPricePerDay * dto.days;

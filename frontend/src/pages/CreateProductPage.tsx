@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { createProduct } from '../api/products';
 import { uploadImage } from '../api/upload';
+import DictateButton from '../components/DictateButton';
 
 export default function CreateProductPage() {
   const navigate = useNavigate();
@@ -72,7 +73,12 @@ export default function CreateProductPage() {
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="Название" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required />
-          <Input label="Описание" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Input label="Описание" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+            </div>
+            <DictateButton size={18} className="w-11 h-11" onResult={(text) => setForm(f => ({ ...f, description: text }))} />
+          </div>
           <Input label="Цена (USDT)" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required />
 
           <div>

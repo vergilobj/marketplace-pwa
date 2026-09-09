@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingBag, MessageCircle, User, Heart, Bell, Search, X, Home } from 'lucide-react';
+import { ShoppingBag, User, Heart, Bell, Search, X, Home, Sparkles, Inbox } from 'lucide-react';
 import api from '../api/axios';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
@@ -89,6 +89,9 @@ export default function Layout() {
 
           {/* Иконки-действия — только десктоп, справа */}
           <nav className={`hidden sm:flex items-center gap-1.5 shrink-0 ml-auto transition-all duration-300 ${searchOpen ? 'opacity-0' : 'opacity-100'}`}>
+            <Link to="/bazar" className="w-10 h-10 rounded-full bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.08)] text-[var(--color-muted)] hover:text-[#22c55e] transition-colors flex items-center justify-center">
+              <Sparkles size={18} />
+            </Link>
             <Link to="/favorites" className="w-10 h-10 rounded-full bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.08)] text-[var(--color-muted)] hover:text-[#22c55e] transition-colors flex items-center justify-center">
               <Heart size={18} />
             </Link>
@@ -100,9 +103,11 @@ export default function Layout() {
             </Link>
             {isAuthenticated && (
               <>
-                <Link to="/chat" className="w-10 h-10 rounded-full bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.08)] text-[var(--color-muted)] hover:text-[#22c55e] transition-colors flex items-center justify-center">
-                  <MessageCircle size={18} />
-                </Link>
+                {user?.role === 'SELLER' || user?.role === 'ADMIN' ? (
+                  <Link to="/leads" title="Лиды" className="w-10 h-10 rounded-full bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.08)] text-[var(--color-muted)] hover:text-[#22c55e] transition-colors flex items-center justify-center">
+                    <Inbox size={18} />
+                  </Link>
+                ) : null}
                 <Link to="/notifications" className="w-10 h-10 rounded-full bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.08)] text-[var(--color-muted)] hover:text-[#22c55e] transition-colors flex items-center justify-center relative">
                   <Bell size={18} />
                   {unreadCount > 0 && (
@@ -150,7 +155,7 @@ export default function Layout() {
             <Link to="/products" className="text-[var(--color-muted)] hover:text-[#22c55e] transition-colors">Товары</Link>
             <Link to="/favorites" className="text-[var(--color-muted)] hover:text-[#22c55e] transition-colors">Избранное</Link>
             <Link to="/cart" className="text-[var(--color-muted)] hover:text-[#22c55e] transition-colors">Корзина</Link>
-            <Link to="/chat" className="text-[var(--color-muted)] hover:text-[#22c55e] transition-colors">Чат</Link>
+            <Link to="/bazar" className="text-[var(--color-muted)] hover:text-[#22c55e] transition-colors">Базар</Link>
             <Link to="/privacy" className="text-[var(--color-muted)] hover:text-[#22c55e] transition-colors">Приватность</Link>
           </div>
         </div>
@@ -165,6 +170,9 @@ export default function Layout() {
         <Link to="/" className={`flex flex-col items-center text-[11px] ${location.pathname === '/' ? 'text-[#22c55e]' : 'text-[var(--color-muted)]'}`}>
           <Home size={20} /><span className="mt-0.5">Главная</span>
         </Link>
+        <Link to="/bazar" className={`flex flex-col items-center text-[11px] ${location.pathname === '/bazar' ? 'text-[#22c55e]' : 'text-[var(--color-muted)]'}`}>
+          <Sparkles size={20} /><span className="mt-0.5">Базар</span>
+        </Link>
         <Link to="/favorites" className={`flex flex-col items-center text-[11px] ${location.pathname === '/favorites' ? 'text-[#22c55e]' : 'text-[var(--color-muted)]'}`}>
           <Heart size={20} /><span className="mt-0.5">Избранное</span>
         </Link>
@@ -175,9 +183,11 @@ export default function Layout() {
         </Link>
         {isAuthenticated && (
           <>
-            <Link to="/chat" className={`flex flex-col items-center text-[11px] ${location.pathname === '/chat' ? 'text-[#22c55e]' : 'text-[var(--color-muted)]'}`}>
-              <MessageCircle size={20} /><span className="mt-0.5">Чат</span>
-            </Link>
+            {user?.role === 'SELLER' || user?.role === 'ADMIN' ? (
+              <Link to="/leads" className={`flex flex-col items-center text-[11px] ${location.pathname === '/leads' ? 'text-[#22c55e]' : 'text-[var(--color-muted)]'}`}>
+                <Inbox size={20} /><span className="mt-0.5">Лиды</span>
+              </Link>
+            ) : null}
             <Link to="/profile" className={`flex flex-col items-center text-[11px] ${location.pathname === '/profile' ? 'text-[#22c55e]' : 'text-[var(--color-muted)]'}`}>
               <User size={20} /><span className="mt-0.5">Профиль</span>
             </Link>

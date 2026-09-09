@@ -16,7 +16,9 @@ const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const FavoritesPage = lazy(() => import('./pages/FavoritesPage'));
 const OrdersPage = lazy(() => import('./pages/OrdersPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
-const ChatPage = lazy(() => import('./pages/ChatPage'));
+// p2p-чат отключён — вместо него Базар.
+// const ChatPage = lazy(() => import('./pages/ChatPage'));
+const LeadsPage = lazy(() => import('./pages/LeadsPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
@@ -28,6 +30,7 @@ const WithdrawalsPage = lazy(() => import('./pages/WithdrawalsPage'));
 const EditPostPage = lazy(() => import('./pages/EditPostPage'));
 const MyProductsPage = lazy(() => import('./pages/MyProductsPage'));
 const ProductsPage = lazy(() => import('./pages/ProductsPage'));
+const BazarChatPage = lazy(() => import('./pages/BazarChatPage'));
 
 function Lazy({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<div className="flex justify-center py-20"><div className="w-8 h-8 rounded-full border-2 border-green-500 border-t-transparent animate-spin" /></div>}>{children}</Suspense>;
@@ -56,7 +59,7 @@ export default function App() {
           <Route path="/favorites" element={<ProtectedRoute><Lazy><FavoritesPage /></Lazy></ProtectedRoute>} />
           <Route path="/cart" element={<ProtectedRoute><Lazy><CartPage /></Lazy></ProtectedRoute>} />
           <Route path="/checkout" element={<ProtectedRoute><Lazy><CheckoutPage /></Lazy></ProtectedRoute>} />
-          <Route path="/chat" element={<ProtectedRoute><Lazy><ChatPage /></Lazy></ProtectedRoute>} />
+          {/* p2p-чат отключён — вместо него Базар. <Route path="/chat" element={<ProtectedRoute><Lazy><ChatPage /></Lazy></ProtectedRoute>} /> */}
           <Route path="/orders" element={<ProtectedRoute><Lazy><OrdersPage /></Lazy></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Lazy><ProfilePage /></Lazy></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><Lazy><NotificationsPage /></Lazy></ProtectedRoute>} />
@@ -68,6 +71,8 @@ export default function App() {
           <Route path="/posts/new" element={<ProtectedRoute requiredRole="ADMIN"><Lazy><CreatePostPage /></Lazy></ProtectedRoute>} />
           <Route path="/posts/:id/edit" element={<ProtectedRoute requiredRole="ADMIN"><Lazy><EditPostPage /></Lazy></ProtectedRoute>} />
           <Route path="/my-products" element={<ProtectedRoute requiredRole="SELLER"><Lazy><MyProductsPage /></Lazy></ProtectedRoute>} />
+          <Route path="/bazar" element={<Lazy><BazarChatPage /></Lazy>} />
+          <Route path="/leads" element={<ProtectedRoute requiredRole="SELLER"><Lazy><LeadsPage /></Lazy></ProtectedRoute>} />
         </Route>
       </Routes>
     </BrowserRouter>
