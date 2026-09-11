@@ -132,6 +132,30 @@ async def create_payout(req: PayoutRequest) -> dict:
     return {"tx_hash": None, "status": "failed", "error": "insufficient balance or gas"}
 
 
+@app.get("/v1/payout/{idempotency_key}")
+async def get_payout(idempotency_key: str) -> dict:
+    """Read-only статус выплаты по idempotency_key.
+
+    Нужен NestJS-стороне для D3 (lost-response double payout): если ответ
+    POST /v1/payout потерялся, но выплата ушла в сеть, вызывающий должен
+    узнать это по ТОМУ ЖЕ ключу, не создавая вторую выплату.
+
+    В отличие от POST /v1/payout (который создаёт запись и, при отсутствии
+    ключа, реально пытается платить), здесь ничего не пишется и не
+    отправляется. 404 — ключа нет, выплаты не было.
+    """
+    existing = await db.get_payout(idempotency_key)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="payout not found")
+    return {
+        "idempotency_key": existing["idempotency_key"],
+        "tx_hash": existing["tx_hash"],
+        "status": existing["status"],
+        "error": existing["error"],
+        "found": True,
+    }
+
+
 @app.get("/v1/tx/{tx_hash}")
 async def get_tx_status(tx_hash: str) -> dict:
     """Статус свипа/выплаты. Заглушка — прокидываем из paymod.db при наличии."""

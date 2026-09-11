@@ -82,27 +82,30 @@ export default function EditPostPage() {
     }
   };
 
-  if (loading) return <p className="text-center py-10 text-gray-500">Загрузка...</p>;
+  if (loading) return <p className="text-center py-10 text-[var(--color-muted)]">Загрузка...</p>;
 
   return (
     <div className="max-w-xl mx-auto">
-      <button onClick={() => navigate(-1)} className="flex items-center text-sm text-gray-500 mb-6">
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center text-sm text-[var(--color-muted)] hover:text-[#22c55e] transition-colors mb-6"
+      >
         <ArrowLeft size={16} className="mr-1" /> Назад
       </button>
       <Card>
         <div className="flex items-center gap-3 mb-6">
-          <FileText className="w-6 h-6 text-blue-600" />
-          <h1 className="text-2xl font-bold">Редактировать пост</h1>
+          <FileText className="w-6 h-6 text-[#22c55e]" />
+          <h1 className="text-2xl font-bold text-[var(--color-text)]">Редактировать пост</h1>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="Заголовок" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required />
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Текст</label>
+            <label className="block text-sm font-medium text-[var(--color-muted)] mb-1">Текст</label>
             <textarea
               value={form.content}
               onChange={e => setForm({ ...form, content: e.target.value })}
               rows={4}
-              className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-[#22c55e] focus:ring-2 focus:ring-[#22c55e]/20 outline-none transition-all"
+              className="w-full px-4 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--color-border)] text-[var(--color-text)] placeholder-[var(--color-faint)] focus:border-[rgba(34,197,94,0.6)] focus:shadow-[0_0_0_3px_rgba(34,197,94,0.15)] outline-none transition-all duration-200"
             />
           </div>
           <Input label="Ссылка (необязательно)" value={form.link} onChange={e => setForm({ ...form, link: e.target.value })} />
@@ -111,10 +114,10 @@ export default function EditPostPage() {
           {/* Существующие медиа */}
           {existingMedia.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Текущие изображения</label>
+              <label className="block text-sm font-medium text-[var(--color-muted)] mb-1">Текущие изображения</label>
               <div className="flex flex-wrap gap-2">
                 {existingMedia.map((url, idx) => (
-                  <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden">
+                  <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-[var(--color-border)]">
                     <img src={url} alt="" className="w-full h-full object-cover" />
                     <button type="button" onClick={() => removeExistingMedia(idx)} className="absolute top-0 right-0 bg-black/60 text-[var(--color-text)] rounded-full w-5 h-5 flex items-center justify-center"><X size={12} /></button>
                   </div>
@@ -125,16 +128,20 @@ export default function EditPostPage() {
 
           {/* Новые фото */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Добавить фото</label>
+            <label className="block text-sm font-medium text-[var(--color-muted)] mb-1">Добавить фото</label>
             <div className="flex flex-wrap gap-2 mb-2">
               {previews.map((src, idx) => (
-                <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden">
+                <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-[var(--color-border)]">
                   <img src={src} alt="" className="w-full h-full object-cover" />
                   <button type="button" onClick={() => removeFile(idx)} className="absolute top-0 right-0 bg-black/60 text-[var(--color-text)] rounded-full w-5 h-5 flex items-center justify-center"><X size={12} /></button>
                 </div>
               ))}
             </div>
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1 text-sm text-[#22c55e] hover:text-[#16a34a] transition-colors"
+            >
               <ImagePlus size={16} /> Добавить фото
             </button>
             <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileChange} className="hidden" />

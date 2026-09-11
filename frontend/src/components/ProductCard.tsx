@@ -24,11 +24,15 @@ export default function ProductCard({ product }: { product: any }) {
           <div className="w-full h-full flex items-center justify-center"><ShoppingCart size={28} className="text-[var(--color-faint)]" /></div>
         )}
 
+        {/* R15: на тач-устройствах hover нет — кнопка видна всегда (CSS .fav-btn) */}
         <button
           onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }}
-          className={`absolute top-2 right-2 p-2 rounded-lg transition-colors ${fav ? 'bg-[#22c55e] text-white' : 'bg-black/50 text-white opacity-0 group-hover:opacity-100'}`}
+          aria-label={fav ? 'Убрать из избранного' : 'В избранное'}
+          className="fav-btn absolute top-0.5 right-0.5 w-11 h-11 flex items-center justify-center"
         >
-          <Heart size={15} fill={fav ? 'currentColor' : 'none'} />
+          <span className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${fav ? 'bg-[#22c55e] text-white' : 'bg-black/60 text-white opacity-0 group-hover:opacity-100'}`}>
+            <Heart size={15} fill={fav ? 'currentColor' : 'none'} />
+          </span>
         </button>
       </div>
 
@@ -39,18 +43,19 @@ export default function ProductCard({ product }: { product: any }) {
         <div className="flex items-center justify-between mt-1">
           <span className="text-[15px] font-semibold text-[#22c55e]">{price}</span>
           {inCart ? (
-            <div className="flex items-center gap-1 border border-[var(--color-border)] rounded-lg px-1.5 py-1" onClick={e => e.stopPropagation()}>
-              <button onClick={(e) => { e.stopPropagation(); updateQuantity(product.id, -1); }} className="p-1 rounded-md hover:bg-[var(--bg-3)] text-[var(--color-text)]"><Minus size={13} /></button>
+            <div className="flex items-center gap-0.5 border border-[var(--color-border)] rounded-lg -mx-1" onClick={e => e.stopPropagation()}>
+              <button onClick={(e) => { e.stopPropagation(); updateQuantity(product.id, -1); }} aria-label="Меньше" className="w-11 h-11 flex items-center justify-center rounded-md hover:bg-[var(--bg-3)] text-[var(--color-text)]"><Minus size={13} /></button>
               <span className="text-sm font-medium min-w-[20px] text-center">{quantity}</span>
-              <button onClick={(e) => { e.stopPropagation(); addToCart(product); }} className="p-1 rounded-md hover:bg-[var(--bg-3)] text-[var(--color-text)]"><Plus size={13} /></button>
+              <button onClick={(e) => { e.stopPropagation(); addToCart(product); }} aria-label="Больше" className="w-11 h-11 flex items-center justify-center rounded-md hover:bg-[var(--bg-3)] text-[var(--color-text)]"><Plus size={13} /></button>
             </div>
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); addToCart(product); }}
-              className="w-8 h-8 rounded-lg bg-[#22c55e] text-white hover:bg-[#16a34a] transition-colors flex items-center justify-center"
+              className="w-11 h-11 rounded-lg bg-[#22c55e] text-white hover:bg-[#16a34a] transition-colors flex items-center justify-center shrink-0"
               title="В корзину"
+              aria-label="В корзину"
             >
-              <ShoppingCart size={15} />
+              <ShoppingCart size={17} />
             </button>
           )}
         </div>

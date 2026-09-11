@@ -3,6 +3,7 @@ import { SocialService } from './social.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ModerationService } from '../moderation/moderation.service';
 import {
   NotFoundException,
   ConflictException,
@@ -41,6 +42,10 @@ describe('SocialService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: NotificationsService, useValue: mockNotifications },
         { provide: AuditService, useValue: mockAudit },
+        {
+          provide: ModerationService,
+          useValue: { moderate: jest.fn().mockResolvedValue({ verdict: 'allow' }) },
+        },
       ],
     }).compile();
     service = module.get<SocialService>(SocialService);

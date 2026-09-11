@@ -9,4 +9,9 @@ export class UploadService {
     const base = this.config.get('UPLOAD_BASE_URL') || '';
     return `${base}/uploads/${filename}`;
   }
+
+  getVideoUrl(filename: string): string {
+    const base = this.config.get('UPLOAD_BASE_URL') || '';
+    return `${base}/uploads/videos/${filename}`;
+  }
 }

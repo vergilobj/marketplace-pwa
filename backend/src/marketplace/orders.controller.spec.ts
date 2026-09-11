@@ -56,7 +56,16 @@ describe('OrdersController', () => {
   describe('findById', () => {
     it('should return order by id', async () => {
       service.findById.mockResolvedValue({ id: 'order-1' });
-      expect(await controller.findById('order-1')).toEqual({ id: 'order-1' });
+      expect(
+        await controller.findById('order-1', {
+          user: { userId: 'buyer-1', role: 'BUYER' },
+        }),
+      ).toEqual({ id: 'order-1' });
+      expect(service.findById).toHaveBeenCalledWith(
+        'order-1',
+        'buyer-1',
+        'BUYER',
+      );
     });
   });
 

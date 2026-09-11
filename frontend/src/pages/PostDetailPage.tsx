@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useAuth } from '../hooks/useAuth';
 import { resolveMedia } from '../utils/media';
+import { isInternalVideo } from '../api/upload';
 import toast from 'react-hot-toast';
 
 export default function PostDetailPage() {
@@ -56,6 +57,16 @@ export default function PostDetailPage() {
             </div>
             <h1 className="text-xl font-extrabold text-[var(--color-text)] mb-3">{post.title}</h1>
             {post.content && <p className="text-[var(--color-muted)] text-sm leading-relaxed mb-4">{post.content}</p>}
+            {isInternalVideo(post.videoUrl) && (
+              <div className="-mx-6 mb-4 bg-black">
+                <video
+                  src={resolveMedia(post.videoUrl)}
+                  controls
+                  playsInline
+                  className="w-full max-h-[480px]"
+                />
+              </div>
+            )}
             {post.link && <a href={post.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-[#22c55e] hover:text-[#34d399] mb-4 break-all underline underline-offset-2"><ExternalLink size={12} /> {post.link}</a>}
             {media.length > 0 && (
               <div className="relative -mx-6 mb-4">

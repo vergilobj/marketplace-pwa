@@ -11,6 +11,7 @@ import {
   Header,
   Query,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.interface';
 import { RolesGuard } from '../auth/roles.guard';
@@ -21,8 +22,29 @@ import { UserRole } from '@prisma/client';
 
 @Controller('users')
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private jwtService: JwtService,
+  ) {}
 
+  /**
+   * Стать продавцом: BUYER → SELLER.
+   * Возвращает обновлённого юзера + свежий accessToken с новой ролью.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('BUYER', 'SELLER', 'ADMIN')
+  @Post('become-seller')
+  async becomeSeller(@Request() req: AuthenticatedRequest) {
+    const user = await this.usersService.becomeSeller(req.user.userId);
+    const accessToken = this.jwtService.sign({
+      sub: user.id,
+      phone: user.phone,
+      role: user.role,
+    });
+    return { user, accessToken };
+  }
+
+  /** @deprecated B13: отдаёт phone по номеру — оставлено как есть (вне скоупа L1). */
   @UseGuards(JwtAuthGuard)
   @Get('search')
   async searchByPhone(@Query('phone') phone: string) {
@@ -91,6 +113,20 @@ export class UsersController {
   @Get('me/balance')
   async getBalance(@Request() req: AuthenticatedRequest) {
     return this.usersService.getBalance(req.user.userId);
+  }
+
+  /** §8.2: история операций по журналу (LedgerEntry) с курсорной пагинацией. */
+  @UseGuards(JwtAuthGuard)
+  @Get('me/ledger')
+  async getLedger(
+    @Request() req: AuthenticatedRequest,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.usersService.getLedger(req.user.userId, {
+      limit: Number(limit) || 20,
+      cursor,
+    });
   }
 
   @UseGuards(JwtAuthGuard)
@@ -164,11 +200,26 @@ export class UsersController {
     return { message: 'Users approved' };
   }
 
+  /**
+   * B13: профиль по id. Свой профиль и ADMIN — полный объект.
+   * Для остальных — только публичный минимум (id, name, role), без phone и
+   * bonusBalance. Публичные поля нужны фронту для карточек продавца.
+   */
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  async getUserById(@Param('id') id: string) {
-    const user = await this.usersService.findById(id);
+  async getUserById(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const isSelf = req.user.userId === id;
+    const isAdmin = req.user.role === 'ADMIN';
+
+    const user = await this.usersService.findById(
+      id,
+      isSelf || isAdmin ? undefined : { id: true, name: true, role: true },
+    );
     if (!user) throw new NotFoundException('Пользователь не найден');
+
     const { passwordHash: _ph, ...result } = user;
     return result;
   }

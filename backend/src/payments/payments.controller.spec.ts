@@ -14,6 +14,7 @@ describe('PaymentsController', () => {
       status: 'pending',
     }),
     processSuccessfulPayment: jest.fn(),
+    verifyLegacyIpnPayment: jest.fn(),
     getAllTransactions: jest.fn(),
   };
 
@@ -33,6 +34,10 @@ describe('PaymentsController', () => {
     controller = module.get<PaymentsController>(PaymentsController);
     service = mockService;
     jest.clearAllMocks();
+    // clearAllMocks сбрасывает реализации — восстанавливаем дефолты.
+    mockNowPayments.verifyIpnSignature.mockReturnValue(true);
+    mockNowPayments.extractOrderId.mockReturnValue('order-1');
+    service.verifyLegacyIpnPayment.mockResolvedValue({ ok: true });
   });
 
   it('should be defined', () => {
@@ -80,9 +85,45 @@ describe('PaymentsController', () => {
 
     it('should process payment on finished status', async () => {
       mockNowPayments.verifyIpnSignature.mockReturnValue(true);
+      // NH7: без успешной сверки суммы заказ НЕ подтверждается.
+      service.verifyLegacyIpnPayment.mockResolvedValue({ ok: true });
       const body = { order_id: 'order-1', payment_status: 'finished' };
       await controller.handleIpn(body, 'valid-sig');
       expect(service.processSuccessfulPayment).toHaveBeenCalledWith('order-1');
+    });
+
+    /**
+     * NH7: legacy NowPayments IPN подтверждал заказ без сверки суммы —
+     * легаси-заказ можно было закрыть на неполную оплату (та же дыра, что B7,
+     * но в старом провайдере). Теперь сумма сверяется, и при недоплате
+     * processSuccessfulPayment НЕ вызывается.
+     */
+    it('NH7: НЕ подтверждает заказ, если сумма не сошлась', async () => {
+      mockNowPayments.verifyIpnSignature.mockReturnValue(true);
+      service.verifyLegacyIpnPayment.mockResolvedValue({
+        ok: false,
+        reason: 'underpaid:expected=100,paid=10',
+      });
+      const body = {
+        order_id: 'order-1',
+        payment_status: 'finished',
+        price_amount: 10,
+      };
+      const result = await controller.handleIpn(body, 'valid-sig');
+      expect(service.verifyLegacyIpnPayment).toHaveBeenCalled();
+      expect(service.processSuccessfulPayment).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ confirmed: false });
+    });
+
+    it('NH7: НЕ подтверждает заказ без order_id (деньги без привязки)', async () => {
+      mockNowPayments.verifyIpnSignature.mockReturnValue(true);
+      mockNowPayments.extractOrderId.mockReturnValue(null);
+      const result = await controller.handleIpn(
+        { payment_status: 'finished' },
+        'valid-sig',
+      );
+      expect(service.processSuccessfulPayment).not.toHaveBeenCalled();
+      expect(result).toEqual({ status: 'ok' });
     });
   });
 });

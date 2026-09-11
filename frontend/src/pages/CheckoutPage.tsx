@@ -1,27 +1,52 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShoppingBag, ShieldCheck, ArrowLeft, Copy, Check, Loader2, ArrowRight, Clock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { createOrder, getOrderPaymentStatus } from '../api/orders';
 import { QRCodeSVG } from 'qrcode.react';
+import { formatPrice } from '../utils/format';
 import toast from 'react-hot-toast';
 
 type Payment = { depositAddress?: string | null; clientRef?: string | null; status?: string; };
 
+type Invoice = {
+  orderId: string | null;
+  productId: string;
+  title: string;
+  quantity: number;
+  amount: number;
+  depositAddress: string | null;
+  clientRef: string | null;
+  status: string;
+};
+
 const PAYMENT_WINDOW_MS = 15 * 60 * 1000;
+const FINAL_STATUSES = ['CONFIRMED', 'SWEPT'];
+
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: 'Ожидание оплаты',
+  CONFIRMED: 'Оплачено',
+  SWEPT: 'Зачислено',
+  FAILED: 'Ошибка',
+};
+
+const isFinal = (s?: string) => !!s && FINAL_STATUSES.includes(s);
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { cart, clearCart } = useApp();
   const [loading, setLoading] = useState(false);
-  const [payment, setPayment] = useState<Payment | null>(null);
-  const [orderId, setOrderId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [copiedAddr, setCopiedAddr] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const invoicesRef = useRef<Invoice[]>([]);
+  const successRef = useRef(false);
   const total = cart.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
+
+  useEffect(() => { invoicesRef.current = invoices; }, [invoices]);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
@@ -33,8 +58,7 @@ export default function CheckoutPage() {
       setTimeLeft(left);
       if (left <= 0) {
         // счёт истёк — сбрасываем, возвращаем кнопку
-        setPayment(null);
-        setOrderId(null);
+        setInvoices([]);
         setExpiresAt(null);
         toast.error('Время оплаты истекло. Создайте новый счёт.');
       }
@@ -44,53 +68,98 @@ export default function CheckoutPage() {
     return () => clearInterval(timer);
   }, [expiresAt]);
 
-  // Поллинг статуса оплаты
+  const payable = invoices.filter((i) => !!i.depositAddress);
+  const paidCount = payable.filter((i) => isFinal(i.status)).length;
+  const allPaid = payable.length > 0 && payable.every((i) => isFinal(i.status));
+
+  // Поллинг статуса ВСЕХ счётов корзины
   useEffect(() => {
-    if (!orderId || !payment?.depositAddress) return;
-    pollRef.current = setInterval(async () => {
-      try {
-        const st = await getOrderPaymentStatus(orderId);
-        setPayment((prev) => ({ ...prev, status: st.status }));
-        if (st.status === 'CONFIRMED' || st.status === 'SWEPT') {
-          if (pollRef.current) clearInterval(pollRef.current);
-          toast.success('Оплата подтверждена!');
-          clearCart();
-          navigate('/orders');
-        }
-      } catch { /* продолжаем поллить */ }
-    }, 3000);
+    if (payable.length === 0 || allPaid) return;
+    const poll = async () => {
+      const targets = invoicesRef.current.filter((i) => i.depositAddress && i.orderId);
+      if (targets.length === 0) return;
+      const results = await Promise.all(
+        targets.map(async (inv) => {
+          try {
+            const st = await getOrderPaymentStatus(inv.orderId as string);
+            return { orderId: inv.orderId, status: st?.status as string };
+          } catch {
+            return null; // продолжаем поллить
+          }
+        }),
+      );
+      setInvoices((prev) =>
+        prev.map((inv) => {
+          const r = results.find((x) => x && x.orderId === inv.orderId);
+          return r?.status ? { ...inv, status: r.status } : inv;
+        }),
+      );
+    };
+    poll();
+    pollRef.current = setInterval(poll, 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderId, payment?.depositAddress]);
+  }, [payable.length, allPaid]);
+
+  // Все позиции оплачены → закрываем корзину
+  useEffect(() => {
+    if (!allPaid || successRef.current) return;
+    successRef.current = true;
+    if (pollRef.current) clearInterval(pollRef.current);
+    toast.success('Все позиции оплачены!');
+    clearCart();
+    navigate('/orders');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPaid]);
 
   const handleOrder = async () => {
     setLoading(true);
-    try {
-      let lastOrder: any = null;
-      for (const item of cart) {
-        lastOrder = await createOrder(item.productId, item.price * item.quantity);
+    successRef.current = false;
+    const created: Invoice[] = [];
+    const failed: string[] = [];
+    for (const item of cart) {
+      try {
+        const res: any = await createOrder(item.productId, item.price * item.quantity);
+        const pay: Payment = res?.payment || {};
+        created.push({
+          orderId: res?.id ?? null,
+          productId: item.productId,
+          title: item.title,
+          quantity: item.quantity,
+          amount: item.price * item.quantity,
+          depositAddress: pay.depositAddress || null,
+          clientRef: pay.clientRef || null,
+          status: pay.status || 'PENDING',
+        });
+      } catch (e: any) {
+        failed.push(`${item.title} (${e.response?.data?.message || 'ошибка'})`);
       }
-      const pay: Payment = lastOrder?.payment || {};
-      setOrderId(lastOrder?.id ?? null);
-      if (pay.depositAddress) {
-        setPayment({ depositAddress: pay.depositAddress, clientRef: pay.clientRef, status: pay.status || 'PENDING' });
-        setExpiresAt(Date.now() + PAYMENT_WINDOW_MS);
-        toast.success('Счёт создан. Оплатите USDT (BSC).');
-      } else {
-        setPayment({ status: pay.status || 'PENDING' });
-      }
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || 'Ошибка');
-    } finally { setLoading(false); }
+    }
+    setInvoices(created);
+
+    const withAddress = created.filter((i) => i.depositAddress);
+    if (withAddress.length > 0) {
+      setExpiresAt(Date.now() + PAYMENT_WINDOW_MS);
+      toast.success(
+        created.length === 1
+          ? 'Счёт создан. Оплатите USDT (BSC).'
+          : `Создано счетов: ${withAddress.length} из ${created.length}. Оплатите USDT (BSC) по каждому адресу.`,
+      );
+    } else if (created.length > 0) {
+      toast.error('Заказы созданы, но платёжные адреса не получены.');
+    }
+    if (failed.length > 0) {
+      toast.error(`Не оформлено: ${failed.join('; ')}`);
+    }
+    setLoading(false);
   };
 
-  const copyAddress = async () => {
-    if (!payment?.depositAddress) return;
+  const copyAddress = async (addr: string) => {
     try {
-      await navigator.clipboard.writeText(payment.depositAddress);
-      setCopied(true);
+      await navigator.clipboard.writeText(addr);
+      setCopiedAddr(addr);
       toast.success('Адрес скопирован');
-      setTimeout(() => setCopied(false), 1500);
+      setTimeout(() => setCopiedAddr((c) => (c === addr ? null : c)), 1500);
     } catch {
       toast.error('Не удалось скопировать');
     }
@@ -102,14 +171,17 @@ export default function CheckoutPage() {
     return `${m}:${sec}`;
   };
 
-  if (cart.length === 0 && !payment) {
+  if (cart.length === 0 && invoices.length === 0) {
     return (
       <div className="relative min-h-screen overflow-x-hidden">
         <div className="fixed inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.10) 0%, transparent 60%)' }} />
         <div className="relative max-w-xl mx-auto px-6 py-24 text-center">
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[var(--color-surface)] flex items-center justify-center"><ShoppingBag size={32} className="text-[var(--color-faint)]" /></div>
           <h1 className="text-3xl font-extrabold text-[var(--color-text)] mb-2">Пусто</h1>
-          <p className="text-[var(--color-muted)] mb-6">Нечего оплачивать.</p>
+          <p className="text-[var(--color-muted)] mb-8">Нечего оплачивать.</p>
+          <Link to="/products" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#22c55e] text-[#0d1512] font-bold text-sm hover:bg-[#16a34a] transition-colors shadow-[0_8px_32px_-8px_rgba(34,197,94,0.5)]">
+            <ShoppingBag size={16} /> В каталог
+          </Link>
         </div>
       </div>
     );
@@ -132,52 +204,83 @@ export default function CheckoutPage() {
 
           {cart.length > 0 && (
             <>
-              <div className="space-y-3 mb-6">
+              <div className="space-y-3 mb-6 mt-4">
                 {cart.map((item: any) => (
                   <div key={item.productId} className="flex justify-between items-center py-2 border-b border-[var(--color-border)]">
                     <span className="text-sm text-[var(--color-text)]">{item.title} × {item.quantity}</span>
-                    <span className="text-sm font-bold text-[#22c55e]">{(item.price * item.quantity).toLocaleString('en-US', { maximumFractionDigits: 2 })} USDT</span>
+                    <span className="text-sm font-bold text-[#22c55e]">{formatPrice(item.price * item.quantity)}</span>
                   </div>
                 ))}
               </div>
               <div className="flex justify-between items-center mb-6">
                 <span className="text-base font-bold text-[var(--color-text)]">Итого</span>
-                <span className="text-xl font-extrabold text-[#22c55e]">{total.toLocaleString('en-US', { maximumFractionDigits: 2 })} USDT</span>
+                <span className="text-xl font-extrabold text-[#22c55e]">{formatPrice(total)}</span>
               </div>
               <div className="flex items-center gap-2 text-xs text-[var(--color-muted)] mb-6"><ShieldCheck size={14} className="text-[#22c55e]" /> Безопасная оплата через платформу</div>
 
-              {/* Кнопка — только пока нет активного счёта */}
-              {!payment?.depositAddress && (
+              {/* Кнопка — только пока не созданы счета */}
+              {invoices.length === 0 && (
                 <button onClick={handleOrder} disabled={loading} className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#22c55e] text-[#0d1512] font-extrabold text-base hover:bg-[#16a34a] transition-colors shadow-[0_12px_32px_-8px_rgba(34,197,94,0.5)] disabled:opacity-50">
-                  <span>{loading ? 'Оформление...' : 'Создать счёт'}</span><ArrowRight size={18} />
+                  <span>{loading ? 'Оформление...' : `Создать счёт${cart.length > 1 ? ` на ${cart.length} позиции` : ''}`}</span><ArrowRight size={18} />
                 </button>
               )}
             </>
           )}
 
-          {payment?.depositAddress && (
-            <div className="mt-6 rounded-2xl bg-[var(--bg-3)] border border-[#22c55e]/20 p-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-bold text-[var(--color-text)]">Оплатите USDT (BSC) на адрес:</p>
+          {payable.length > 0 && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-bold text-[var(--color-text)]">
+                  Оплатите USDT (BSC) — {payable.length === 1 ? 'адрес:' : `по каждому адресу (${paidCount}/${payable.length} оплачено):`}
+                </p>
                 {timeLeft > 0 && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#22c55e]">
                     <Clock size={14} /> {formatTime(timeLeft)}
                   </span>
                 )}
               </div>
-              <div className="mb-4 flex justify-center">
-                <div className="w-full bg-white rounded-2xl p-4">
-                  <QRCodeSVG value={payment.depositAddress} className="w-full h-auto" />
-                </div>
+
+              <div className="space-y-4">
+                {invoices.map((inv) => (
+                  <div key={inv.orderId || inv.productId} className="rounded-2xl bg-[var(--bg-3)] border border-[#22c55e]/20 p-4">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-[var(--color-text)] truncate">{inv.title} × {inv.quantity}</div>
+                        <div className="text-xs text-[#22c55e] font-bold mt-0.5">{formatPrice(inv.amount)}</div>
+                      </div>
+                      <span className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full border ${isFinal(inv.status) ? 'text-[#0d1512] bg-[#22c55e] border-[#22c55e]' : inv.status === 'FAILED' ? 'text-red-400 border-red-400/40 bg-red-400/10' : 'text-[var(--color-muted)] border-[var(--color-border)] bg-[var(--color-surface)]'}`}>
+                        {STATUS_LABEL[inv.status] || inv.status}
+                      </span>
+                    </div>
+
+                    {inv.depositAddress ? (
+                      <>
+                        <div className="mb-3 flex justify-center">
+                          <div className="w-full max-w-[220px] bg-white rounded-2xl p-3">
+                            <QRCodeSVG value={inv.depositAddress} className="w-full h-auto" />
+                          </div>
+                        </div>
+                        <div className="relative">
+                          <code className="block w-full pl-3 pr-12 py-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[#34d399] break-all font-mono">{inv.depositAddress}</code>
+                          <button onClick={() => copyAddress(inv.depositAddress as string)} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-muted)] hover:text-[#22c55e] hover:bg-[var(--bg-3)] transition-colors" title="Копировать адрес">
+                            {copiedAddr === inv.depositAddress ? <Check size={16} className="text-[#22c55e]" /> : <Copy size={16} />}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-xs text-red-400">Платёжный адрес не получен. Создайте счёт заново.</p>
+                    )}
+                  </div>
+                ))}
               </div>
-              <div className="relative mt-2">
-                <code className="block w-full pl-3 pr-12 py-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[#34d399] break-all font-mono">{payment.depositAddress}</code>
-                <button onClick={copyAddress} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-muted)] hover:text-[#22c55e] hover:bg-[var(--bg-3)] transition-colors" title="Копировать адрес">
-                  {copied ? <Check size={16} className="text-[#22c55e]" /> : <Copy size={16} />}
-                </button>
+
+              <div className="flex items-center gap-2 mt-4 text-xs text-[var(--color-muted)]">
+                <Loader2 size={14} className={`animate-spin text-[#22c55e] ${allPaid ? 'opacity-0' : ''}`} />
+                {allPaid ? 'Все позиции оплачены — переходим к заказам...' : 'Ожидание подтверждения транзакций (BSC)...'}
               </div>
-              <div className="flex items-center gap-2 mt-4 text-xs text-[var(--color-muted)]"><Loader2 size={14} className="animate-spin text-[#22c55e]" /> Ожидание подтверждения транзакции (BSC)...</div>
-              <p className="mt-2 text-[11px] text-[var(--color-faint)]">Статус: {payment.status || 'PENDING'}</p>
+              <p className="mt-2 text-[11px] text-[var(--color-faint)]">
+                Заказ считается оплаченным только после подтверждения сети. Неоплаченные счета автоматически отменяются через 15 минут.
+              </p>
             </div>
           )}
         </motion.div>

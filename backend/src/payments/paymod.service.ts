@@ -94,6 +94,30 @@ export class PaymodService {
     return this.request('GET', `/v1/tx/${txHash}`);
   }
 
+  /**
+   * D3: read-only статус выплаты по idempotency_key.
+   *
+   * Возвращает null, если выплаты с таким ключом нет (404) — тогда откат
+   * безопасен. Если запись есть — отдаёт {tx_hash, status}. Ничего не
+   * создаёт и не отправляет (в отличие от payout(), который для нового
+   * ключа реально инициирует перевод).
+   */
+  async getPayout(
+    idempotencyKey: string,
+  ): Promise<{ tx_hash: string | null; status: string; error?: string | null } | null> {
+    try {
+      return await this.request<{
+        tx_hash: string | null;
+        status: string;
+        error?: string | null;
+      }>('GET', `/v1/payout/${encodeURIComponent(idempotencyKey)}`);
+    } catch (err: any) {
+      // 404 приходит как Error('paymod error: 404 ...') — выплаты нет.
+      if (String(err?.message ?? '').includes('404')) return null;
+      throw err;
+    }
+  }
+
   /** Валидация HMAC входящего webhook. timestamp+rawBody против подписи. */
   verifyWebhookSignature(timestamp: string, rawBody: string, signature: string): boolean {
     return this.verify(timestamp, rawBody, signature);

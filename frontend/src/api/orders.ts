@@ -6,6 +6,10 @@ export const updateOrderStatus = (id: string, status: string) =>
 export const createOrder = (productId: string, amount: number) =>
     api.post('/orders', { productId, amount }).then(res => res.data);
 
+/** §4.3: покупатель подтверждает получение → релиз эскроу продавцу. */
+export const confirmOrderReceipt = (id: string) =>
+    api.post(`/orders/${id}/confirm`).then(res => res.data);
+
 export const getOrderPaymentStatus = (orderId: string) =>
     api.get(`/payments/order/${orderId}/status`).then(res => res.data);
 export const getOrderPayAddress = (orderId: string) =>

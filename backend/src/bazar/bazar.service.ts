@@ -149,8 +149,14 @@ export class BazarService {
       dealsHint,
     });
 
+    // Явная инструкция: каталог содержит И товары, И посты ленты.
+    const catalogHint =
+      'В каталоге (catalog) есть и товары (PRODUCT в catalog.products), и посты ленты (POST в catalog.posts). ' +
+      'Отвечая на поиск, показывай И товары, И посты: для постов используй refs типом "POST", для товаров — "PRODUCT". ' +
+      'Не игнорируй посты, даже если пользователь просил «товары» — упоминай релевантные посты ленты тоже.';
+
     // Без system-роли: личность подхватит SOUL профиля bazar.
-    const userMessage = `КОНТЕКСТ:\n${contextBlock}\n\nЗАПРОС ПОЛЬЗОВАТЕЛЯ: ${text}`;
+    const userMessage = `КОНТЕКСТ:\n${contextBlock}\n\n${catalogHint}\n\nЗАПРОС ПОЛЬЗОВАТЕЛЯ: ${text}`;
 
     let answer;
     try {

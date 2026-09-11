@@ -4,7 +4,11 @@ import {
   BadRequestException,
   Logger,
   ForbiddenException,
+  Optional,
+  OnModuleInit,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { EscrowStatus, OrderStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { SettingsService } from '../settings/settings.service';
@@ -13,9 +17,11 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateAdDto } from './dto/create-ad.dto';
 import { ModerationService } from '../moderation/moderation.service';
+import { AdActivationHook } from '../payments/ad-activation.hook';
+import { addDays } from '../payments/money.util';
 
 @Injectable()
-export class PostsService {
+export class PostsService implements OnModuleInit {
   private readonly logger = new Logger(PostsService.name);
   constructor(
     private prisma: PrismaService,
@@ -24,7 +30,19 @@ export class PostsService {
     private paymentsService: PaymentsService,
     private notificationsService: NotificationsService,
     private moderationService: ModerationService,
+    // NH5-ad: мост к payments. @Optional — юнит-тесты конструируют без него.
+    @Optional() private readonly adActivation?: AdActivationHook,
   ) {}
+
+  /**
+   * NH5-ad: регистрируем в payments реакцию «депозит подтверждён → активация
+   * рекламы». Раньше createAd сам подтверждал оплату без депозита — это был
+   * минт на ad_price × days. Теперь единственный путь к PAID/HELD — webhook
+   * депозита, а он после холда дёргает этот колбэк.
+   */
+  onModuleInit(): void {
+    this.adActivation?.register((orderId) => this.activateAdForOrder(orderId));
+  }
 
   async create(authorId: string, dto: CreatePostDto) {
     const moderation = await this.moderationService.moderate({
@@ -115,9 +133,39 @@ export class PostsService {
       where: { id: post.id },
       data: { orderId: order.id },
     });
+    // NH5-ad: создаём депозит-адрес и ждём РЕАЛЬНОЙ оплаты.
+    //
+    // Здесь БОЛЬШЕ НЕТ processSuccessfulPayment: этот вызов ставил заказ в
+    // PAID + escrowStatus=HELD без депозита, реклама активировалась, а через
+    // 5 дней autoCloseOrders возвращал покупателю (самому рекламодателю)
+    // escrowAmount на AVAILABLE → вывод в BSC. Минт.
+    //
+    // Теперь оплата идёт штатным путём: заказ PENDING, escrow NONE →
+    // покупатель платит на депозит-адрес → paymod-webhook сверяет сумму,
+    // зовёт processSuccessfulPayment (PAID + HELD) → тот дёргает
+    // AdActivationHook → реклама активируется. См. activateAdForOrder().
     await this.paymentsService.createPaymentForOrder(order.id);
-    await this.paymentsService.processSuccessfulPayment(order.id);
-    await this.activatePost(order.id, dto.days);
+
+    // Оплаченный срок размещения — свойство РЕКЛАМЫ, а не заказа, и поля под
+    // него в схеме нет (её делят несколько билдеров). Фиксируем его в payload
+    // платежа: activateAdForOrder читает `adDays` оттуда. Так срок остаётся
+    // верным, даже если админ поменяет ad_price между созданием и активацией.
+    const payment = await this.prisma.transaction.findFirst({
+      where: { orderId: order.id, type: 'payment' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, payload: true },
+    });
+    if (payment) {
+      const payload =
+        payment.payload && typeof payment.payload === 'object'
+          ? (payment.payload as Record<string, unknown>)
+          : {};
+      await this.prisma.transaction.update({
+        where: { id: payment.id },
+        data: { payload: { ...payload, adDays: dto.days } },
+      });
+    }
+
     await this.auditService.log({
       userId: sellerId,
       action: 'ad_created',
@@ -130,7 +178,12 @@ export class PostsService {
     });
   }
 
-  async findAll(params: { page?: number; limit?: number; sort?: string }) {
+  async findAll(params: {
+    page?: number;
+    limit?: number;
+    sort?: string;
+    search?: string;
+  }) {
     const page = params.page || 1;
     const limit = params.limit || 20;
     const skip = (page - 1) * limit;
@@ -147,13 +200,27 @@ export class PostsService {
         break;
     }
 
-    const where = {
+    const search = params.search?.trim();
+    const visibility = {
       isHidden: false,
       OR: [
         { isAd: false },
         { isAd: true, isPinned: true, adExpireDate: { gte: now } },
       ],
     };
+    const where: any = search
+      ? {
+          AND: [
+            visibility,
+            {
+              OR: [
+                { title: { contains: search, mode: 'insensitive' } },
+                { content: { contains: search, mode: 'insensitive' } },
+              ],
+            },
+          ],
+        }
+      : visibility;
 
     const [items, total] = await Promise.all([
       this.prisma.post.findMany({
@@ -217,18 +284,139 @@ export class PostsService {
     return deleted;
   }
 
-  async activatePost(orderId: string, days: number = 7) {
+  /**
+   * NH5-ad: активация рекламы ТОЛЬКО после реального депозита.
+   *
+   * Вызывается хуком из `PaymentsService.processSuccessfulPayment` (то есть
+   * из webhook депозита paymod / легаси-IPN с проверенной суммой) — после
+   * того, как заказ стал PAID и эскроу встал в HELD.
+   *
+   * Здесь жёсткий guard: активируем рекламу только при PAID + HELD. Раньше
+   * `createAd` активировал её сразу, что и давало бесплатную рекламу + минт
+   * через таймаут-возврат эскроу.
+   *
+   * @returns true — активировали; false — не оплачено / не рекламный заказ /
+   *          уже активно.
+   */
+  async activateAdForOrder(orderId: string): Promise<boolean> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        status: true,
+        escrowStatus: true,
+        escrowHeldAt: true,
+      },
+    });
+    if (!order) return false;
+
+    if (
+      order.status !== OrderStatus.PAID ||
+      order.escrowStatus !== EscrowStatus.HELD
+    ) {
+      this.logger.warn(
+        `activateAdForOrder: order ${orderId} не оплачен (${order.status}/${order.escrowStatus}) — реклама не активируется`,
+      );
+      return false;
+    }
+
     const post = await this.prisma.post.findUnique({ where: { orderId } });
-    if (!post) return;
-    const expireDate = new Date();
-    expireDate.setDate(expireDate.getDate() + days);
+    if (!post) return false; // обычный товарный заказ — не наша забота
+
+    if (post.isPinned && post.adExpireDate && post.adExpireDate > new Date()) {
+      return false; // уже активна, повторный webhook/крон — no-op
+    }
+
+    // Срок размещения = ОПЛАЧЕННЫЙ срок (dto.days), а не окно эскроу.
+    // Раньше здесь брался escrow_ship_deadline_days (5 дней): пользователь
+    // платил за 30 дней, а реклама гасла через 5. Эскроу-окно про защиту
+    // платежа (когда autoCloseOrders вернёт деньги), срок размещения — про то,
+    // что куплено. Это разные вещи и они не обязаны совпадать.
+    const days = await this.adDaysForOrder(orderId);
+    const base = order.escrowHeldAt ?? new Date();
+    const expireDate = addDays(base, days);
     await this.prisma.post.update({
       where: { id: post.id },
       data: { isPinned: true, adExpireDate: expireDate },
     });
     this.logger.log(
-      `Post ${post.id} activated until ${expireDate.toISOString()}`,
+      `Ad post ${post.id} activated until ${expireDate.toISOString()} (order ${orderId})`,
     );
+    return true;
+  }
+
+  /**
+   * Оплаченный срок размещения рекламы (дни).
+   *
+   * В `Post` нет поля `days` (схему делят несколько билдеров — новых полей не
+   * заводим), поэтому срок выводим из заказа: `amount = ad_price × days`.
+   * Основной путь — `Transaction.payload.days` (пишется при создании платежа);
+   * фолбэк — `round(Order.amount / ad_price)`.
+   *
+   * Возвращает целое >= 1; при любой неопределённости (нет заказа, нулевая
+   * цена, дробный остаток) — 1 день, чтобы не выдать рекламу «на халяву».
+   */
+  private async adDaysForOrder(orderId: string): Promise<number> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { amount: true },
+    });
+    if (!order) return 1;
+
+    const tx = await this.prisma.transaction.findFirst({
+      where: { orderId },
+      orderBy: { createdAt: 'desc' },
+      select: { payload: true },
+    });
+    const raw = tx?.payload as { adDays?: unknown; days?: unknown } | null;
+    const fromPayload = Number(raw?.adDays ?? raw?.days);
+    if (Number.isFinite(fromPayload) && fromPayload >= 1) {
+      return Math.floor(fromPayload);
+    }
+
+    const adPrice = (await this.settingsService.getFloat('ad_price')) || 5000;
+    const days = adPrice > 0 ? Math.round(order.amount / adPrice) : 1;
+    return days >= 1 ? days : 1;
+  }
+
+  /**
+   * NH5-ad: страховка. Если webhook подтвердил депозит, но вызов моста упал
+   * (рестарт процесса между холдом и активацией) — заказ PAID + HELD, а
+   * реклама не активна. Cron догоняет. Идемпотентно.
+   *
+   * NH9: инвариант «PAID + HELD + post != null = оплаченная реклама» не
+   * ломается закрытием эскроу — рекламный заказ не переводится в COMPLETED,
+   * а остаётся PAID с escrowStatus = RELEASED, поэтому сюда он уже не
+   * попадает (выборка требует HELD). Условие `post: { isNot: null }` при
+   * этом дополнительно гарантирует, что обычный товарный заказ, у которого
+   * пост не создан, никогда не будет активирован как реклама.
+   */
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async reconcilePaidAds(): Promise<{ activated: number }> {
+    const orders = await this.prisma.order.findMany({
+      where: {
+        status: OrderStatus.PAID,
+        escrowStatus: EscrowStatus.HELD,
+        post: { isNot: null },
+      },
+      select: { id: true },
+      take: 50,
+    });
+
+    let activated = 0;
+    for (const o of orders) {
+      try {
+        if (await this.activateAdForOrder(o.id)) activated++;
+      } catch (e) {
+        this.logger.error(
+          `reconcilePaidAds failed for order ${o.id}: ${(e as Error).message}`,
+        );
+      }
+    }
+    if (activated > 0) {
+      this.logger.log(`reconcilePaidAds: activated ${activated} ad(s)`);
+    }
+    return { activated };
   }
 
   async getFeed(params: {
@@ -236,6 +424,7 @@ export class PostsService {
     page?: number;
     limit?: number;
     sort?: string;
+    search?: string;
   }) {
     const page = params.page || 1;
     const limit = params.limit || 20;
@@ -255,13 +444,29 @@ export class PostsService {
         break;
     }
 
-    const where = {
+    // R10: серверный поиск. Условие видимости (isHidden/реклама) должно
+    // сохраняться вместе с поиском — объединяем через AND.
+    const search = params.search?.trim();
+    const visibility = {
       isHidden: false,
       OR: [
         { isAd: false },
         { isAd: true, isPinned: true, adExpireDate: { gte: now } },
       ],
     };
+    const where: any = search
+      ? {
+          AND: [
+            visibility,
+            {
+              OR: [
+                { title: { contains: search, mode: 'insensitive' } },
+                { content: { contains: search, mode: 'insensitive' } },
+              ],
+            },
+          ],
+        }
+      : visibility;
 
     const [items, total] = await Promise.all([
       this.prisma.post.findMany({

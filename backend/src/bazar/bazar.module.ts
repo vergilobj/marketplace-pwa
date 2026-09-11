@@ -12,9 +12,16 @@ import { ProactiveService } from './proactive.service';
 import { ArbitrageService } from './arbitrage.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ModerationModule } from '../moderation/moderation.module';
+import { PaymentsModule } from '../payments/payments.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
-  imports: [NotificationsModule, ModerationModule],
+  imports: [
+    NotificationsModule,
+    ModerationModule,
+    PaymentsModule,
+    SettingsModule,
+  ],
   controllers: [BazarController],
   providers: [
     BazarService,

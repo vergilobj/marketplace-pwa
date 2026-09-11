@@ -4,6 +4,10 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NowPaymentsProvider } from './nowpayments.provider';
+import { PaymodProvider } from './paymod.provider';
+import { PaymodService } from './paymod.service';
+import { LedgerService } from './ledger.service';
+import { EscrowService } from './escrow.service';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
@@ -14,8 +18,8 @@ describe('PaymentsService', () => {
     amount: 1000,
     status: 'PENDING',
     productId: 'prod-1',
-    platformFee: 0,
-    referralBonus: 0,
+    platformFee: 100,
+    referralBonus: 50,
     referralUserId: null,
     transactionId: null,
     buyer: { id: 'buyer-1', name: 'Buyer' },
@@ -27,6 +31,7 @@ describe('PaymentsService', () => {
     order: {
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     transaction: {
       create: jest.fn(),
@@ -37,8 +42,18 @@ describe('PaymentsService', () => {
     user: {
       update: jest.fn(),
     },
+    withdrawalRequest: {
+      findMany: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      update: jest.fn(),
+    },
+    ledgerEntry: {
+      findMany: jest.fn(),
+    },
+    $transaction: jest.fn((fn: any) => fn(mockPrisma)),
   };
   const mockSettings = {
+    get: jest.fn().mockResolvedValue('paymod'),
     getFloat: jest.fn((key: string) => {
       if (key === 'platform_fee_percent') return Promise.resolve(10);
       if (key === 'referral_percent') return Promise.resolve(5);
@@ -59,6 +74,30 @@ describe('PaymentsService', () => {
     }),
   };
 
+  const mockPaymod = {
+    createPayment: jest.fn().mockResolvedValue({
+      success: true,
+      transactionId: 'mp-txn-order-1',
+      status: 'pending',
+      raw: { deposit_address: '0xabc', client_ref: 'mp-txn-order-1' },
+    }),
+  };
+
+  const mockEscrow = {
+    holdForOrder: jest.fn().mockResolvedValue({ held: true, amount: 1000 }),
+    releaseEscrow: jest.fn(),
+    refundEscrow: jest.fn(),
+  };
+
+  const mockPaymodService = {
+    getTxStatus: jest.fn(),
+  };
+
+  const mockLedger = {
+    credit: jest.fn().mockResolvedValue({ applied: [], skipped: [] }),
+    debit: jest.fn().mockResolvedValue({ applied: [], skipped: [] }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -66,12 +105,23 @@ describe('PaymentsService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: SettingsService, useValue: mockSettings },
         { provide: NowPaymentsProvider, useValue: mockNowPayments },
+        { provide: PaymodProvider, useValue: mockPaymod },
+        { provide: PaymodService, useValue: mockPaymodService },
+        { provide: LedgerService, useValue: mockLedger },
         { provide: NotificationsService, useValue: mockNotifications },
+        { provide: EscrowService, useValue: mockEscrow },
       ],
     }).compile();
     service = module.get<PaymentsService>(PaymentsService);
     prisma = mockPrisma;
     jest.clearAllMocks();
+    mockSettings.get.mockResolvedValue('paymod');
+    mockPaymod.createPayment.mockResolvedValue({
+      success: true,
+      transactionId: 'mp-txn-order-1',
+      status: 'pending',
+      raw: { deposit_address: '0xabc', client_ref: 'mp-txn-order-1' },
+    });
   });
 
   it('should be defined', () => {
@@ -82,7 +132,7 @@ describe('PaymentsService', () => {
     it('should throw if order not found', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(null);
       await expect(service.createPaymentForOrder('bad-id')).rejects.toThrow(
-        'Order not found',
+        'Заказ не найден',
       );
     });
 
@@ -96,89 +146,163 @@ describe('PaymentsService', () => {
       );
     });
 
-    it('should calculate platform fees for product orders', async () => {
+    it('§7.4: НЕ пересчитывает комиссии (снапшот берётся из Order)', async () => {
       mockPrisma.order.findUnique.mockResolvedValue(mockOrder);
-      mockPrisma.order.update.mockResolvedValue({});
       mockPrisma.transaction.create.mockResolvedValue({});
       await service.createPaymentForOrder('order-1');
-      expect(mockPrisma.order.update).toHaveBeenCalledWith(
+      expect(mockPrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('создаёт транзакцию с expectedAmountRaw и tokenDecimals', async () => {
+      mockPrisma.order.findUnique.mockResolvedValue(mockOrder);
+      mockPrisma.transaction.create.mockResolvedValue({});
+      const result = await service.createPaymentForOrder('order-1');
+      expect(result).toHaveProperty('depositAddress');
+      expect(mockPrisma.transaction.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            platformFee: 100,
-            referralBonus: 50,
+            expectedAmountRaw: expect.any(String),
+            tokenDecimals: 18,
           }),
         }),
       );
     });
+  });
 
-    it('should create transaction and return invoice url', async () => {
-      mockPrisma.order.findUnique.mockResolvedValue(mockOrder);
-      mockPrisma.order.update.mockResolvedValue({});
-      mockPrisma.transaction.create.mockResolvedValue({});
-      const result = await service.createPaymentForOrder('order-1');
-      expect(result).toHaveProperty('invoiceUrl');
-      expect(result).toHaveProperty('transactionId');
-      expect(mockPrisma.transaction.create).toHaveBeenCalled();
+  describe('processSuccessfulPayment (§4.2, этап 3)', () => {
+    it('ничего не делает, если guard не захватил заказ (уже не PENDING)', async () => {
+      mockPrisma.order.updateMany.mockResolvedValue({ count: 0 });
+      await service.processSuccessfulPayment('order-1');
+      expect(mockEscrow.holdForOrder).not.toHaveBeenCalled();
+    });
+
+    it('PENDING → PAID + escrow hold (split НЕ исполняется)', async () => {
+      mockPrisma.order.updateMany.mockResolvedValue({ count: 1 });
+      mockEscrow.holdForOrder.mockResolvedValue({ held: true, amount: 1000 });
+      await service.processSuccessfulPayment('order-1');
+
+      expect(mockPrisma.order.updateMany).toHaveBeenCalledWith({
+        where: { id: 'order-1', status: 'PENDING' },
+        data: expect.objectContaining({ status: 'PAID' }),
+      });
+      expect(mockEscrow.holdForOrder).toHaveBeenCalledWith('order-1');
+      // Сплит больше НЕ создаётся и бонус НЕ начисляется на этом шаге.
+      expect(mockPrisma.transaction.createMany).not.toHaveBeenCalled();
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('идемпотентен: повторный вызов не холдирует второй раз', async () => {
+      mockPrisma.order.updateMany.mockResolvedValueOnce({ count: 1 });
+      mockEscrow.holdForOrder.mockResolvedValue({ held: true, amount: 1000 });
+      await service.processSuccessfulPayment('order-1');
+
+      mockPrisma.order.updateMany.mockResolvedValueOnce({ count: 0 });
+      await service.processSuccessfulPayment('order-1');
+
+      expect(mockEscrow.holdForOrder).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('processSuccessfulPayment', () => {
-    it('should do nothing if order not found', async () => {
-      mockPrisma.order.findUnique.mockResolvedValue(null);
-      await service.processSuccessfulPayment('bad-id');
-      expect(mockPrisma.order.update).not.toHaveBeenCalled();
+  describe('reconcilePayouts (D3)', () => {
+    it('CONFIRMED в сети → status=paid, payoutStatus=CONFIRMED', async () => {
+      mockPrisma.withdrawalRequest.findMany.mockResolvedValue([
+        {
+          id: 'wr-1',
+          userId: 'user-1',
+          amount: 100,
+          status: 'approved',
+          payoutStatus: 'SUBMITTED',
+          payoutTxHash: '0xtx1',
+          payoutAttempts: 1,
+        },
+      ]);
+      mockPaymodService.getTxStatus.mockResolvedValue({
+        tx_hash: '0xtx1',
+        status: 'CONFIRMED',
+        confirmations: 12,
+      });
+      mockPrisma.withdrawalRequest.update.mockResolvedValue({});
+
+      const result = await service.reconcilePayouts();
+
+      expect(result.confirmed).toBe(1);
+      expect(mockPrisma.withdrawalRequest.update).toHaveBeenCalledWith({
+        where: { id: 'wr-1' },
+        data: { status: 'paid', payoutStatus: 'CONFIRMED' },
+      });
     });
 
-    it('should do nothing if order not PENDING', async () => {
-      mockPrisma.order.findUnique.mockResolvedValue({
-        ...mockOrder,
-        status: 'PAID',
+    it('FAILED в сети → reversal + заявка обратно в pending', async () => {
+      mockPrisma.withdrawalRequest.findMany.mockResolvedValue([
+        {
+          id: 'wr-2',
+          userId: 'user-2',
+          amount: 50,
+          status: 'approved',
+          payoutStatus: 'SUBMITTED',
+          payoutTxHash: '0xtx2',
+          payoutAttempts: 1,
+        },
+      ]);
+      mockPaymodService.getTxStatus.mockResolvedValue({
+        tx_hash: '0xtx2',
+        status: 'failed',
+        confirmations: 0,
       });
-      await service.processSuccessfulPayment('order-1');
-      expect(mockPrisma.order.update).not.toHaveBeenCalled();
-    });
+      // Списание по заявке было: 50 с AVAILABLE.
+      // NH4: номер попытки берётся из refKey дебета, поэтому он обязан быть
+      // в моке — это тот же источник истины, что и в проде.
+      mockPrisma.ledgerEntry.findMany.mockResolvedValue([
+        {
+          account: 'AVAILABLE',
+          amount: -50,
+          refKey: 'withdrawal_debit:wr-2:1:AVAILABLE',
+        },
+      ]);
+      mockPrisma.withdrawalRequest.findUniqueOrThrow.mockResolvedValue({
+        id: 'wr-2',
+        status: 'approved',
+        payoutAttempts: 1,
+      });
+      mockPrisma.withdrawalRequest.update.mockResolvedValue({});
 
-    it('should update order status to PAID and create split transactions', async () => {
-      mockPrisma.order.findUnique.mockResolvedValue({
-        ...mockOrder,
-        platformFee: 100,
-        referralBonus: 50,
-        referralUserId: 'ref-1',
-        buyer: { id: 'buyer-1' },
-        seller: { id: 'seller-1' },
-        referralUser: { id: 'ref-1' },
-      });
-      mockPrisma.order.update.mockResolvedValue({});
-      mockPrisma.transaction.createMany.mockResolvedValue({});
-      mockPrisma.user.update.mockResolvedValue({});
-      await service.processSuccessfulPayment('order-1');
-      expect(mockPrisma.order.update).toHaveBeenCalledWith(
+      const result = await service.reconcilePayouts();
+
+      expect(result.failed).toBe(1);
+      // Возврат средств покупателю через ledger.
+      expect(mockLedger.credit).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
-          data: expect.objectContaining({ status: 'PAID' }),
+          account: 'AVAILABLE',
+          amount: 50,
+          type: 'withdrawal_reversal',
         }),
       );
-      expect(mockPrisma.transaction.createMany).toHaveBeenCalled();
     });
 
-    it('should credit referral bonus', async () => {
-      mockPrisma.order.findUnique.mockResolvedValue({
-        ...mockOrder,
-        platformFee: 100,
-        referralBonus: 50,
-        referralUserId: 'ref-1',
-        buyer: { id: 'buyer-1' },
-        seller: { id: 'seller-1' },
-        referralUser: { id: 'ref-1' },
+    it('PENDING в сети → ничего не меняем, ждём следующий тик', async () => {
+      mockPrisma.withdrawalRequest.findMany.mockResolvedValue([
+        {
+          id: 'wr-3',
+          userId: 'user-3',
+          amount: 10,
+          status: 'approved',
+          payoutStatus: 'SUBMITTED',
+          payoutTxHash: '0xtx3',
+          payoutAttempts: 1,
+        },
+      ]);
+      mockPaymodService.getTxStatus.mockResolvedValue({
+        tx_hash: '0xtx3',
+        status: 'pending',
+        confirmations: 0,
       });
-      mockPrisma.order.update.mockResolvedValue({});
-      mockPrisma.transaction.createMany.mockResolvedValue({});
-      mockPrisma.user.update.mockResolvedValue({});
-      await service.processSuccessfulPayment('order-1');
-      expect(mockPrisma.user.update).toHaveBeenCalledWith({
-        where: { id: 'ref-1' },
-        data: { bonusBalance: { increment: 50 } },
-      });
-      expect(mockNotifications.createNotification).toHaveBeenCalled();
+
+      const result = await service.reconcilePayouts();
+
+      expect(result.confirmed).toBe(0);
+      expect(result.failed).toBe(0);
+      expect(mockPrisma.withdrawalRequest.update).not.toHaveBeenCalled();
     });
   });
 

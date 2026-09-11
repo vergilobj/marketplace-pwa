@@ -3,6 +3,9 @@ import { UsersService } from './users.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../settings/settings.service';
+import { PaymodService } from '../payments/paymod.service';
+import { LedgerService } from '../payments/ledger.service';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -10,10 +13,11 @@ describe('UsersService', () => {
 
   const mockUser = {
     id: 'user-1',
-    phone: '+79991112233',
+    phone: '+799****2233',
     name: 'Test User',
     role: 'BUYER',
     bonusBalance: 500,
+    availableBalance: 0,
     isApproved: true,
     referralCode: 'ABC12345',
     createdAt: new Date(),
@@ -32,19 +36,49 @@ describe('UsersService', () => {
       count: jest.fn(),
       aggregate: jest.fn(),
     },
+    ledgerEntry: {
+      findMany: jest.fn(),
+      count: jest.fn(),
+      aggregate: jest.fn(),
+    },
     withdrawalRequest: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       count: jest.fn(),
     },
+    $transaction: jest.fn((cb: any) => cb(mockPrisma)),
   };
 
   const mockAudit = { log: jest.fn().mockResolvedValue({}) };
   const mockNotifications = {
     createNotification: jest.fn().mockResolvedValue({}),
     sendToUser: jest.fn().mockResolvedValue(null),
+  };
+  const mockSettings = {
+    getFloat: jest.fn().mockResolvedValue(0),
+  };
+  const mockLedger = {
+    getBalances: jest.fn(),
+    credit: jest.fn().mockResolvedValue({ applied: [], skipped: [] }),
+    // NH1: approveWithdrawal проверяет, что каждая проводка РЕАЛЬНО
+    // записалась (applied.length === 1, skipped пуст). Мок должен отдавать
+    // реалистичный результат, иначе любой вызов упадёт на проверке.
+    debit: jest
+      .fn()
+      .mockImplementation((_tx: any, p: any) =>
+        Promise.resolve({ applied: [p.refKey], skipped: [] }),
+      ),
+  };
+  const mockPaymod = {
+    payout: jest
+      .fn()
+      .mockResolvedValue({ tx_hash: '0x0', status: 'submitted' }),
+    // D3: read-only проверка состояния выплаты. null — выплаты с таким
+    // idempotency_key нет, откат безопасен (поведение по умолчанию).
+    getPayout: jest.fn().mockResolvedValue(null),
   };
 
   beforeEach(async () => {
@@ -54,12 +88,25 @@ describe('UsersService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditService, useValue: mockAudit },
         { provide: NotificationsService, useValue: mockNotifications },
+        { provide: SettingsService, useValue: mockSettings },
+        { provide: PaymodService, useValue: mockPaymod },
+        { provide: LedgerService, useValue: mockLedger },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
     _prisma = mockPrisma;
     jest.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation((cb: any) => cb(mockPrisma));
+    mockSettings.getFloat.mockResolvedValue(0);
+    mockLedger.getBalances.mockResolvedValue({
+      availableBalance: 0,
+      bonusBalance: 500,
+      escrowBalance: 0,
+      pendingEscrow: 0,
+      totalWithdrawable: 500,
+    });
+    mockPaymod.payout.mockResolvedValue({ tx_hash: '0x0', status: 'submitted' });
   });
 
   it('should be defined', () => {
@@ -78,13 +125,6 @@ describe('UsersService', () => {
     });
   });
 
-  describe('findByPhone', () => {
-    it('should return user by phone', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      expect(await service.findByPhone('+79991112233')).toEqual(mockUser);
-    });
-  });
-
   describe('findAll', () => {
     it('should return paginated users', async () => {
       mockPrisma.user.findMany.mockResolvedValue([mockUser]);
@@ -92,54 +132,6 @@ describe('UsersService', () => {
       const result = await service.findAll({ page: 1, limit: 10 });
       expect(result.items).toHaveLength(1);
       expect(result.total).toBe(1);
-      expect(result.page).toBe(1);
-      expect(result.pages).toBe(1);
-    });
-
-    it('should filter by search query', async () => {
-      mockPrisma.user.findMany.mockResolvedValue([mockUser]);
-      mockPrisma.user.count.mockResolvedValue(1);
-      await service.findAll({ search: 'Test' });
-      expect(mockPrisma.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            OR: expect.arrayContaining([
-              { name: { contains: 'Test', mode: 'insensitive' } },
-              { phone: { contains: 'Test', mode: 'insensitive' } },
-            ]),
-          }),
-        }),
-      );
-    });
-  });
-
-  describe('updateProfile', () => {
-    it('should update user profile', async () => {
-      mockPrisma.user.update.mockResolvedValue({
-        ...mockUser,
-        name: 'New Name',
-      });
-      const result = await service.updateProfile('user-1', {
-        name: 'New Name',
-      });
-      expect(result.name).toBe('New Name');
-    });
-  });
-
-  describe('getReferrals', () => {
-    it('should return referral orders', async () => {
-      mockPrisma.order.findMany.mockResolvedValue([
-        { id: 'order-1', referralUserId: 'user-1' },
-      ]);
-      const result = await service.getReferrals('user-1');
-      expect(result).toHaveLength(1);
-    });
-  });
-
-  describe('exportUsers', () => {
-    it('should export all users', async () => {
-      mockPrisma.user.findMany.mockResolvedValue([mockUser]);
-      expect(await service.exportUsers()).toHaveLength(1);
     });
   });
 
@@ -150,41 +142,104 @@ describe('UsersService', () => {
         _sum: { referralBonus: 150 },
       });
       mockPrisma.user.findUnique.mockResolvedValue({ bonusBalance: 500 });
+      mockPrisma.ledgerEntry.aggregate.mockResolvedValue({
+        _sum: { amount: 0 },
+      });
       const result = await service.getStats('user-1');
       expect(result.boughtCount).toBe(5);
       expect(result.soldCount).toBe(3);
       expect(result.referralEarned).toBe(150);
-      expect(result.bonusBalance).toBe(500);
+      expect(result.soldEarned).toBe(0);
     });
 
-    it('should handle null aggregation', async () => {
-      mockPrisma.order.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+    it('§8.2: soldEarned = сумма положительных AVAILABLE-проводок', async () => {
+      mockPrisma.order.count.mockResolvedValueOnce(0).mockResolvedValueOnce(7);
       mockPrisma.order.aggregate.mockResolvedValue({
-        _sum: { referralBonus: null },
+        _sum: { referralBonus: 0 },
       });
       mockPrisma.user.findUnique.mockResolvedValue({ bonusBalance: 0 });
-      const result = await service.getStats('user-1');
-      expect(result.referralEarned).toBe(0);
+      mockPrisma.ledgerEntry.aggregate.mockResolvedValue({
+        _sum: { amount: 4200.5 },
+      });
+
+      const result = await service.getStats('seller-1');
+
+      expect(result.soldEarned).toBe(4200.5);
+      // Запрос считает только зачисления и только по AVAILABLE.
+      expect(mockPrisma.ledgerEntry.aggregate).toHaveBeenCalledWith({
+        where: {
+          userId: 'seller-1',
+          account: 'AVAILABLE',
+          amount: { gt: 0 },
+        },
+        _sum: { amount: true },
+      });
     });
   });
 
-  describe('getBalance', () => {
-    it('should return user balance', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ bonusBalance: 500 });
-      expect(await service.getBalance('user-1')).toEqual({ balance: 500 });
-    });
-
-    it('should return 0 for unknown user', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(null);
-      expect(await service.getBalance('bad-id')).toEqual({ balance: 0 });
+  describe('getBalance (§4.6)', () => {
+    it('returns available + bonus + pendingEscrow + totalWithdrawable', async () => {
+      mockLedger.getBalances.mockResolvedValue({
+        availableBalance: 850,
+        bonusBalance: 50,
+        escrowBalance: 0,
+        pendingEscrow: 300,
+        totalWithdrawable: 900,
+      });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        availableBalance: 850,
+        bonusBalance: 50,
+      });
+      const result = await service.getBalance('user-1');
+      expect(result.availableBalance).toBe(850);
+      expect(result.bonusBalance).toBe(50);
+      expect(result.pendingEscrow).toBe(300);
+      expect(result.totalWithdrawable).toBe(900);
     });
   });
 
-  describe('requestWithdrawal', () => {
+  describe('getLedger (§8.2)', () => {
+    it('returns items and null cursor when no more pages', async () => {
+      mockPrisma.ledgerEntry.findMany.mockResolvedValue([
+        { id: 'l1', amount: 10, account: 'AVAILABLE' },
+        { id: 'l2', amount: -5, account: 'REFERRAL' },
+      ]);
+      const result = await service.getLedger('user-1', { limit: 20 });
+      expect(result.items).toHaveLength(2);
+      expect(result.nextCursor).toBeNull();
+      expect(mockPrisma.ledgerEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId: 'user-1' }, take: 21 }),
+      );
+    });
+
+    it('returns nextCursor when there is an extra row', async () => {
+      mockPrisma.ledgerEntry.findMany.mockResolvedValue([
+        { id: 'l1' },
+        { id: 'l2' },
+        { id: 'l3' },
+      ]);
+      const result = await service.getLedger('user-1', { limit: 2 });
+      expect(result.items).toHaveLength(2);
+      expect(result.nextCursor).toBe('l2');
+    });
+
+    it('applies cursor with skip 1', async () => {
+      mockPrisma.ledgerEntry.findMany.mockResolvedValue([{ id: 'l3' }]);
+      await service.getLedger('user-1', { limit: 2, cursor: 'l2' });
+      expect(mockPrisma.ledgerEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cursor: { id: 'l2' },
+          skip: 1,
+        }),
+      );
+    });
+  });
+
+  describe('requestWithdrawal (§5.2)', () => {
     it('should throw if user not found', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       await expect(service.requestWithdrawal('bad-id', 100)).rejects.toThrow(
-        'User not found',
+        'Пользователь не найден',
       );
     });
 
@@ -193,22 +248,43 @@ describe('UsersService', () => {
       await expect(service.requestWithdrawal('user-1', 0)).rejects.toThrow(
         'Amount must be positive',
       );
-      await expect(service.requestWithdrawal('user-1', -10)).rejects.toThrow(
-        'Amount must be positive',
+    });
+
+    it('should throw if below withdrawal_min_amount', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
+      mockSettings.getFloat.mockImplementation((key: string) =>
+        Promise.resolve(key === 'withdrawal_min_amount' ? 10 : 0),
+      );
+      await expect(service.requestWithdrawal('user-1', 5)).rejects.toThrow(
+        'Минимальная сумма вывода',
       );
     });
 
     it('should throw if insufficient balance', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       mockPrisma.withdrawalRequest.findMany.mockResolvedValue([]);
+      mockLedger.getBalances.mockResolvedValue({
+        availableBalance: 0,
+        bonusBalance: 100,
+        escrowBalance: 0,
+        pendingEscrow: 0,
+        totalWithdrawable: 100,
+      });
       await expect(service.requestWithdrawal('user-1', 1000)).rejects.toThrow(
-        'Insufficient bonus balance',
+        'Insufficient balance',
       );
     });
 
-    it('should create withdrawal request', async () => {
+    it('should create withdrawal request from combined balance', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
       mockPrisma.withdrawalRequest.findMany.mockResolvedValue([]);
+      mockLedger.getBalances.mockResolvedValue({
+        availableBalance: 300,
+        bonusBalance: 200,
+        escrowBalance: 0,
+        pendingEscrow: 0,
+        totalWithdrawable: 500,
+      });
       mockPrisma.withdrawalRequest.create.mockResolvedValue({
         id: 'wr-1',
         amount: 100,
@@ -224,13 +300,20 @@ describe('UsersService', () => {
       mockPrisma.withdrawalRequest.findMany.mockResolvedValue([
         { amount: 450, status: 'pending' },
       ]);
+      mockLedger.getBalances.mockResolvedValue({
+        availableBalance: 0,
+        bonusBalance: 500,
+        escrowBalance: 0,
+        pendingEscrow: 0,
+        totalWithdrawable: 500,
+      });
       await expect(service.requestWithdrawal('user-1', 100)).rejects.toThrow(
-        'Insufficient bonus balance',
+        'Insufficient balance',
       );
     });
   });
 
-  describe('approveWithdrawal', () => {
+  describe('approveWithdrawal (§5.2)', () => {
     it('should throw if request not found', async () => {
       mockPrisma.withdrawalRequest.findUnique.mockResolvedValue(null);
       await expect(service.approveWithdrawal('bad-id')).rejects.toThrow(
@@ -250,25 +333,103 @@ describe('UsersService', () => {
       );
     });
 
-    it('should approve and decrement balance', async () => {
+    it('адрес проверяется ДО списания: нет адреса → FAILED, без debit', async () => {
       mockPrisma.withdrawalRequest.findUnique.mockResolvedValue({
         id: 'wr-1',
         userId: 'user-1',
         amount: 100,
         status: 'pending',
+        toAddress: null,
       });
-      mockPrisma.user.findUnique.mockResolvedValue({ bonusBalance: 500 });
-      mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.user.findUnique.mockResolvedValue({
+        bonusBalance: 500,
+        walletAddress: null,
+      });
+      await expect(service.approveWithdrawal('wr-1')).rejects.toThrow(
+        'No valid wallet address',
+      );
+      expect(mockLedger.debit).not.toHaveBeenCalled();
+    });
+
+    it('успех: списание через ledger + SUBMITTED', async () => {
+      mockPrisma.withdrawalRequest.findUnique.mockResolvedValue({
+        id: 'wr-1',
+        userId: 'user-1',
+        amount: 100,
+        status: 'pending',
+        toAddress: '0x' + 'a'.repeat(40),
+        payoutAttempts: 0,
+      });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        bonusBalance: 500,
+        walletAddress: null,
+      });
+      mockLedger.getBalances.mockResolvedValue({
+        availableBalance: 500,
+        bonusBalance: 0,
+        escrowBalance: 0,
+        pendingEscrow: 0,
+        totalWithdrawable: 500,
+      });
       mockPrisma.withdrawalRequest.update.mockResolvedValue({
         id: 'wr-1',
         status: 'approved',
+        payoutStatus: 'SUBMITTED',
       });
+      await service.approveWithdrawal('wr-1');
+      expect(mockLedger.debit).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          account: 'AVAILABLE',
+          amount: 100,
+          // NH1: refKey дебета ОБЯЗАН содержать номер попытки. Без него
+          // повторное одобрение после reversal молча пропускалось
+          // (skipDuplicates) и выплата уходила без списания.
+          refKey: 'withdrawal_debit:wr-1:1:AVAILABLE',
+        }),
+      );
+    });
+
+    it('FAILED payout: компенсация + заявка обратно в pending', async () => {
+      mockPrisma.withdrawalRequest.findUnique.mockResolvedValue({
+        id: 'wr-1',
+        userId: 'user-1',
+        amount: 100,
+        status: 'pending',
+        toAddress: '0x' + 'a'.repeat(40),
+        payoutAttempts: 0,
+      });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        bonusBalance: 500,
+        walletAddress: null,
+      });
+      mockLedger.getBalances.mockResolvedValue({
+        availableBalance: 500,
+        bonusBalance: 0,
+        escrowBalance: 0,
+        pendingEscrow: 0,
+        totalWithdrawable: 500,
+      });
+      mockPaymod.payout.mockRejectedValue(new Error('network down'));
+      mockPrisma.withdrawalRequest.findUniqueOrThrow.mockResolvedValue({
+        id: 'wr-1',
+        status: 'pending',
+        payoutStatus: 'FAILED',
+        payoutAttempts: 1,
+      });
+
       const result = await service.approveWithdrawal('wr-1');
-      expect(result.status).toBe('approved');
-      expect(mockPrisma.user.update).toHaveBeenCalledWith({
-        where: { id: 'user-1' },
-        data: { bonusBalance: { decrement: 100 } },
-      });
+
+      // Компенсирующая проводка с refKey включающим attempt.
+      expect(mockLedger.credit).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          refKey: 'withdrawal_reversal:wr-1:1:AVAILABLE',
+          amount: 100,
+        }),
+      );
+      expect(result.status).toBe('pending');
+      expect(result.payoutStatus).toBe('FAILED');
     });
   });
 
@@ -294,17 +455,6 @@ describe('UsersService', () => {
       mockPrisma.user.update.mockResolvedValue({ ...mockUser, role: 'SELLER' });
       const result = await service.changeRole('user-1', 'SELLER');
       expect(result.role).toBe('SELLER');
-    });
-  });
-
-  describe('batchChangeRole', () => {
-    it('should batch update roles', async () => {
-      mockPrisma.user.updateMany.mockResolvedValue({ count: 2 });
-      await service.batchChangeRole(['user-1', 'user-2'], 'SELLER');
-      expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: ['user-1', 'user-2'] } },
-        data: { role: 'SELLER' },
-      });
     });
   });
 

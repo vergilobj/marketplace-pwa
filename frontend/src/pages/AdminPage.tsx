@@ -68,7 +68,7 @@ export default function AdminPage() {
         { label: 'Пользователи', value: dashboard?.usersCount || 0, icon: <Users size={22} />, color: 'from-[#22c55e] to-[#16a34a]' },
         { label: 'Товары', value: dashboard?.productsCount || 0, icon: <ShoppingBag size={22} />, color: 'from-[#34d399] to-[#22c55e]' },
         { label: 'Заказы', value: dashboard?.ordersCount || 0, icon: <Wallet size={22} />, color: 'from-[#22c55e] to-[#34d399]' },
-        { label: 'Доход', value: `${(dashboard?.totalRevenue || 0).toLocaleString('ru-RU')} USDT`, icon: <TrendingUp size={22} />, color: 'from-[#22c55e] to-[#16a34a]' },
+        { label: 'Доход', value: formatPrice(dashboard?.totalRevenue || 0), icon: <TrendingUp size={22} />, color: 'from-[#22c55e] to-[#16a34a]' },
       ].map((s, i) => (
         <div key={i} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-5">
           <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center text-[#0d1512] mb-3`}>{s.icon}</div>
@@ -163,7 +163,7 @@ export default function AdminPage() {
             <p className="text-xs text-[var(--color-muted)]">{t.orderId?.slice(0, 8)} • {t.createdAt ? format(new Date(t.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</p>
           </div>
           <div className="text-right">
-            <p className="text-sm font-bold text-[var(--color-text)]">{t.amount?.toLocaleString('ru-RU')} USDT</p>
+            <p className="text-sm font-bold text-[var(--color-text)]">{formatPrice(t.amount)}</p>
             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${t.status === 'success' ? 'bg-[#22c55e]/10 text-[#22c55e]' : 'bg-amber-400/10 text-amber-400'}`}>{t.status}</span>
           </div>
         </div>
@@ -176,7 +176,7 @@ export default function AdminPage() {
       {withdrawals.map((w: any) => (
         <div key={w.id} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-[var(--color-text)]">{w.amount?.toLocaleString('ru-RU')} USDT</p>
+            <p className="text-sm font-semibold text-[var(--color-text)]">{formatPrice(w.amount)}</p>
             <p className="text-xs text-[var(--color-muted)]">{w.userId?.slice(0, 8)} • {w.createdAt ? format(new Date(w.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -235,7 +235,7 @@ export default function AdminPage() {
         background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.10) 0%, transparent 60%)'
       }} />
 
-      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-20">
+      <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-20">
         <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Админка</h1>
         <div className="mb-6" />
 
@@ -243,7 +243,7 @@ export default function AdminPage() {
         <div className="flex items-center gap-1.5 mb-8 overflow-x-auto pb-1 no-scrollbar">
           {tabs.map(tab => (
             <button key={tab.key} onClick={() => { setActiveTab(tab.key); setSearch(''); }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 min-h-[44px] rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
                 activeTab === tab.key ? 'bg-[#22c55e] text-[#0d1512] shadow-[0_8px_32px_-8px_rgba(34,197,94,0.5)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-white/[0.06]'
               }`}>{tab.icon}{tab.label}</button>
           ))}

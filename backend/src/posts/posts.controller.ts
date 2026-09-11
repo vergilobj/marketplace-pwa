@@ -30,17 +30,20 @@ export class PostsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('sort') sort?: string,
+    @Query('search') search?: string,
+    @Query('q') q?: string,
   ) {
     return this.postsService.getFeed({
       userId: req.user?.userId,
       page: Number(page) || 1,
       limit: Number(limit) || 20,
       sort: sort || 'newest',
+      search: search || q || undefined,
     });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('BUYER', 'SELLER', 'ADMIN')
   @Post()
   async create(
     @Request() req: AuthenticatedRequest,
@@ -64,11 +67,14 @@ export class PostsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('sort') sort?: string,
+    @Query('search') search?: string,
+    @Query('q') q?: string,
   ) {
     return this.postsService.findAll({
       page: Number(page) || 1,
       limit: Number(limit) || 20,
       sort: sort || 'newest',
+      search: search || q || undefined,
     });
   }
 

@@ -5,6 +5,7 @@ import { AuditService } from '../common/audit/audit.service';
 import { SettingsService } from '../settings/settings.service';
 import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ModerationService } from '../moderation/moderation.service';
 import {
   NotFoundException,
   BadRequestException,
@@ -39,11 +40,15 @@ describe('PostsService', () => {
     },
     user: { findFirst: jest.fn() },
     order: { create: jest.fn(), findUnique: jest.fn() },
+    // Срок рекламы (adDaysForOrder) читает payload платежа; в юнит-тестах
+    // моков нет — падаем в фолбэк Order.amount / ad_price.
+    transaction: { findFirst: jest.fn(), update: jest.fn(), create: jest.fn() },
     like: { deleteMany: jest.fn() },
     comment: { deleteMany: jest.fn() },
   };
   const mockSettings = {
     getFloat: jest.fn().mockResolvedValue(5000),
+    getInt: jest.fn().mockResolvedValue(5),
   };
   const mockPayments = {
     createPaymentForOrder: jest.fn().mockResolvedValue({}),
@@ -51,6 +56,9 @@ describe('PostsService', () => {
   };
   const mockNotifications = {
     createNotification: jest.fn().mockResolvedValue({}),
+  };
+  const mockModeration = {
+    moderate: jest.fn().mockResolvedValue({ verdict: 'allow' }),
   };
   const mockAudit = { log: jest.fn().mockResolvedValue({}) };
 
@@ -62,12 +70,16 @@ describe('PostsService', () => {
         { provide: SettingsService, useValue: mockSettings },
         { provide: PaymentsService, useValue: mockPayments },
         { provide: NotificationsService, useValue: mockNotifications },
+        { provide: ModerationService, useValue: mockModeration },
         { provide: AuditService, useValue: mockAudit },
       ],
     }).compile();
     service = module.get<PostsService>(PostsService);
     _prisma = mockPrisma;
     jest.clearAllMocks();
+    mockModeration.moderate.mockResolvedValue({ verdict: 'allow' });
+    mockSettings.getFloat.mockResolvedValue(5000);
+    mockSettings.getInt.mockResolvedValue(5);
   });
 
   it('should be defined', () => {
@@ -97,7 +109,15 @@ describe('PostsService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should create ad order and activate', async () => {
+    /**
+     * NH5-ad (крит): рекламный заказ НЕ подтверждается без депозита.
+     * Раньше createAd звал processSuccessfulPayment → Order сразу PAID +
+     * escrowStatus HELD без единого цента в блокчейне, реклама активировалась,
+     * а через 5 дней autoCloseOrders возвращал «покупателю» escrowAmount на
+     * AVAILABLE → вывод в BSC. Теперь заказ остаётся PENDING/escrow NONE,
+     * платёж создаётся, реклама не активируется.
+     */
+    it('NH5-ad: создаёт PENDING-заказ и НЕ подтверждает оплату без депозита', async () => {
       mockPrisma.post.create.mockResolvedValue({ ...mockPost, isAd: true });
       mockPrisma.user.findFirst.mockResolvedValue({
         id: 'admin-1',
@@ -113,14 +133,81 @@ describe('PostsService', () => {
         isAd: true,
         order: { id: 'order-1' },
       });
-      const result = await service.createAd('seller-1', {
+
+      await service.createAd('seller-1', {
         title: 'Ad',
         content: '',
         link: '',
         days: 7,
       });
-      expect(result).toBeDefined();
-      expect(mockPayments.createPaymentForOrder).toHaveBeenCalled();
+
+      // Заказ создан неподтверждённым.
+      expect(mockPrisma.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'PENDING' }),
+        }),
+      );
+      // Платёж (депозит-адрес) создан — оплата пойдёт через webhook.
+      expect(mockPayments.createPaymentForOrder).toHaveBeenCalledWith(
+        'order-1',
+      );
+      // ГЛАВНОЕ: оплата НЕ подтверждается в HTTP-хендлере.
+      expect(mockPayments.processSuccessfulPayment).not.toHaveBeenCalled();
+      // Реклама НЕ активирована: post.update звался только для orderId.
+      expect(mockPrisma.post.update).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.post.update).toHaveBeenCalledWith({
+        where: { id: 'post-1' },
+        data: { orderId: 'order-1' },
+      });
+    });
+  });
+
+  describe('activateAdForOrder (NH5-ad)', () => {
+    it('НЕ активирует рекламу, если заказ не PAID/HELD (нет депозита)', async () => {
+      mockPrisma.order.findUnique.mockResolvedValue({
+        id: 'order-1',
+        status: 'PENDING',
+        escrowStatus: 'NONE',
+        escrowHeldAt: null,
+      });
+      const result = await service.activateAdForOrder('order-1');
+      expect(result).toBe(false);
+      expect(mockPrisma.post.update).not.toHaveBeenCalled();
+    });
+
+    it('активирует рекламу только при PAID + HELD (депозит подтверждён)', async () => {
+      mockPrisma.order.findUnique.mockResolvedValue({
+        id: 'order-1',
+        status: 'PAID',
+        escrowStatus: 'HELD',
+        escrowHeldAt: new Date(),
+      });
+      mockPrisma.post.findUnique.mockResolvedValue({
+        id: 'post-1',
+        isPinned: false,
+        adExpireDate: null,
+      });
+      mockPrisma.post.update.mockResolvedValue({});
+      const result = await service.activateAdForOrder('order-1');
+      expect(result).toBe(true);
+      expect(mockPrisma.post.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'post-1' },
+          data: expect.objectContaining({ isPinned: true }),
+        }),
+      );
+    });
+
+    it('не трогает обычный (не рекламный) заказ', async () => {
+      mockPrisma.order.findUnique.mockResolvedValue({
+        id: 'order-1',
+        status: 'PAID',
+        escrowStatus: 'HELD',
+        escrowHeldAt: new Date(),
+      });
+      mockPrisma.post.findUnique.mockResolvedValue(null);
+      const result = await service.activateAdForOrder('order-1');
+      expect(result).toBe(false);
     });
   });
 

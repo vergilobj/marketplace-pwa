@@ -17,7 +17,7 @@ import {
 } from '../../api/bazar';
 import type { BazarMessage, BazarDealThread } from '../../api/bazar';
 import { getProductById } from '../../api/products';
-import { BazarAvatar, BazarDots, BazarRefRow, MINT } from './bazar-ui';
+import { BazarAvatar, BazarDots, BazarRefRow, MINT, formatPrice } from './bazar-ui';
 import { bazarStore } from '../../state/bazarStore';
 import {
   isSpeechSupported,
@@ -188,8 +188,9 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
     };
   }, [dealMode, productId, isAuthenticated]);
 
+  // Всегда держим чат у последнего сообщения (при загрузке — без анимации).
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
   }, [messages, sending]);
 
   // ── Toast по meta.action.intent ответа Базара ──
@@ -422,7 +423,11 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
   const hasText = input.trim() !== '';
 
   return (
-    <div className={`flex flex-col ${compact ? '' : 'flex-1 min-h-0 h-full'}`}>
+    <div
+      className={`flex flex-col ${
+        compact ? '' : 'flex-1 min-h-0 h-full'
+      }`}
+    >
       {/* Шапка сделки */}
       {dealMode && !loading && deal && (
         <div
@@ -432,7 +437,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
           <div className="min-w-0">
             <div className="text-sm font-bold text-white truncate">{dealTitle}</div>
             <div className="text-[11px] text-[var(--color-muted)] truncate">
-              {deal.product?.price ? `${deal.product.price} USDT` : ''}
+              {deal.product?.price ? formatPrice(deal.product.price) : ''}
               {deal.status ? ` · ${DEAL_STATUS_RU[deal.status] ?? deal.status}` : ''}
             </div>
           </div>
@@ -497,7 +502,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
           <button
             onClick={handleReset}
             disabled={resetting}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] font-semibold transition-opacity disabled:opacity-50 hover:opacity-80"
+            className="flex items-center gap-1.5 px-2.5 min-h-[44px] rounded-lg text-[12px] font-semibold transition-opacity disabled:opacity-50 hover:opacity-80"
             style={{ color: MINT, border: '1px solid rgba(52,211,153,0.3)' }}
           >
             <RotateCcw size={13} />
@@ -507,7 +512,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
       )}
 
       <div
-        className={`space-y-4 overflow-y-auto ${compact ? '' : 'flex-1 min-h-0'}`}
+        className={`space-y-4 overflow-y-auto pt-4 ${compact ? '' : 'flex-1 min-h-0'}`}
         style={compact ? { maxHeight: 340 } : undefined}
       >
         {loading ? (
@@ -520,12 +525,13 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="text-center py-12"
+            className="text-center py-4 md:py-12"
           >
-            <div className="w-16 h-16 mx-auto mb-6">
-              <BazarAvatar size={64} />
+            {/* H1: на мобиле приветственный блок компактный — композер должен быть виден без скролла */}
+            <div className="w-11 h-11 mx-auto mb-3 md:w-16 md:h-16 md:mb-6">
+              <BazarAvatar size={44} />
             </div>
-            <div className="text-xl font-bold text-white">{dealMode ? 'Пока нет сообщений' : 'Базар на связи'}</div>
+            <div className="text-lg md:text-xl font-bold text-white">{dealMode ? 'Пока нет сообщений' : 'Базар на связи'}</div>
             <div className="text-sm text-[var(--color-muted)] mt-2 leading-relaxed">
               {dealMode ? 'Напиши первым — Базар передаст продавцу.' : 'Спроси — найдёт среди 2000+ своих'}
             </div>
@@ -546,7 +552,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
                   </div>
                 )}
                 <div
-                  className={`max-w-[85%] text-sm leading-relaxed ${
+                  className={`max-w-[85%] min-w-0 break-words text-sm leading-relaxed ${
                     m.role === 'USER'
                       ? 'bg-[#22c55e] text-[#0b0e0d] rounded-2xl rounded-br-md px-4 py-3 font-medium'
                       : 'rounded-2xl rounded-bl-md px-4 py-3.5 text-[var(--color-text)]'
@@ -645,7 +651,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
               className="flex items-center gap-2.5 w-full"
             >
               <div
-                className="flex-1 h-12 px-4 rounded-xl flex items-center gap-2.5 transition-colors duration-200"
+                className="flex-1 min-h-[48px] px-4 rounded-xl flex items-center gap-2.5 transition-colors duration-200"
                 style={{
                   background: '#0d1210',
                   border: '1px solid rgba(34,197,94,0.18)',
@@ -662,7 +668,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                   placeholder={dealMode ? 'Сообщение продавцу…' : 'Спроси Базара…'}
-                  className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-[var(--color-faint)]"
+                  className="flex-1 min-h-[44px] bg-transparent outline-none text-sm text-white placeholder:text-[var(--color-faint)]"
                 />
               </div>
 

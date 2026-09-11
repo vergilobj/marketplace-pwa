@@ -8,14 +8,14 @@ interface BreadcrumbsProps {
 
 export default function Breadcrumbs({ items }: BreadcrumbsProps) {
   return (
-    <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
+    <nav className="flex items-center space-x-2 text-sm text-[var(--color-muted)] mb-4">
       {items.map((item, index) => (
         <React.Fragment key={index}>
           {index > 0 && <ChevronRight size={14} />}
           {item.to ? (
             <Link to={item.to} className="hover:text-green-600 transition">{item.label}</Link>
           ) : (
-            <span className="text-gray-900 dark:text-[var(--color-text)] font-medium">{item.label}</span>
+            <span className="text-[var(--color-text)] font-medium">{item.label}</span>
           )}
         </React.Fragment>
       ))}

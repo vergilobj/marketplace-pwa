@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { bazarDeals, DEAL_STATUS_RU } from '../api/bazar';
 import type { BazarDeal } from '../api/bazar';
 import { resolveMedia } from '../utils/media';
+import { formatPrice } from '../utils/format';
 
 const fmt = (s?: string | null) => {
   if (!s) return '';
@@ -34,7 +35,7 @@ export default function LeadsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
         <div className="flex justify-center py-24">
           <div className="w-8 h-8 rounded-full border-2 border-[#22c55e] border-t-transparent animate-spin" />
         </div>
@@ -43,7 +44,7 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 pb-20">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 pb-20">
       <h1 className="text-2xl font-bold text-white mb-1">Лиды</h1>
       <p className="text-sm text-[var(--color-muted)] mb-6">Входящие заявки покупателей по вашим товарам</p>
 
@@ -92,7 +93,7 @@ export default function LeadsPage() {
                   </div>
                   {d.product?.price != null && (
                     <div className="text-[13px] font-bold text-[#22c55e] mt-0.5">
-                      {d.product.price.toLocaleString('en-US', { maximumFractionDigits: 2 })} USDT
+                      {formatPrice(d.product.price)}
                     </div>
                   )}
                   <div className="text-[11px] text-[var(--color-faint)] mt-1">

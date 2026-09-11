@@ -11,10 +11,15 @@ import {
   DealSource,
   BazarRole,
   OrderStatus,
+  PriceSource,
+  EscrowStatus,
 } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../settings/settings.service';
+import { EscrowService } from '../payments/escrow.service';
+import { computeFees, round2 } from '../payments/money.util';
 
 const MAX_RELAY_TEXT = 4000;
 
@@ -30,6 +35,8 @@ export class DealService {
     private readonly prisma: PrismaService,
     private readonly moderation: ModerationService,
     private readonly notify: NotificationsService,
+    private readonly settings: SettingsService,
+    private readonly escrow: EscrowService,
   ) {}
 
   /** Создание сделки из чата с Базаром. Без LLM. */
@@ -193,20 +200,66 @@ export class DealService {
     if (!deal.productId) {
       throw new BadRequestException('Сделка без товара — уточните, что именно берёте');
     }
-    if (deal.status === DealStatus.ACCEPTED || deal.status === DealStatus.CLOSED) {
-      throw new BadRequestException('Сделка уже принята');
+    // N4: accept разрешён ТОЛЬКО из статусов активного диалога.
+    //   NEW        — сделка создана, покупатель сразу нажал «беру»;
+    //   CONTACTED  — продавец ответил;
+    //   NEGOTIATING— шёл торг.
+    // LOST / CLOSED / ACCEPTED исключены намеренно: раньше гард ловил только
+    // ACCEPTED|CLOSED, поэтому accept на отменённой (LOST) сделке создавал
+    // НОВЫЙ Order → дубликаты заказов и повторные списания.
+    const ACCEPTABLE: DealStatus[] = [
+      DealStatus.NEW,
+      DealStatus.CONTACTED,
+      DealStatus.NEGOTIATING,
+    ];
+    if (!ACCEPTABLE.includes(deal.status)) {
+      throw new BadRequestException(
+        `Сделку нельзя принять в статусе ${deal.status}`,
+      );
+    }
+    // Идемпотентность: заказ уже создан — второй не плодим.
+    if (deal.orderId) {
+      throw new BadRequestException('По сделке уже создан заказ');
     }
     if (!deal.product?.isActive) {
       throw new BadRequestException('Товар недоступен');
     }
+
+    // D7 (§7.4): комиссии считаются ЗДЕСЬ — ровно тем же расчётом, что и в
+    // OrdersService.create. Раньше Order создавался без platformFee/
+    // referralBonus (default 0) → продавец получал 100%, платформа 0.
+    // Ставки снапшотятся в заказ и позже не пересчитываются.
+    const amount = round2(deal.cashPrice ?? deal.product.price);
+    const buyer = await this.prisma.user.findUnique({
+      where: { id: deal.buyerId },
+      select: { invitedById: true },
+    });
+    const platformPercent =
+      (await this.settings.getFloat('platform_fee_percent')) || 10;
+    const referralPercent =
+      (await this.settings.getFloat('referral_percent')) || 5;
+    const referralUserId = buyer?.invitedById || null;
+    const fees = computeFees(
+      amount,
+      platformPercent,
+      referralPercent,
+      Boolean(referralUserId),
+    );
 
     const order = await this.prisma.order.create({
       data: {
         buyerId: deal.buyerId,
         sellerId: deal.sellerId,
         productId: deal.productId,
-        amount: deal.cashPrice ?? deal.product.price,
+        amount,
+        platformFee: fees.platformFee,
+        referralBonus: fees.referralBonus,
+        referralUserId,
         status: OrderStatus.PENDING,
+        // §1.2: обратная связь Deal ↔ Order и снапшот источника цены.
+        dealId,
+        priceSource:
+          deal.cashPrice != null ? PriceSource.DEAL : PriceSource.PRODUCT,
       },
     });
 
@@ -226,9 +279,14 @@ export class DealService {
     return order;
   }
 
-  /** Отмена / отказ → LOST. */
+  /** Отмена / отказ → LOST. Не теряет деньги по оплаченному заказу (§8.2). */
   async lose(userId: string, dealId: string, reason?: string) {
-    const deal = await this.prisma.deal.findUnique({ where: { id: dealId } });
+    const deal = await this.prisma.deal.findUnique({
+      where: { id: dealId },
+      include: {
+        order: { select: { id: true, status: true, escrowStatus: true } },
+      },
+    });
     if (!deal) throw new NotFoundException('Сделка не найдена');
     if (deal.buyerId !== userId && deal.sellerId !== userId) {
       throw new ForbiddenException('Вы не участник сделки');
@@ -238,6 +296,19 @@ export class DealService {
       where: { id: dealId },
       data: { status: DealStatus.LOST },
     });
+
+    // §8.2: если по сделке уже есть оплаченный заказ с замороженным эскроу —
+    // отмена сделки НЕ должна оставлять деньги в подвешенном состоянии.
+    // Возвращаем эскроу покупателю (идемпотентно по escrowStatus/refKey).
+    if (deal.order && deal.order.escrowStatus === EscrowStatus.HELD) {
+      await this.escrow
+        .refundEscrow(deal.order.id, 'deal_cancelled', 100)
+        .catch((e) =>
+          this.logger.error(
+            `lose(): refund escrow for order ${deal.order?.id} failed: ${(e as Error).message}`,
+          ),
+        );
+    }
 
     const msg = reason ? `Сделка отменена: ${reason}` : 'Сделка отменена';
     await this.pushDealEvent(userId === deal.buyerId ? deal.sellerId : deal.buyerId, 'Сделка отменена', msg, 'deal_lost', dealId);
@@ -316,8 +387,16 @@ export class DealService {
     if (!offer || offer.dealId !== deal.id) {
       throw new NotFoundException('Предложение не найдено');
     }
+    // N3: нельзя принимать СВОЁ предложение — иначе покупатель сам себе
+    // фиксирует cashPrice, а продавец узнаёт о «согласованной» цене постфактум.
+    if (offer.byUserId === userId) {
+      throw new BadRequestException('Нельзя принять своё предложение');
+    }
     if (offer.status === 'ACCEPTED') {
       throw new BadRequestException('Предложение уже принято');
+    }
+    if (offer.status === 'REJECTED') {
+      throw new BadRequestException('Предложение уже отклонено');
     }
 
     await this.prisma.counterOffer.update({
@@ -348,11 +427,168 @@ export class DealService {
     if (!offer || offer.dealId !== deal.id) {
       throw new NotFoundException('Предложение не найдено');
     }
+    // N3 (reject): та же дыра — отклонять своё предложение бессмысленно и
+    // позволяет автору «закрыть» оффер, который контрагент уже готов принять.
+    if (offer.byUserId === userId) {
+      throw new BadRequestException('Нельзя отклонить своё предложение');
+    }
+    if (offer.status !== 'PENDING') {
+      throw new BadRequestException(`Предложение уже ${offer.status}`);
+    }
     await this.prisma.counterOffer.update({
       where: { id: offer.id },
       data: { status: 'REJECTED' },
     });
     return { rejected: true };
+  }
+
+  /**
+   * N1: закрытие сделки, когда её заказ завершён.
+   * Единственный писатель CLOSED раньше был только арбитраж → успешные сделки
+   * висели в ACCEPTED вечно (и ломали successRate в репутации).
+   * Вызывается из cron DealTimeoutService (чужой orders.service не трогаем).
+   */
+  async closeDealsForCompletedOrders(): Promise<number> {
+    const deals = await this.prisma.deal.findMany({
+      where: {
+        status: DealStatus.ACCEPTED,
+        orderId: { not: null },
+        order: { status: OrderStatus.COMPLETED },
+      },
+      select: { id: true, buyerId: true, sellerId: true },
+    });
+
+    for (const deal of deals) {
+      await this.prisma.deal.update({
+        where: { id: deal.id },
+        data: { status: DealStatus.CLOSED },
+      });
+      await this.pushDealEvent(
+        deal.buyerId,
+        'Сделка завершена',
+        'Заказ выполнен, сделка закрыта. Спасибо!',
+        'deal_closed',
+        deal.id,
+      );
+    }
+    return deals.length;
+  }
+
+  /** Точечное закрытие одной сделки по завершённому заказу (для вызовов извне). */
+  async closeIfOrderCompleted(dealId: string): Promise<boolean> {
+    const deal = await this.prisma.deal.findUnique({
+      where: { id: dealId },
+      include: { order: { select: { status: true } } },
+    });
+    if (
+      !deal ||
+      deal.status !== DealStatus.ACCEPTED ||
+      deal.order?.status !== OrderStatus.COMPLETED
+    ) {
+      return false;
+    }
+    await this.prisma.deal.update({
+      where: { id: dealId },
+      data: { status: DealStatus.CLOSED },
+    });
+    await this.pushDealEvent(
+      deal.buyerId,
+      'Сделка завершена',
+      'Заказ выполнен, сделка закрыта. Спасибо!',
+      'deal_closed',
+      dealId,
+    );
+    return true;
+  }
+
+  // ─── N2: спор (dispute) ────────────────────────────────────────────────
+  // Раньше dispute='OPEN' никто не выставлял → арбитраж был мёртвой веткой.
+  private static readonly DISPUTABLE: DealStatus[] = [
+    DealStatus.ACCEPTED,
+    DealStatus.CONTACTED,
+    DealStatus.NEGOTIATING,
+  ];
+
+  /** Открыть спор участником сделки. */
+  async openDispute(userId: string, dealId: string, reason?: string) {
+    const deal = await this.prisma.deal.findUnique({
+      where: { id: dealId },
+      select: {
+        id: true,
+        buyerId: true,
+        sellerId: true,
+        status: true,
+        dispute: true,
+        orderId: true,
+      },
+    });
+    if (!deal) throw new NotFoundException('Сделка не найдена');
+    if (deal.buyerId !== userId && deal.sellerId !== userId) {
+      throw new ForbiddenException('Вы не участник сделки');
+    }
+    if (deal.dispute === 'OPEN') {
+      throw new BadRequestException('Спор уже открыт');
+    }
+    if (deal.dispute === 'RESOLVED') {
+      throw new BadRequestException('Спор по сделке уже рассмотрен');
+    }
+    // Спор имеет смысл только на живой сделке — на LOST/CLOSED делить нечего.
+    if (!DealService.DISPUTABLE.includes(deal.status)) {
+      throw new BadRequestException(
+        `Нельзя открыть спор в статусе ${deal.status}`,
+      );
+    }
+
+    const note = (reason || '').slice(0, 500) || 'Спор открыт участником';
+
+    // D1 (§4.4, §5.3): спор ОБЯЗАН остановить таймер эскроу. Без синхронизации
+    // Order.status остаётся PAID/SHIPPED, и autoCloseOrders через 5/7 дней
+    // двигает деньги, пока арбитраж ещё думает (а потом молча выходит,
+    // увидев escrowStatus !== HELD).
+    await this.prisma.$transaction(async (tx) => {
+      await tx.deal.update({
+        where: { id: dealId },
+        data: { dispute: 'OPEN', disputeNote: note },
+      });
+
+      if (deal.orderId) {
+        await tx.order.updateMany({
+          where: {
+            id: deal.orderId,
+            status: {
+              in: [
+                OrderStatus.PAID,
+                OrderStatus.SHIPPED,
+                OrderStatus.DISPUTED,
+              ],
+            },
+          },
+          data: {
+            status: OrderStatus.DISPUTED,
+            autoCompleteAt: null,
+          },
+        });
+      }
+    });
+
+    const counterpartyId =
+      userId === deal.buyerId ? deal.sellerId : deal.buyerId;
+    await this.pushDealEvent(
+      counterpartyId,
+      'Открыт спор',
+      `Контрагент открыл спор: ${note.slice(0, 120)}`,
+      'deal_dispute',
+      dealId,
+    );
+    await this.pushDealEvent(
+      userId,
+      'Спор открыт',
+      'Арбитр изучит переписку и вынесет решение автоматически.',
+      'deal_dispute',
+      dealId,
+    );
+
+    return { dispute: 'OPEN' };
   }
 
   /** Статус заказа текстом. */

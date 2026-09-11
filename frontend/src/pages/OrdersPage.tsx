@@ -1,18 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { getMyOrders, updateOrderStatus, payOrder, getOrderPayStatus } from '../api/orders';
-import { PackageCheck, Clock, Truck, CheckCircle2, XCircle, Copy, Check, X, Loader2 } from 'lucide-react';
+import { getMyOrders, updateOrderStatus, payOrder, getOrderPayStatus, confirmOrderReceipt } from '../api/orders';
+import { PackageCheck, Clock, Truck, CheckCircle2, XCircle, Copy, Check, X, Loader2, ShieldCheck, RotateCcw, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatPrice } from "../utils/format";
+import { useAuth } from '../hooks/useAuth';
 
 const statusConfig: Record<string, { icon: React.ReactNode; cls: string; label: string }> = {
   PENDING: { icon: <Clock size={14} />, cls: 'text-amber-400 bg-amber-400/10', label: 'ждёт' },
   PAID: { icon: <CheckCircle2 size={14} />, cls: 'text-[#22c55e] bg-[#22c55e]/10', label: 'оплачено' },
   SHIPPED: { icon: <Truck size={14} />, cls: 'text-[#34d399] bg-[#34d399]/10', label: 'едет' },
   COMPLETED: { icon: <PackageCheck size={14} />, cls: 'text-[#22c55e] bg-[#22c55e]/10', label: 'закрыто' },
+  DISPUTED: { icon: <AlertTriangle size={14} />, cls: 'text-amber-400 bg-amber-400/10', label: 'спор' },
+  REFUNDED: { icon: <RotateCcw size={14} />, cls: 'text-sky-400 bg-sky-400/10', label: 'возврат' },
   CANCELLED: { icon: <XCircle size={14} />, cls: 'text-red-400 bg-red-400/10', label: 'мимо' },
 };
 
@@ -25,9 +28,11 @@ type PayModalState = {
 };
 
 export default function OrdersPage() {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [confirming, setConfirming] = useState<string | null>(null);
   const [pay, setPay] = useState<PayModalState | null>(null);
   const [creatingPay, setCreatingPay] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -60,6 +65,20 @@ export default function OrdersPage() {
   }, [pay?.orderId, pay?.depositAddress]);
 
   const handleStatus = async (id: string, status: string) => { try { await updateOrderStatus(id, status); toast.success('Статус обновлён'); fetchOrders(); } catch { toast.error('Ошибка'); } };
+
+  /** §4.3: подтверждение получения → релиз эскроу продавцу. */
+  const handleConfirmReceipt = async (id: string) => {
+    setConfirming(id);
+    try {
+      await confirmOrderReceipt(id);
+      toast.success('Получение подтверждено, деньги отправлены продавцу');
+      fetchOrders();
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Не удалось подтвердить');
+    } finally {
+      setConfirming(null);
+    }
+  };
 
   const handlePay = async (order: any) => {
     setCreatingPay(true);
@@ -107,16 +126,16 @@ export default function OrdersPage() {
         background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.10) 0%, transparent 60%)'
       }} />
 
-      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-20">
+      <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-20">
         <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Заказы</h1>
         <p className="text-[var(--color-muted)] text-sm mb-6">История сделок</p>
 
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1 no-scrollbar">
-          {['', 'PENDING', 'PAID', 'SHIPPED', 'COMPLETED', 'CANCELLED'].map(s => (
+          {['', 'PENDING', 'PAID', 'SHIPPED', 'COMPLETED', 'DISPUTED', 'REFUNDED', 'CANCELLED'].map(s => (
             <button
               key={s}
               onClick={() => setFilter(s)}
-              className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
+              className={`inline-flex items-center justify-center px-4 min-h-[44px] rounded-full text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
                 filter === s
                   ? 'bg-[#22c55e] text-[#0d1512] shadow-[0_4px_20px_rgba(34,197,94,0.4)]'
                   : 'text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)] hover:border-[#22c55e]/40'
@@ -149,6 +168,33 @@ export default function OrdersPage() {
                         <span>•</span>
                         <span>{order.createdAt ? format(new Date(order.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</span>
                       </div>
+                      {(() => {
+                        const isBuyer = user?.id === order.buyerId;
+                        const es = order.escrowStatus;
+                        if (es === 'HELD') {
+                          return (
+                            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#34d399]/10 text-[#34d399] text-[11px] font-bold">
+                              <ShieldCheck size={12} />
+                              {isBuyer ? 'Деньги в эскроу · ожидает подтверждения' : 'Деньги в эскроу'}
+                            </div>
+                          );
+                        }
+                        if (es === 'RELEASED') {
+                          return (
+                            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#22c55e]/10 text-[#22c55e] text-[11px] font-bold">
+                              <CheckCircle2 size={12} /> {isBuyer ? 'Продавец получил оплату' : 'Деньги получены'}
+                            </div>
+                          );
+                        }
+                        if (es === 'REFUNDED') {
+                          return (
+                            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-400/10 text-sky-400 text-[11px] font-bold">
+                              <RotateCcw size={12} /> Средства возвращены
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {order.status === 'PENDING' && (
@@ -159,7 +205,17 @@ export default function OrdersPage() {
                           <button onClick={() => handleStatus(order.id, 'CANCELLED')} className="text-xs text-red-400 hover:text-red-300 font-bold px-3 py-1.5 rounded-full hover:bg-red-400/10 transition-all shrink-0">Отменить</button>
                         </>
                       )}
-                      {order.status === 'SHIPPED' && <button onClick={() => handleStatus(order.id, 'COMPLETED')} className="text-xs text-[#22c55e] hover:text-[#34d399] font-bold px-3 py-1.5 rounded-full hover:bg-[#22c55e]/10 transition-all shrink-0">Подтвердить</button>}
+                      {/* §4.3: подтверждение получения — только покупателю, только из SHIPPED */}
+                      {order.status === 'SHIPPED' && (user?.id === order.buyerId) && (
+                        <button
+                          onClick={() => handleConfirmReceipt(order.id)}
+                          disabled={confirming === order.id}
+                          className="inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-full bg-[#22c55e] text-[#0d1512] hover:bg-[#16a34a] transition-colors disabled:opacity-50 shrink-0"
+                        >
+                          {confirming === order.id ? <Loader2 size={13} className="animate-spin" /> : <PackageCheck size={13} />}
+                          Подтвердить получение
+                        </button>
+                      )}
                     </div>
                   </div>
                 </motion.div>

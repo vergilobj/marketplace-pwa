@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { NotFoundException } from '@nestjs/common';
@@ -25,6 +26,7 @@ describe('UsersController', () => {
     getReferrals: jest.fn(),
     exportUsers: jest.fn(),
     getBalance: jest.fn(),
+    getLedger: jest.fn(),
     requestWithdrawal: jest.fn(),
     getMyWithdrawalRequests: jest.fn(),
     getAllWithdrawalRequests: jest.fn(),
@@ -39,7 +41,10 @@ describe('UsersController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
-      providers: [{ provide: UsersService, useValue: mockUsersService }],
+      providers: [
+        { provide: UsersService, useValue: mockUsersService },
+        { provide: JwtService, useValue: { sign: jest.fn().mockReturnValue('t') } },
+      ],
     }).compile();
     controller = module.get<UsersController>(UsersController);
     service = mockUsersService;
@@ -99,6 +104,36 @@ describe('UsersController', () => {
         user: { userId: 'user-1', role: 'ADMIN' },
       });
       expect(result.balance).toBe(500);
+    });
+  });
+
+  describe('getLedger (§8.2)', () => {
+    it('should return items + nextCursor', async () => {
+      service.getLedger.mockResolvedValue({ items: [], nextCursor: null });
+      const result = await controller.getLedger(
+        { user: { userId: 'user-1', role: 'ADMIN' } },
+        undefined,
+        undefined,
+      );
+      expect(service.getLedger).toHaveBeenCalledWith('user-1', {
+        limit: 20,
+        cursor: undefined,
+      });
+      expect(result.items).toEqual([]);
+      expect(result.nextCursor).toBeNull();
+    });
+
+    it('should pass limit and cursor through', async () => {
+      service.getLedger.mockResolvedValue({ items: [], nextCursor: null });
+      await controller.getLedger(
+        { user: { userId: 'user-1', role: 'ADMIN' } },
+        '5',
+        'cursor-1',
+      );
+      expect(service.getLedger).toHaveBeenCalledWith('user-1', {
+        limit: 5,
+        cursor: 'cursor-1',
+      });
     });
   });
 

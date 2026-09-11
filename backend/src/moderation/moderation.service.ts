@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../common/prisma/prisma.service';
 
 export interface ModerationInput {
   text: string;
@@ -38,7 +39,10 @@ export class ModerationService {
   private readonly apiUrl: string;
   private readonly apiKey: string;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {
     this.apiUrl =
       this.config.get<string>('BAZAR_API_URL') || 'http://127.0.0.1:8642/v1';
     this.apiKey = this.config.get<string>('BAZAR_API_KEY') || '';
@@ -55,6 +59,19 @@ export class ModerationService {
   private readonly urlRe =
     /(?:https?:\/\/|www\.|t\.me\/|vk\.com\/|wa\.me\/|instagram\.com\/|whatsapp\.)/i;
 
+  // Разрешённые видеоссылки для не-админов: только внешние видеохостинги.
+  // Внутренние /uploads/videos/* ссылки НЕ имеют протокола/домена, поэтому urlRe
+  // на них не срабатывает и они не попадают в ветку внешних ссылок вообще.
+  private readonly allowedVideoRe =
+    /(?:(?<![a-z0-9])youtube\.com\/watch|(?<![a-z0-9])youtu\.be\/|(?<![a-z0-9])disk\.yandex\.ru\/|(?<![a-z0-9])drive\.google\.com\/|(?<![a-z0-9])rutube\.ru\/|(?<![a-z0-9])vkvideo\.ru\/|(?<![a-z0-9])vk\.com\/video|(?<![a-z0-9])t\.me\/)/i;
+
+  // Тот же whitelist, но с флагом g — для вырезания разрешённых ссылок из текста
+  // ПЕРЕД проверкой offPlatformRe и ПЕРЕД отправкой в LLM. Поедает URL целиком
+  // (протокол + домен + путь + query), иначе остаётся обрывок «https://» или «?v=x»,
+  // который LLM всё равно флагает как увод с площадки.
+  private readonly allowedVideoStripRe =
+    /(?<![\w@.-])(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch|youtu\.be\/|disk\.yandex\.ru\/|drive\.google\.com\/|rutube\.ru\/|vkvideo\.ru\/|vk\.com\/video|t\.me\/)\S*/gi;
+
   // Маркеры мессенджеров/соцсетей сами по себе — попытка увода с площадки
   private readonly offPlatformRe =
     /(?:вацап|вацапп|ватсап|вотсап|во?тсап|whatsapp|телеграм|телега|телег|telegram|t\.me|vk\.com|(?<![а-яёa-z0-9])вк(?![а-яёa-z0-9])|(?<![а-яёa-z0-9])тг(?![а-яёa-z0-9])|\btg\b|instagram|инстаграм|инста|инст|созвон|созвонимся|позвони|позвоните|мой номер|свой номер|скинь номер|дай номер|мой контакт|дай контакт|свой контакт)/i;
@@ -63,10 +80,40 @@ export class ModerationService {
     const violations: string[] = [];
     const text = input.text || '';
 
+    // ADMIN обходит модерацию полностью.
+    if (input.userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: input.userId },
+        select: { role: true },
+      });
+      if (user?.role === 'ADMIN') {
+        return { verdict: 'allow', reason: '', violations: [] };
+      }
+    }
+
     if (this.phoneRe.test(text)) violations.push('phone');
     if (this.emailRe.test(text)) violations.push('email');
-    if (this.urlRe.test(text)) violations.push('external_link');
-    if (this.offPlatformRe.test(text)) violations.push('off_platform');
+
+    // Внешние ссылки для не-админов: разрешены только видеохостинги.
+    // Внутренние /uploads/* ссылки площадки не содержат протокола/домена,
+    // поэтому urlRe их не матчит — они никогда не попадают сюда.
+    // Разрешённая видеоссылка (whitelist) не считается ни внешней ссылкой,
+    // ни попыткой увода с площадки — иначе whitelist бессмысленен (напр. vk.com/video).
+    const isAllowedVideo = this.allowedVideoRe.test(text);
+
+    if (this.urlRe.test(text)) {
+      if (!isAllowedVideo) {
+        violations.push('external_link');
+      }
+    }
+
+    // Проверяем увод с площадки на тексте БЕЗ разрешённых ссылок (whitelist).
+    // Так «пиши в телегу» и «мой номер» по-прежнему блокируются, а сам факт
+    // вставки ссылки t.me / vk.com/video — нет.
+    const offPlatformProbe = text.replace(this.allowedVideoStripRe, ' ');
+    if (this.offPlatformRe.test(offPlatformProbe)) {
+      violations.push('off_platform');
+    }
 
     if (violations.length > 0) {
       const reason = this.reasonFor(violations);
@@ -81,11 +128,27 @@ export class ModerationService {
   }
 
   private async moderateWithLlm(text: string): Promise<ModerationVerdict> {
-    const trimmed = text.slice(0, LLM_MAX_CHARS);
+    // Whitelist-ссылки уже провалидированы regExp-слоем выше. Модель склонна
+    // флагать их как off_platform даже при явном промпте, поэтому вырезаем их
+    // из текста перед отправкой — LLM судит только остаток (контакты, призывы).
+    const stripped = text
+      .replace(this.allowedVideoStripRe, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const trimmed = stripped.slice(0, LLM_MAX_CHARS);
+
+    // После вырезания whitelist-ссылок модерировать нечего — regExp уже пропустил.
+    if (!trimmed) {
+      return { verdict: 'allow', reason: '', violations: [] };
+    }
 
     const prompt =
       'Ты — модератор площадки. Проверь текст на нарушения. Ответь СТРОГО JSON без пояснений: ' +
       '{"verdict":"allow"|"block"|"warn","reason":"...","violations":["spam"|"insult"|"off_platform"|"contact_sharing"]}. ' +
+      'ВАЖНО: ссылки на видеохостинги и облака разрешены и НЕ являются уводом с площадки: ' +
+      'youtube.com, youtu.be, rutube.ru, vk.com/video, vkvideo.ru, disk.yandex.ru, drive.google.com, t.me. ' +
+      'Если текст содержит ТОЛЬКО такие ссылки (без номера телефона, email, призыва «пиши в телегу/ватсап», без попытки созвона) — verdict=allow. ' +
+      'Блокируй (off_platform) только: призывы уйти в мессенджер БЕЗ ссылки, обмен телефоном/email, ссылки на ЛЮБЫЕ другие домены. ' +
       `Текст: ${trimmed}`;
 
     const controller = new AbortController();

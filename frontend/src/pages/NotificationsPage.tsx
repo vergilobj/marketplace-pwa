@@ -34,7 +34,7 @@ export default function NotificationsPage() {
       <div className="relative max-w-2xl mx-auto px-4 sm:px-6 pt-10 pb-20">
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-2xl font-bold text-[var(--color-text)]">Уведомления</h1>
-          {list.some(n=>!n.isRead) && <button onClick={readAll} className="text-sm text-[#22c55e] hover:text-[#34d399] font-bold flex items-center gap-1"><CheckCheck size={14} /> Прочитать все</button>}
+          {list.some(n=>!n.isRead) && <button onClick={readAll} className="tap-link gap-1 text-sm text-[#22c55e] hover:text-[#34d399] font-bold"><CheckCheck size={14} /> Прочитать все</button>}
         </div>
         {list.length > 0 && <p className="text-[var(--color-muted)] text-sm mb-6">{list.filter(n=>!n.isRead).length} непрочитанных</p>}
 

@@ -42,7 +42,7 @@ export default function LoginPage() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
-        <Link to="/" className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-8 transition-colors text-sm"><ArrowLeft size={16} /> На главную</Link>
+        <Link to="/" className="tap-link inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-8 transition-colors text-sm"><ArrowLeft size={16} /> На главную</Link>
 
         <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[28px] p-8">
           <div className="text-center mb-8">
@@ -76,7 +76,7 @@ export default function LoginPage() {
                   placeholder="Ваш пароль"
                   className={`w-full px-4 py-3 pr-12 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.password)}`}
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
@@ -91,7 +91,7 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 pt-6 border-t border-[var(--color-border)] text-center">
-            <p className="text-[var(--color-muted)] text-sm">Нет аккаунта? <Link to="/register" className="text-[#22c55e] hover:text-[#16a34a] font-semibold">Зарегистрироваться</Link></p>
+            <p className="text-[var(--color-muted)] text-sm">Нет аккаунта? <Link to="/register" className="tap-link min-w-[44px] justify-center text-[#22c55e] hover:text-[#16a34a] font-semibold">Зарегистрироваться</Link></p>
           </div>
         </div>
       </motion.div>

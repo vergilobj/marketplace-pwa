@@ -12,6 +12,8 @@ import { formatPrice } from '../utils/format';
 import { resolveMedia } from '../utils/media';
 import BazarChat from '../components/bazar/BazarChat';
 import DictateButton from '../components/DictateButton';
+import { CreateMenu } from '../components/CreateMenu';
+import { useDebounced } from '../hooks/useDebounced';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 type TabType = 'all' | 'posts' | 'products' | 'ads';
@@ -21,7 +23,7 @@ const PAGE_SIZE = 20;
 export default function FeedPage() {
   const navigate = useNavigate();
   const [sp] = useSearchParams();
-  const { isAdmin, isSeller, isAuthenticated } = useAuth();
+  const { isAdmin, isAuthenticated } = useAuth();
   const { cart, addToCart, updateQuantity } = useApp();
   const [posts, setPosts] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -32,6 +34,8 @@ export default function FeedPage() {
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [sort, setSort] = useState<SortType>('newest');
   const [search, setSearch] = useState(() => sp.get('search') || '');
+  // R10: поиск уходит на сервер с дебаунсом, а не фильтрует 20 загруженных записей
+  const debouncedSearch = useDebounced(search, 300);
 
   const [postsPage, setPostsPage] = useState(1);
   const [productsPage, setProductsPage] = useState(1);
@@ -40,8 +44,9 @@ export default function FeedPage() {
   const loaderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Восстанавливаем закэшированные данные мгновенно, без «быстрой прогрузки»
-    const cached = sessionStorage.getItem('feed_cache');
+    // Восстанавливаем закэшированные данные мгновенно, без «быстрой прогрузки».
+    // При активном поиске кэш не подходит — там другой набор данных.
+    const cached = debouncedSearch ? null : sessionStorage.getItem('feed_cache');
     let restored = false;
     if (cached) {
       try {
@@ -70,7 +75,7 @@ export default function FeedPage() {
       setLoading(true);
     }
     loadInitial();
-  }, [sort, activeTab]);
+  }, [sort, activeTab, debouncedSearch]);
 
   // Восстановление скролла после рендера
   useEffect(() => {
@@ -96,8 +101,8 @@ export default function FeedPage() {
   const loadInitial = async () => {
     try {
       const [postRes, prodRes] = await Promise.all([
-        getFeed({ page: 1, limit: PAGE_SIZE, sort }),
-        getProducts({ page: 1, limit: PAGE_SIZE, sort: sort === 'price_asc' ? 'price_asc' : sort === 'price_desc' ? 'price_desc' : sort === 'popular' ? 'popular' : 'newest' }),
+        getFeed({ page: 1, limit: PAGE_SIZE, sort, search: debouncedSearch.trim() || undefined }),
+        getProducts({ page: 1, limit: PAGE_SIZE, sort: sort === 'price_asc' ? 'price_asc' : sort === 'price_desc' ? 'price_desc' : sort === 'popular' ? 'popular' : 'newest', search: debouncedSearch.trim() || undefined }),
       ]);
       setPosts(postRes.items || []);
       setProducts(prodRes.items || []);
@@ -121,13 +126,13 @@ export default function FeedPage() {
       const isPostTab = activeTab === 'posts' || activeTab === 'ads';
       const isProductTab = activeTab === 'products';
       if ((isPostTab || activeTab === 'all') && hasMorePosts) {
-        const res = await getFeed({ page: postsPage, limit: PAGE_SIZE, sort });
+        const res = await getFeed({ page: postsPage, limit: PAGE_SIZE, sort, search: debouncedSearch.trim() || undefined });
         setPosts(prev => [...prev, ...(res.items || [])]);
         setHasMorePosts(res.page < res.pages);
         setPostsPage(p => p + 1);
       }
       if ((isProductTab || activeTab === 'all') && hasMoreProducts) {
-        const res = await getProducts({ page: productsPage, limit: PAGE_SIZE, sort: sort === 'price_asc' ? 'price_asc' : sort === 'price_desc' ? 'price_desc' : sort === 'popular' ? 'popular' : 'newest' });
+        const res = await getProducts({ page: productsPage, limit: PAGE_SIZE, sort: sort === 'price_asc' ? 'price_asc' : sort === 'price_desc' ? 'price_desc' : sort === 'popular' ? 'popular' : 'newest', search: debouncedSearch.trim() || undefined });
         setProducts(prev => [...prev, ...(res.items || [])]);
         setHasMoreProducts(res.page < res.pages);
         setProductsPage(p => p + 1);
@@ -137,7 +142,7 @@ export default function FeedPage() {
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, activeTab, sort, postsPage, productsPage, hasMorePosts, hasMoreProducts]);
+  }, [loadingMore, activeTab, sort, postsPage, productsPage, hasMorePosts, hasMoreProducts, debouncedSearch]);
 
   useEffect(() => {
     const el = loaderRef.current;
@@ -171,8 +176,9 @@ export default function FeedPage() {
     } catch { toast.error('Не удалось'); }
   };
 
-  const fp = posts.filter(p => p.title?.toLowerCase().includes(search.toLowerCase()) || p.content?.toLowerCase().includes(search.toLowerCase()));
-  const fpr = products.filter(p => p.title?.toLowerCase().includes(search.toLowerCase()));
+  // Сервер уже отфильтровал выдачу по поисковому запросу (R10)
+  const fp = posts;
+  const fpr = products;
   const ads = fp.filter(p => p.isAd);
   const regular = fp.filter(p => !p.isAd);
 
@@ -211,7 +217,7 @@ export default function FeedPage() {
         background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.14) 0%, transparent 60%), radial-gradient(ellipse 50% 35% at 85% 110%, rgba(13,148,136,0.10) 0%, transparent 60%)'
       }} />
 
-      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-20">
+      <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-20">
 
         {/* МАНИФЕСТ — дерзкий, с визуалом */}
         <div className="mb-10">
@@ -246,8 +252,7 @@ export default function FeedPage() {
               </div>
 
               <div className="mt-7 flex gap-2 flex-wrap">
-                {isSeller && <button onClick={() => navigate('/products/new')} className="btn-capsule btn-primary">Выставить товар</button>}
-                {isAdmin && <button onClick={() => navigate('/posts/new')} className="btn-capsule btn-ghost">Написать в канал</button>}
+                <CreateMenu variant="button" />
                 {!isAuthenticated && <button onClick={() => navigate('/register')} className="btn-capsule btn-primary">Вступить</button>}
               </div>
             </div>
@@ -279,21 +284,24 @@ export default function FeedPage() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)]" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Искать среди своих…" className="w-full pl-10 pr-20 py-3 rounded-xl bg-[var(--color-surface)] text-[var(--color-text)] text-sm outline-none border border-[var(--color-border)] focus:border-[#22c55e] transition-colors" />
             <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-              <DictateButton size={15} className="w-8 h-8" onResult={(text) => setSearch(text)} />
-              {search && <button onClick={() => setSearch('')} className="text-[var(--color-muted)] hover:text-[var(--color-text)]"><X size={16} /></button>}
+              <DictateButton size={15} className="w-11 h-11" onResult={(text) => setSearch(text)} />
+              {search && <button onClick={() => setSearch('')} aria-label="Очистить поиск" className="w-11 h-11 flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-text)]"><X size={16} /></button>}
             </div>
           </div>
         </div>
 
-        {/* ТАБЫ + СОРТИРОВКА */}
-        <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {[{ key: 'all', label: 'Всё' }, { key: 'posts', label: 'Канал' }, { key: 'products', label: 'Товары' }, { key: 'ads', label: 'Реклама' }].map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${activeTab === tab.key ? 'bg-[#22c55e] text-white' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}>{tab.label}</button>
-          ))}
-          <div className="ml-auto flex gap-1.5">
+        {/* ТАБЫ + СОРТИРОВКА — G1: на mobile переносим строки, чтобы блок
+            сортировки не уезжал за вьюпорт на 194px. */}
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar min-w-0 max-w-full">
+            {[{ key: 'all', label: 'Всё' }, { key: 'posts', label: 'Канал' }, { key: 'products', label: 'Товары' }, { key: 'ads', label: 'Реклама' }].map(tab => (
+              <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`px-4 min-h-[44px] inline-flex items-center rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${activeTab === tab.key ? 'bg-[#22c55e] text-white' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}>{tab.label}</button>
+            ))}
+          </div>
+          <div className="flex gap-1.5 shrink-0 sm:ml-auto max-w-full overflow-x-auto pb-1 no-scrollbar">
             {(['newest','popular','price_asc','price_desc'] as SortType[]).map(s => {
               const labels: Record<SortType,string> = { newest:'Свежее', popular:'Хайп', price_asc:'Дешевле', price_desc:'Дороже' };
-              return <button key={s} onClick={() => setSort(s)} className={`px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-colors ${sort === s ? 'text-[#22c55e] border border-[#22c55e]' : 'text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)]'}`}>{labels[s]}</button>;
+              return <button key={s} onClick={() => setSort(s)} className={`px-3 min-h-[44px] inline-flex items-center rounded-lg text-[11px] font-bold whitespace-nowrap transition-colors ${sort === s ? 'text-[#22c55e] border border-[#22c55e]' : 'text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)]'}`}>{labels[s]}</button>;
             })}
           </div>
         </div>
@@ -305,7 +313,9 @@ export default function FeedPage() {
           </div>
         ) : items.length === 0 ? (
           <div className="text-center py-24">
-            <div className="text-[var(--color-faint)] text-sm">Пока тихо. Здесь начнётся твой рынок.</div>
+            <div className="text-[var(--color-faint)] text-sm">
+              {search ? 'По запросу ничего не нашлось.' : 'Пока тихо. Здесь начнётся твой рынок.'}
+            </div>
           </div>
         ) : (
           <motion.div
@@ -351,15 +361,15 @@ export default function FeedPage() {
                             {!inCart ? (
                               <button
                                 onClick={(e) => { e.stopPropagation(); addToCart(item); }}
-                                className="shrink-0 h-10 px-5 rounded-xl bg-[#22c55e] text-white text-sm font-bold flex items-center gap-1.5 transition-colors hover:bg-[#16a34a]"
+                                className="shrink-0 min-h-[44px] px-5 rounded-xl bg-[#22c55e] text-white text-sm font-bold flex items-center gap-1.5 transition-colors hover:bg-[#16a34a]"
                               >
                                 <ShoppingCart size={16} /> В корзину
                               </button>
                             ) : (
                               <div className="shrink-0 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                                <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }} className="w-9 h-9 rounded-xl border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Minus size={15} /></button>
+                                <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }} aria-label="Меньше" className="w-11 h-11 rounded-xl border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Minus size={15} /></button>
                                 <span className="text-base font-bold text-[var(--color-text)] min-w-[22px] text-center">{qty}</span>
-                                <button onClick={(e) => { e.stopPropagation(); addToCart(item); }} className="w-9 h-9 rounded-xl border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Plus size={15} /></button>
+                                <button onClick={(e) => { e.stopPropagation(); addToCart(item); }} aria-label="Больше" className="w-11 h-11 rounded-xl border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Plus size={15} /></button>
                               </div>
                             )}
                           </div>
@@ -381,12 +391,12 @@ export default function FeedPage() {
                     </div>
                     <div className="text-sm font-bold text-[#22c55e] whitespace-nowrap">{formatPrice(item.price)}</div>
                     {!inCart ? (
-                      <button onClick={(e) => { e.stopPropagation(); addToCart(item); }} className="shrink-0 w-8 h-8 rounded-lg bg-[#22c55e] text-white transition-colors flex items-center justify-center"><ShoppingCart size={14} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); addToCart(item); }} title="В корзину" aria-label="В корзину" className="shrink-0 w-11 h-11 rounded-lg bg-[#22c55e] text-white transition-colors flex items-center justify-center"><ShoppingCart size={17} /></button>
                     ) : (
                       <div className="shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                        <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }} className="w-7 h-7 rounded-lg border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Minus size={13} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }} aria-label="Меньше" className="w-11 h-11 rounded-lg border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Minus size={15} /></button>
                         <span className="text-sm font-bold text-[var(--color-text)] min-w-[18px] text-center">{qty}</span>
-                        <button onClick={(e) => { e.stopPropagation(); addToCart(item); }} className="w-7 h-7 rounded-lg border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Plus size={13} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); addToCart(item); }} aria-label="Больше" className="w-11 h-11 rounded-lg border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Plus size={15} /></button>
                       </div>
                     )}
                   </motion.div>
@@ -408,15 +418,15 @@ export default function FeedPage() {
                   )}
 
                   <div className="flex items-center gap-2 mt-2.5">
-                    <button onClick={(e) => togglePostLike(item, e)} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${item.likedByMe ? 'text-[#22c55e] bg-[rgba(34,197,94,0.1)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)]'}`}>
+                    <button onClick={(e) => togglePostLike(item, e)} className={`flex items-center justify-center gap-1.5 px-2.5 min-h-[44px] min-w-[44px] rounded-lg text-xs font-medium transition-colors ${item.likedByMe ? 'text-[#22c55e] bg-[rgba(34,197,94,0.1)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)]'}`}>
                       <Heart size={14} fill={item.likedByMe ? 'currentColor' : 'none'} />
                       {item.likeCount > 0 && item.likeCount}
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); saveScrollAndNavigate(`/posts/${item.id}`); }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] transition-colors">
+                    <button onClick={(e) => { e.stopPropagation(); saveScrollAndNavigate(`/posts/${item.id}`); }} className="flex items-center justify-center gap-1.5 px-2.5 min-h-[44px] min-w-[44px] rounded-lg text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] transition-colors">
                       <MessageCircle size={14} />
                       {item.commentCount > 0 && item.commentCount}
                     </button>
-                    {isAdmin && <button onClick={(e) => { e.stopPropagation(); delPost(item.id); }} className="ml-auto text-[10px] text-red-400 hover:underline">удалить</button>}
+                    {isAdmin && <button onClick={(e) => { e.stopPropagation(); delPost(item.id); }} className="tap-link px-1 ml-auto text-[10px] text-red-400 hover:underline">удалить</button>}
                   </div>
                 </motion.div>
               );
@@ -457,15 +467,21 @@ function PostMedia({ media, title }: { media: string[]; title: string }) {
           <>
             <button
               onClick={(e) => { e.stopPropagation(); go(-1); }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 backdrop-blur text-white flex items-center justify-center hover:bg-black/75 transition-colors"
+              aria-label="Предыдущее фото"
+              className="tap-chip absolute left-0.5 top-1/2 -translate-y-1/2 w-11 h-11"
             >
-              <ChevronLeft size={18} />
+              <span className="w-8 h-8 rounded-full bg-black/55 backdrop-blur text-white flex items-center justify-center hover:bg-black/75 transition-colors">
+                <ChevronLeft size={18} />
+              </span>
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); go(1); }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/55 backdrop-blur text-white flex items-center justify-center hover:bg-black/75 transition-colors"
+              aria-label="Следующее фото"
+              className="tap-chip absolute right-0.5 top-1/2 -translate-y-1/2 w-11 h-11"
             >
-              <ChevronRight size={18} />
+              <span className="w-8 h-8 rounded-full bg-black/55 backdrop-blur text-white flex items-center justify-center hover:bg-black/75 transition-colors">
+                <ChevronRight size={18} />
+              </span>
             </button>
             <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1.5">
               {media.map((_, i) => (

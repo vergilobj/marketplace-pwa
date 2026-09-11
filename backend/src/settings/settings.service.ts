@@ -15,6 +15,17 @@ export class SettingsService {
     return val ? parseFloat(val) : 0;
   }
 
+  /**
+   * Целочисленная настройка (дни/минуты/проценты-счётчики).
+   * Возвращает default, если ключа нет или значение невалидно.
+   */
+  async getInt(key: string, defaultValue = 0): Promise<number> {
+    const val = await this.get(key);
+    if (val === null || val === undefined || val === '') return defaultValue;
+    const parsed = parseInt(val, 10);
+    return Number.isFinite(parsed) ? parsed : defaultValue;
+  }
+
   async set(key: string, value: string) {
     return this.prisma.setting.upsert({
       where: { key },

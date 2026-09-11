@@ -1,17 +1,22 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, ImagePlus, X } from 'lucide-react';
+import { ArrowLeft, FileText, ImagePlus, Video, X } from 'lucide-react';
 import { createPost } from '../api/posts';
-import { uploadImage } from '../api/upload';
+import { uploadImage, uploadVideo } from '../api/upload';
 
 export default function CreatePostPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ title: '', content: '', link: '', videoUrl: '' });
+  const [form, setForm] = useState({ title: '', content: '', link: '' });
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoPreview, setVideoPreview] = useState('');
+  const [videoUploading, setVideoUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
@@ -29,6 +34,32 @@ export default function CreatePostPage() {
     setPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleVideoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVideoFile(file);
+    setVideoPreview(URL.createObjectURL(file));
+    setVideoUploading(true);
+    setError('');
+    try {
+      const url = await uploadVideo(file);
+      setVideoUrl(url);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Ошибка при загрузке видео');
+      setVideoFile(null);
+      setVideoPreview('');
+    } finally {
+      setVideoUploading(false);
+    }
+    if (videoInputRef.current) videoInputRef.current.value = '';
+  };
+
+  const removeVideo = () => {
+    setVideoFile(null);
+    setVideoUrl('');
+    setVideoPreview('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -43,7 +74,7 @@ export default function CreatePostPage() {
         title: form.title,
         content: form.content,
         link: form.link || undefined,
-        videoUrl: form.videoUrl || undefined,
+        videoUrl: videoUrl || undefined,
         media: uploadedUrls.length > 0 ? uploadedUrls : undefined,
       });
       navigate('/');
@@ -56,7 +87,7 @@ export default function CreatePostPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-6 pb-20">
-      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
+      <button onClick={() => navigate(-1)} className="tap-link items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
         <ArrowLeft size={16} /> Назад
       </button>
 
@@ -101,14 +132,45 @@ export default function CreatePostPage() {
           />
         </div>
 
+        {/* Видео */}
         <div>
-          <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Видео (YouTube/Vimeo)</label>
+          <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Видео</label>
+          {videoFile || videoUrl ? (
+            <div className="rounded-xl overflow-hidden border border-[var(--color-border)] mb-2 relative">
+              {videoPreview ? (
+                <video src={videoPreview} controls playsInline className="w-full max-h-64 bg-black" />
+              ) : (
+                <div className="w-full h-40 flex items-center justify-center bg-[var(--bg-3)] text-sm text-[var(--color-muted)]">
+                  {videoUploading ? 'Загружаем...' : 'Видео загружено'}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={removeVideo}
+                className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-black/80"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => videoInputRef.current?.click()}
+              disabled={videoUploading}
+              className="tap-link items-center gap-2 px-4 rounded-xl border border-dashed border-[var(--color-border)] text-[#22c55e] text-sm font-medium hover:border-[#22c55e]/50 transition-colors disabled:opacity-50"
+            >
+              <Video size={16} />
+              {videoUploading ? 'Загружаем видео...' : 'Загрузить видео'}
+            </button>
+          )}
           <input
-            value={form.videoUrl}
-            onChange={e => setForm({ ...form, videoUrl: e.target.value })}
-            placeholder="https://youtube.com/..."
-            className="w-full px-4 py-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors"
+            ref={videoInputRef}
+            type="file"
+            accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
+            onChange={handleVideoChange}
+            className="hidden"
           />
+          <p className="text-[11px] text-[var(--color-faint)] mt-1">mp4, webm, mov или mkv, до 100 МБ</p>
         </div>
 
         {/* Фото */}
@@ -124,7 +186,7 @@ export default function CreatePostPage() {
               </div>
             ))}
           </div>
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-[var(--color-border)] text-[#22c55e] text-sm font-medium hover:border-[#22c55e]/50 transition-colors">
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="tap-link items-center gap-2 px-4 rounded-xl border border-dashed border-[var(--color-border)] text-[#22c55e] text-sm font-medium hover:border-[#22c55e]/50 transition-colors">
             <ImagePlus size={16} /> Добавить фото
           </button>
           <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileChange} className="hidden" />

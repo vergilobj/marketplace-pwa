@@ -10,8 +10,8 @@ export default function PrivacyPage() {
         background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.10) 0%, transparent 60%)'
       }} />
 
-      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-20">
-        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] mb-8 transition-colors">
+      <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-20">
+        <button onClick={() => navigate(-1)} className="tap-link items-center gap-2 text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] mb-8 transition-colors">
           <ArrowLeft size={16} /> Назад
         </button>
 

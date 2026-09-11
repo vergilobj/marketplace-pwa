@@ -4,18 +4,28 @@ interface TabsProps {
   tabs: string[];
   active: string;
   onChange: (tab: string) => void;
+  className?: string;
 }
-const Tabs: React.FC<TabsProps> = ({ tabs, active, onChange }) => (
-  <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
-    {tabs.map(tab => (
+
+/** R17 + R14 — табы под тёмную тему, тач-таргет ≥44px. */
+const Tabs: React.FC<TabsProps> = ({ tabs, active, onChange, className = '' }) => (
+  <div className={`flex gap-1 bg-[var(--bg-3)] p-1 rounded-xl ${className}`} role="tablist">
+    {tabs.map((tab) => (
       <button
         key={tab}
+        role="tab"
+        aria-selected={active === tab}
         onClick={() => onChange(tab)}
-        className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all ${active === tab ? 'bg-white dark:bg-gray-700 shadow text-green-600' : 'text-gray-500'}`}
+        className={`flex-1 min-h-[44px] px-4 text-sm font-medium rounded-lg transition-all ${
+          active === tab
+            ? 'bg-[var(--color-surface)] text-[#22c55e] shadow-sm'
+            : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+        }`}
       >
         {tab}
       </button>
     ))}
   </div>
 );
+
 export default Tabs;

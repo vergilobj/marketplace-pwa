@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProductsService } from './products.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
+import { ModerationService } from '../moderation/moderation.service';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 
 describe('ProductsService', () => {
@@ -46,6 +47,10 @@ describe('ProductsService', () => {
         ProductsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditService, useValue: mockAudit },
+        {
+          provide: ModerationService,
+          useValue: { moderate: jest.fn().mockResolvedValue({ verdict: 'allow' }) },
+        },
       ],
     }).compile();
 

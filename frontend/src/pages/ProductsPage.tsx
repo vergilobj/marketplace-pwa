@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Loader2, Clock, Flame, TrendingUp, Package, Search, X } from 'lucide-react';
+import { Loader2, Clock, Flame, TrendingUp, Package, Search, X } from 'lucide-react';
 import { getProducts } from '../api/products';
 import ProductCard from '../components/ProductCard';
-import { useAuth } from '../hooks/useAuth';
+import { CreateMenu } from '../components/CreateMenu';
+import { formatPrice } from '../utils/format';
+import { useDebounced } from '../hooks/useDebounced';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 const PAGE_SIZE = 24;
@@ -24,31 +25,37 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const loaderRef = useRef<HTMLDivElement>(null);
-  const { isSeller } = useAuth();
+
+  // R10: поиск уходит на сервер, а не фильтрует первые 24 загруженных записи
+  const debouncedSearch = useDebounced(search, 300);
 
   const loadProducts = useCallback(async (pageNum: number, reset: boolean) => {
     if (reset) setLoading(true);
     else setLoadingMore(true);
     try {
-      const res = await getProducts({ page: pageNum, limit: PAGE_SIZE, sort });
+      const res = await getProducts({
+        page: pageNum,
+        limit: PAGE_SIZE,
+        sort,
+        search: debouncedSearch.trim() || undefined,
+      });
       const items = res.items || [];
-      const filtered = search ? items.filter((p: any) => p.title?.toLowerCase().includes(search.toLowerCase())) : items;
-      if (reset) { setProducts(filtered); }
-      else setProducts(prev => [...prev, ...filtered]);
+      if (reset) { setProducts(items); }
+      else setProducts(prev => [...prev, ...items]);
       setHasMore(res.page < res.pages);
       setPage(pageNum + 1);
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [sort, search]);
+  }, [sort, debouncedSearch]);
 
   useEffect(() => {
     setProducts([]);
     setPage(1);
     setHasMore(true);
     loadProducts(1, true);
-  }, [sort, search, loadProducts]);
+  }, [sort, debouncedSearch, loadProducts]);
 
   useEffect(() => {
     const el = loaderRef.current;
@@ -65,9 +72,19 @@ export default function ProductsPage() {
     return () => obs.disconnect();
   }, [loading, loadingMore, hasMore, page, loadProducts]);
 
-  const filteredProducts = search
-    ? products.filter(p => p.title?.toLowerCase().includes(search.toLowerCase()))
-    : products;
+  // Результаты приходят уже отфильтрованными на сервере
+  const filteredProducts = products;
+
+  // Диапазон цен каталога — единый формат (R22)
+  const priceRange = (() => {
+    const prices = filteredProducts
+      .map(p => Number(p.price))
+      .filter(n => Number.isFinite(n));
+    if (prices.length === 0) return '';
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    return min === max ? formatPrice(min) : `${formatPrice(min)} – ${formatPrice(max)}`;
+  })();
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
@@ -75,15 +92,17 @@ export default function ProductsPage() {
         background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.10) 0%, transparent 60%)'
       }} />
 
-      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-20">
+      {/* Ширина каноническая для проекта (max-w-5xl) — совпадает с шапкой и футером в Layout. */}
+      <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-20">
         {/* Заголовок */}
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-[var(--color-text)]">Товары</h1>
-          {isSeller && (
-            <Link to="/products/new" className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#22c55e] text-[#0d1512] text-sm font-bold hover:bg-[#16a34a] transition-colors">
-              <Plus size={16} /> Выставить
-            </Link>
-          )}
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--color-text)]">Товары</h1>
+            {priceRange && (
+              <p className="text-[11px] text-[var(--color-muted)] mt-1">Цены в каталоге: {priceRange}</p>
+            )}
+          </div>
+          <CreateMenu variant="button" label="Выставить" />
         </div>
 
         {/* Поиск */}
@@ -110,7 +129,7 @@ export default function ProductsPage() {
             <button
               key={opt.value}
               onClick={() => setSort(opt.value)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-colors shrink-0 ${
+              className={`flex items-center gap-1.5 px-4 min-h-[44px] rounded-full text-xs font-bold whitespace-nowrap transition-colors shrink-0 ${
                 sort === opt.value
                   ? 'bg-[#22c55e] text-[#0d1512]'
                   : 'text-[var(--color-muted)] border border-[var(--color-border)] hover:text-[var(--color-text)] hover:border-[#22c55e]/40'
@@ -121,9 +140,9 @@ export default function ProductsPage() {
           ))}
         </div>
 
-        {/* Сетка */}
+        {/* Сетка — адаптивная: 2 / 3 / 4 колонки */}
         {loading ? (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="rounded-2xl bg-[var(--color-surface)] overflow-hidden">
                 <div className="h-36 bg-[var(--bg-3)] animate-pulse" />
@@ -139,11 +158,13 @@ export default function ProductsPage() {
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--color-surface)] flex items-center justify-center">
               <Package size={28} className="text-[var(--color-faint)]" />
             </div>
-            <div className="text-[var(--color-muted)] text-sm">Пока пусто. Здесь появится твой рынок.</div>
+            <div className="text-[var(--color-muted)] text-sm">
+              {search ? 'Ничего не нашли по запросу.' : 'Пока пусто. Здесь появится твой рынок.'}
+            </div>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {filteredProducts.map(p => (
                 <ProductCard key={p.id} product={p} />
               ))}

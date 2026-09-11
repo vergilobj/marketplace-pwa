@@ -55,7 +55,7 @@ export class ProductsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SELLER', 'ADMIN')
+  @Roles('BUYER', 'SELLER', 'ADMIN')
   @Get('my')
   async findMyProducts(@Request() req: AuthenticatedRequest) {
     return this.productsService.findBySeller(req.user.userId);
@@ -66,16 +66,19 @@ export class ProductsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('sort') sort?: string,
+    @Query('search') search?: string,
+    @Query('q') q?: string,
   ) {
     return this.productsService.findAll({
       page: Number(page) || 1,
       limit: Number(limit) || 20,
       sort: sort || 'newest',
+      search: search || q || undefined,
     });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SELLER', 'ADMIN')
+  @Roles('BUYER', 'SELLER', 'ADMIN')
   @Post()
   async create(
     @Request() req: AuthenticatedRequest,
@@ -102,7 +105,7 @@ export class ProductsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SELLER', 'ADMIN')
+  @Roles('BUYER', 'SELLER', 'ADMIN')
   @Patch(':id')
   async update(
     @Param('id') id: string,
@@ -113,7 +116,7 @@ export class ProductsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SELLER', 'ADMIN')
+  @Roles('BUYER', 'SELLER', 'ADMIN')
   @Delete(':id')
   async remove(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
     return this.productsService.remove(id, req.user.userId);

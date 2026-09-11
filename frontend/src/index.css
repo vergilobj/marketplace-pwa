@@ -161,7 +161,7 @@
 [class*="bg-black/"] { color: #fff !important; }
 
 @media (max-width: 640px) {
-  main.max-w-7xl { padding-left: 8px !important; padding-right: 8px !important; }
+  main.max-w-5xl { padding-left: 8px !important; padding-right: 8px !important; }
   .max-w-6xl, .max-w-5xl, .max-w-4xl, .max-w-3xl, .max-w-2xl {
     padding-left: 8px !important; padding-right: 8px !important;
   }
@@ -174,6 +174,69 @@
 
 @media (prefers-reduced-motion: reduce) {
   .animate-spring-in { animation: none; opacity: 1; transform: none; }
+}
+
+/* ============================================================
+   R14 — тач-таргеты ≥44px
+   Хелперы, которые увеличивают ЗОНУ ТАПА, не раздувая визуал.
+   ============================================================ */
+
+/* Кнопка-обёртка 44×44 вокруг компактной иконки-«чипа» */
+.tap-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Гарантированный тач-таргет для текстовых ссылок/кнопок */
+.tap-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* D1/R14: иконка-чип внутри кнопки. Кнопка-обёртка держит 44×44,
+   иконка остаётся визуально компактной (не раздуваем картинку). */
+.tap-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+/* R20/D8: нижний отступ под плавающее мобильное меню (bottom-3 + ~68px высоты).
+   Применяется к спискам действий, чтобы последний элемент не уходил под меню. */
+/* H1: меню bottom-3 (12px) + высота ~57px → нужно ≥90px запаса, берём 104px */
+@media (max-width: 767px) {
+  .pb-nav-safe { padding-bottom: 104px; }
+}
+
+/* H1 — подпись мобильного таба: 10px и НЕ раздувается правилом .text-[10px] из R16.
+   Горизонтальных отступов нет, подпись обрезается truncate — соседние пункты не слипаются. */
+.tab-label {
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* R15 — сердечко «в избранное»: на тач-устройствах hover нет,
+   поэтому кнопка должна быть видима всегда */
+.fav-btn > span { transition: opacity 0.15s var(--ease), background-color 0.15s var(--ease); }
+@media (hover: none), (pointer: coarse) {
+  .fav-btn > span { opacity: 1 !important; }
+  .fav-btn { opacity: 1 !important; }
+}
+
+/* R16 — минимальный размер контентного текста на мобиле */
+@media (max-width: 767px) {
+  .text-\[9px\], .text-\[10px\] { font-size: 11px !important; line-height: 1.35 !important; }
 }
 
 /* Скрыть скроллбар (горизонтальные витрины) */

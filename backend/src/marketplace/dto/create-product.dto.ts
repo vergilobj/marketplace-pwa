@@ -30,6 +30,10 @@ export class CreateProductDto {
   media?: string[];
 
   @IsOptional()
+  @IsString()
+  videoUrl?: string;
+
+  @IsOptional()
   @IsBoolean()
   isAd?: boolean;
 }

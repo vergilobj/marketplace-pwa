@@ -82,7 +82,10 @@ describe('PostsController', () => {
   describe('findById', () => {
     it('should return post', async () => {
       service.findById.mockResolvedValue({ id: 'post-1' });
-      expect(await controller.findById('post-1')).toEqual({ id: 'post-1' });
+      // Контроллер читает req.user?.userId (OptionalJwtAuthGuard) — мокаем req.
+      expect(
+        await controller.findById('post-1', { user: undefined } as any),
+      ).toEqual({ id: 'post-1' });
     });
   });
 

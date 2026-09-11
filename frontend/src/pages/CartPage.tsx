@@ -1,5 +1,6 @@
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, Minus, Plus, ArrowLeft, ArrowRight } from 'lucide-react';
+import EmptyState from '../components/ui/EmptyState';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { formatPrice } from "../utils/format";
@@ -18,15 +19,13 @@ export default function CartPage() {
         <div className="fixed inset-0 pointer-events-none" style={{
           background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.10) 0%, transparent 60%)'
         }} />
-        <div className="relative max-w-xl mx-auto px-6 py-24 text-center">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[var(--color-surface)] flex items-center justify-center">
-            <ShoppingBag size={32} className="text-[var(--color-faint)]" />
-          </div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-[var(--color-text)] mb-2">Пусто</h1>
-          <p className="text-[var(--color-muted)] mb-8">Как в твоём кошельке до зарплаты.</p>
-          <Link to="/" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#22c55e] text-[#0d1512] font-bold text-sm hover:bg-[#16a34a] transition-colors shadow-[0_8px_32px_-8px_rgba(34,197,94,0.5)]">
-            <ShoppingBag size={16} /> На базар
-          </Link>
+        <div className="relative max-w-xl mx-auto px-6 py-24">
+          <EmptyState
+            icon={<ShoppingBag size={32} />}
+            title="Пусто"
+            description="Как в твоём кошельке до зарплаты."
+            action={{ label: 'На базар', onClick: () => navigate('/') }}
+          />
         </div>
       </div>
     );

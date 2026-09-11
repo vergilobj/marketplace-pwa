@@ -1,13 +1,15 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Minus, Plus, ArrowLeft, ChevronLeft, ChevronRight, Heart, Sparkles } from 'lucide-react';
+import { ShoppingCart, Minus, Plus, ArrowLeft, ChevronLeft, ChevronRight, Heart, Sparkles, Video, PackageX, LayoutGrid } from 'lucide-react';
 import { getProductById, getSimilarProducts } from '../api/products';
 import { createOrder, getOrderPaymentStatus } from '../api/orders';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../hooks/useAuth';
 import { useApp } from '../context/AppContext';
 import { resolveMedia } from '../utils/media';
+import { getVideoEmbed } from '../utils/video';
+import { formatPrice } from '../utils/format';
 import toast from 'react-hot-toast';
 
 export default function ProductDetailPage() {
@@ -92,15 +94,36 @@ export default function ProductDetailPage() {
   if (error && !product) {
     return (
       <div className="max-w-xl mx-auto px-6 py-24 text-center">
-        <p className="text-[var(--color-muted)]">{error}</p>
+        <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center">
+          <PackageX size={28} className="text-[#22c55e]" />
+        </div>
+        <h1 className="text-2xl font-extrabold text-[var(--color-text)] mb-2">{error}</h1>
+        <p className="text-sm text-[var(--color-muted)] mb-8">
+          Возможно, товар сняли с продажи или ссылка устарела.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-2.5">
+          <button
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 px-5 h-11 rounded-full border border-[var(--color-border)] text-[var(--color-text)] text-sm font-bold hover:border-[#22c55e]/40 hover:bg-[var(--color-surface)] transition-colors"
+          >
+            <ArrowLeft size={16} /> Назад
+          </button>
+          <button
+            onClick={() => navigate('/products')}
+            className="inline-flex items-center gap-2 px-5 h-11 rounded-full bg-[#22c55e] text-[#0b0e0d] text-sm font-bold hover:bg-[#16a34a] transition-colors"
+          >
+            <LayoutGrid size={16} /> В каталог
+          </button>
+        </div>
       </div>
     );
   }
 
   const media = Array.isArray(product.media) ? product.media : [];
+  const videoEmbed = getVideoEmbed(product.videoUrl);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 pb-20">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 pb-20">
       <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
         <ArrowLeft size={16} /> Назад
       </button>
@@ -147,10 +170,9 @@ export default function ProductDetailPage() {
           <h1 className="text-2xl lg:text-3xl font-bold text-[var(--color-text)] leading-tight">{product.title}</h1>
 
           <div className="flex items-baseline gap-3 mt-3">
-            <span className="text-3xl lg:text-4xl font-extrabold text-[var(--color-text)]">
-              {product.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+            <span className="text-3xl lg:text-4xl font-extrabold text-[#22c55e]">
+              {formatPrice(product.price)}
             </span>
-            <span className="text-lg font-bold text-[#22c55e]">USDT</span>
           </div>
 
           {product.seller?.name && (
@@ -215,6 +237,37 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
+      {/* Видео товара */}
+      {videoEmbed && (
+        <div className="mt-8">
+          <h2 className="text-lg font-bold text-[var(--color-text)] mb-3">Видео</h2>
+          {videoEmbed.type === 'video' ? (
+            <div className="rounded-2xl overflow-hidden border border-[var(--color-border)] bg-black">
+              <video src={resolveMedia(videoEmbed.src)} controls playsInline className="w-full max-h-[520px]" />
+            </div>
+          ) : videoEmbed.type === 'iframe' ? (
+            <div className="rounded-2xl overflow-hidden border border-[var(--color-border)] aspect-video">
+              <iframe
+                src={videoEmbed.src}
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allowFullScreen
+                title="Видео товара"
+              />
+            </div>
+          ) : (
+            <a
+              href={videoEmbed.src}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-[#22c55e]/40 text-[#22c55e] hover:bg-[#22c55e]/10 transition-colors text-sm font-bold"
+            >
+              <Video size={17} /> Открыть видео {videoEmbed.label ? `(${videoEmbed.label})` : ''}
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Оплата QR */}
       {payment?.depositAddress && (
         <div className="mt-6 rounded-2xl bg-[var(--color-surface)] border border-[#22c55e]/20 p-5">
@@ -267,7 +320,7 @@ export default function ProductDetailPage() {
                 </div>
                 <div className="p-2.5">
                   <div className="text-[13px] font-medium text-[var(--color-text)] truncate mb-0.5">{s.title}</div>
-                  <div className="text-[13px] font-bold text-[#22c55e]">{s.price.toLocaleString('en-US', { maximumFractionDigits: 2 })} USDT</div>
+                  <div className="text-[13px] font-bold text-[#22c55e]">{formatPrice(s.price)}</div>
                 </div>
               </div>
             ))}

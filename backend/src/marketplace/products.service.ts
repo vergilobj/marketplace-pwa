@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
@@ -12,6 +13,8 @@ import { ModerationService } from '../moderation/moderation.service';
 
 @Injectable()
 export class ProductsService {
+  private readonly logger = new Logger(ProductsService.name);
+
   constructor(
     private prisma: PrismaService,
     private auditService: AuditService,
@@ -37,6 +40,26 @@ export class ProductsService {
       entity: 'product',
       entityId: product.id,
     });
+
+    // Фича: товар автоматически попадает в ленту (пост-новость).
+    // Модерация уже пройдена для товара — текст тот же, повторно не модерируем.
+    // Не роняем создание товара, если пост не создался.
+    try {
+      await this.prisma.post.create({
+        data: {
+          title: product.title,
+          content: product.description || null,
+          authorId: sellerId,
+          isAd: false,
+          isHidden: false,
+        },
+      });
+    } catch (e) {
+      this.logger.warn(
+        `Failed to auto-create feed post for product ${product.id}: ${(e as Error).message}`,
+      );
+    }
+
     return product;
   }
 
@@ -45,6 +68,7 @@ export class ProductsService {
     limit?: number;
     sort?: string;
     onlyActive?: boolean;
+    search?: string;
   }) {
     const page = params.page || 1;
     const limit = params.limit || 20;
@@ -68,7 +92,15 @@ export class ProductsService {
         break;
     }
 
-    const where = onlyActive ? { isActive: true } : {};
+    // R10: серверный поиск по названию и описанию — не ограничен страницей пагинации
+    const search = params.search?.trim();
+    const where: any = onlyActive ? { isActive: true } : {};
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.product.findMany({

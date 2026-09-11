@@ -4,6 +4,7 @@ import api from '../api/axios';
 import { Gift, Users, Copy, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { formatPrice } from '../utils/format';
 import toast from 'react-hot-toast';
 
 export default function ReferralsPage() {
@@ -43,7 +44,7 @@ export default function ReferralsPage() {
           </div>
           <div className="flex items-center gap-2 max-w-xs mx-auto">
             <div className="flex-1 rounded-xl px-4 py-3 text-center font-mono text-lg font-bold text-[#22c55e] bg-[var(--bg-3)] border border-[var(--color-border)]">{profile?.referralCode||'—'}</div>
-            <button onClick={copyCode} className={`p-3 rounded-full transition-all ${copied ? 'bg-[#22c55e] text-[#0d1512]' : 'bg-[#22c55e] text-[#0d1512] hover:bg-[#16a34a]'} shadow-[0_8px_24px_rgba(34,197,94,0.4)]`}>
+            <button onClick={copyCode} className={`inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-3 rounded-full transition-all ${copied ? 'bg-[#22c55e] text-[#0d1512]' : 'bg-[#22c55e] text-[#0d1512] hover:bg-[#16a34a]'} shadow-[0_8px_24px_rgba(34,197,94,0.4)]`}>
               {copied ? <Check size={16}/> : <Copy size={16}/>}
             </button>
           </div>
@@ -64,7 +65,7 @@ export default function ReferralsPage() {
                   <p className="text-xs text-[var(--color-muted)]">{r.product?.title||'Заказ'} • {r.createdAt?format(new Date(r.createdAt),'d MMM',{locale:ru}):''}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-extrabold text-[#22c55e] text-sm">+{r.referralBonus||0} USDT</p>
+                  <p className="font-extrabold text-[#22c55e] text-sm">+{formatPrice(r.referralBonus || 0)}</p>
                 </div>
               </motion.div>
             ))}

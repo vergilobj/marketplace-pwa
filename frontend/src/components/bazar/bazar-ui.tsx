@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Package, MessageSquare, User, Receipt, ShoppingBasket } from 'lucide-react';
 import type { BazarRef } from '../../api/bazar';
+import { formatPrice as formatPriceImpl } from '../../utils/format';
 
 export const NEON_GREEN = '#22c55e';
 export const MINT = '#34d399';
@@ -28,9 +29,8 @@ export function refHref(ref: BazarRef): string {
   }
 }
 
-export function formatPrice(n: number): string {
-  return n.toLocaleString('ru-RU') + ' USDT';
-}
+/** R22: единый формат цены — тот же, что в utils/format (один источник истины). */
+export const formatPrice = formatPriceImpl;
 
 /** Аватар Базара: тёмная плитка с тонкой зелёной рамкой, мятная корзина. */
 export function BazarAvatar({ size = 44 }: { size?: number }) {
@@ -119,7 +119,7 @@ export function BazarRefCard({ ref, large = false }: { ref: BazarRef; large?: bo
 export function BazarRefRow({ refs, large = false }: { refs: BazarRef[]; large?: boolean }) {
   if (!refs || refs.length === 0) return null;
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 mt-3 [scrollbar-width:thin] [scrollbar-color:rgba(34,197,94,0.4)_transparent]">
+    <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 mt-3 w-full min-w-0 max-w-full [scrollbar-width:thin] [scrollbar-color:rgba(34,197,94,0.4)_transparent]">
       {refs.map((r, i) => (
         <BazarRefCard key={i} ref={r} large={large} />
       ))}

@@ -17,6 +17,7 @@ model User {
   invitedUsers  User[]   @relation("UserInvited")
   referralCode  String   @unique
   bonusBalance  Float    @default(0)
+  availableBalance Float @default(0)
   isApproved    Boolean  @default(false)
   passwordHash  String?
   cometChatUid  String?  @unique
@@ -48,6 +49,7 @@ model User {
   dealsAsSeller      Deal[]         @relation("DealSeller")
   trustScore         Float          @default(0.5)
   trustScoreAt       DateTime?
+  ledgerEntries      LedgerEntry[]
 }
 
 enum UserRole {
@@ -74,6 +76,7 @@ model Product {
   description String?
   price       Float
   media       String[]
+  videoUrl    String?
   sellerId    String
   seller      User     @relation(fields: [sellerId], references: [id])
   isActive     Boolean     @default(true)
@@ -104,10 +107,26 @@ model Order {
   transactionId  String?     @unique
   paidAt         DateTime?
   createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  dealId         String?     @unique
+  priceSource    PriceSource @default(PRODUCT)
+  escrowAmount   Float       @default(0)
+  escrowStatus   EscrowStatus @default(NONE)
+  escrowHeldAt   DateTime?
+  escrowClosedAt DateTime?
+  autoCompleteAt DateTime?
+  shippedAt      DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+  cancelReason   String?
 
   post         Post?
   transactions Transaction[]
   deals        Deal[]
+  ledgerEntries LedgerEntry[]
+
+  @@index([status, autoCompleteAt])
+  @@index([sellerId, escrowStatus])
 }
 
 enum OrderStatus {
@@ -115,7 +134,22 @@ enum OrderStatus {
   PAID
   SHIPPED
   COMPLETED
+  DISPUTED
+  REFUNDED
   CANCELLED
+}
+
+enum EscrowStatus {
+  NONE
+  HELD
+  RELEASED
+  REFUNDED
+  SPLIT
+}
+
+enum PriceSource {
+  PRODUCT
+  DEAL
 }
 
 enum ProductType {
@@ -254,6 +288,9 @@ enum TransactionStatus {
   CONFIRMED
   SWEPT
   FAILED
+  UNDERPAID
+  OVERPAID
+  REFUNDED
 }
 
 model Transaction {
@@ -262,7 +299,7 @@ model Transaction {
   order          Order           @relation(fields: [orderId], references: [id])
   type           String
   amount         Float
-  status         String
+  status         TransactionStatus @default(PENDING)
   payload        Json?
   provider       PaymentProvider @default(NOWPAYMENTS)
   clientRef      String?         @unique
@@ -271,7 +308,41 @@ model Transaction {
   token          String?
   txHash         String?         @unique
   amountRaw      String?
+  expectedAmountRaw String?
+  receivedAmountRaw String?
+  confirmations  Int?
+  confirmedAt    DateTime?
+  tokenDecimals  Int             @default(18)
+  mismatchReason String?
   createdAt      DateTime        @default(now())
+}
+
+enum LedgerAccount {
+  ESCROW
+  AVAILABLE
+  REFERRAL
+  PLATFORM
+}
+
+model LedgerEntry {
+  id           String        @id @default(uuid())
+  userId       String?
+  user         User?         @relation(fields: [userId], references: [id])
+  account      LedgerAccount
+  amount       Float
+  currency     String        @default("USDT")
+  type         String
+  orderId      String?
+  order        Order?        @relation(fields: [orderId], references: [id])
+  dealId       String?
+  refKey       String        @unique
+  balanceAfter Float?
+  meta         Json?
+  createdAt    DateTime      @default(now())
+
+  @@index([userId, account, createdAt])
+  @@index([orderId])
+  @@index([account, createdAt])
 }
 
 model ModerationLog {
@@ -309,6 +380,8 @@ model WithdrawalRequest {
   toAddress      String?
   provider       PaymentProvider? @default(PAYMOD)
   idempotencyKey String?          @unique
+  ledgerEntryId  String?
+  payoutAttempts Int              @default(0)
   payoutTxHash   String?
   payoutStatus   PayoutStatus     @default(PENDING)
   payoutError    String?

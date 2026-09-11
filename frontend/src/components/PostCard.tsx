@@ -6,6 +6,9 @@ import { ru } from 'date-fns/locale';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
+import { isInternalVideo } from '../api/upload';
+import { resolveMedia } from '../utils/media';
+import Badge from './ui/Badge';
 
 interface Props { post: any; onDelete?: (id: string) => void; onEdit?: (post: any) => void; }
 
@@ -41,9 +44,7 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-[var(--color-text)]">{post.author?.name || post.adOwner?.name || 'Аноним'}</span>
               {post.isAd && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[rgba(255,213,102,0.12)] text-amber-300 text-[10px]">
-                  <Megaphone size={10} /> Реклама
-                </span>
+                <Badge tone="amber" text="Реклама" icon={<Megaphone size={11} />} />
               )}
             </div>
             <span className="text-[11px] text-[var(--color-muted)]">{time}</span>
@@ -51,8 +52,8 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
         </div>
         {isAdmin && (
           <div className="relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setMenu(!menu)} className="p-1.5 rounded-md hover:bg-[var(--bg-3)] text-[var(--color-muted)] transition-colors">
-              <MoreHorizontal size={16} />
+            <button onClick={() => setMenu(!menu)} aria-label="Меню" className="w-11 h-11 flex items-center justify-center rounded-md hover:bg-[var(--bg-3)] text-[var(--color-muted)] transition-colors -mr-2">
+              <MoreHorizontal size={17} />
             </button>
             {menu && (
               <div className="absolute right-0 top-full mt-1.5 w-32 bg-[var(--card-2)] rounded-lg py-1 z-10 border border-[var(--color-border)]">
@@ -67,6 +68,17 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
       <div className="px-3.5 pb-3.5">
         <h2 className="text-[15px] font-semibold mb-1.5 line-clamp-2 text-[var(--color-text)]">{post.title}</h2>
         {post.content && <p className="text-[13px] text-[var(--color-muted)] line-clamp-3 mb-2.5 leading-relaxed">{post.content}</p>}
+        {isInternalVideo(post.videoUrl) && (
+          <div className="rounded-lg overflow-hidden mb-2.5 bg-black">
+            <video
+              src={resolveMedia(post.videoUrl)}
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full h-48 object-contain"
+            />
+          </div>
+        )}
         {media.length > 0 && (
           <div className="rounded-lg overflow-hidden mb-2.5">
             <img src={media[0]} alt={post.title} className="w-full h-48 object-cover" loading="lazy" />
@@ -79,13 +91,13 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
         )}
       </div>
 
-      <div className="px-3.5 pb-3 flex items-center gap-3 border-t border-[var(--color-border)] pt-2.5">
-        <button onClick={handleLike} className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-colors ${liked ? 'text-[#22c55e]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}>
-          <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
+      <div className="px-3.5 pb-3 flex items-center gap-1 border-t border-[var(--color-border)] pt-1.5">
+        <button onClick={handleLike} aria-label="Нравится" className={`flex items-center gap-1.5 px-2.5 min-h-[44px] rounded-md text-xs transition-colors ${liked ? 'text-[#22c55e]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}>
+          <Heart size={15} fill={liked ? 'currentColor' : 'none'} />
           {likes > 0 && likes}
         </button>
-        <button onClick={e => { e.stopPropagation(); navigate(`/posts/${post.id}`); }} className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
-          <MessageCircle size={14} />
+        <button onClick={e => { e.stopPropagation(); navigate(`/posts/${post.id}`); }} aria-label="Комментарии" className="flex items-center gap-1.5 px-2.5 min-h-[44px] rounded-md text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
+          <MessageCircle size={15} />
           {post.commentCount > 0 && post.commentCount}
         </button>
       </div>

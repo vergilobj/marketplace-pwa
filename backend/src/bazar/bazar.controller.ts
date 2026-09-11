@@ -13,6 +13,7 @@ import type { AuthenticatedRequest } from '../common/types/authenticated-request
 import { BazarService } from './bazar.service';
 import { DealService } from './deal.service';
 import { AutopilotService } from './autopilot.service';
+import { ReputationService } from './reputation.service';
 import { SendBazarMessageDto } from './dto/send-bazar-message.dto';
 
 @Controller('bazar')
@@ -22,6 +23,7 @@ export class BazarController {
     private bazarService: BazarService,
     private dealService: DealService,
     private autopilotService: AutopilotService,
+    private reputationService: ReputationService,
   ) {}
 
   /** Идемпотентное приветствие. Вызывается фронтом после логина. */
@@ -127,6 +129,16 @@ export class BazarController {
     return this.dealService.rejectOffer(req.user.userId, { dealId: id, offerId });
   }
 
+  /** N2: открыть спор по сделке (доступно участникам). Запускает нейро-арбитраж. */
+  @Post('deals/:id/dispute')
+  dispute(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body?: { reason?: string },
+  ) {
+    return this.dealService.openDispute(req.user.userId, id, body?.reason);
+  }
+
   /** Записать ViewEvent (открытие карточки товара). */
   @Post('views')
   recordView(@Req() req: AuthenticatedRequest, @Body() body: { productId: string }) {
@@ -158,9 +170,14 @@ export class BazarController {
     return this.bazarService.generateDescription(body.rawText);
   }
 
-  /** Прочитать trustScore пользователя. */
+  /**
+   * N9 + N16: репутация пользователя.
+   * Решение по N16: trustScore публичен ТОЛЬКО для продавцов (у кого есть
+   * товары). Свой профиль и ADMIN/MODERATOR видят всегда. Иначе — 403,
+   * чтобы нельзя было перебором id собрать trustScore всех юзеров.
+   */
   @Get('users/:id/trust')
-  getTrust(@Param('id') id: string) {
-    return this.bazarService.getTrustScore(id);
+  getTrust(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    return this.reputationService.publicTrust(id, req.user);
   }
 }

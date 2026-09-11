@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, ShoppingCart, Trash2, Plus, Minus } from 'lucide-react';
+import EmptyState from '../components/ui/EmptyState';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { getProducts } from '../api/products';
@@ -29,20 +30,17 @@ export default function FavoritesPage() {
         background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.10) 0%, transparent 60%)'
       }} />
 
-      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-20">
+      <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-20">
         <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Избранное</h1>
         <p className="text-[var(--color-muted)] text-sm mb-6">{products.length} товаров</p>
 
         {products.length === 0 ? (
-          <div className="flex items-center justify-center py-24 w-full">
-            <div className="text-center">
-              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[var(--color-surface)] flex items-center justify-center">
-                <Heart size={32} className="text-[var(--color-faint)]" />
-              </div>
-              <p className="text-[var(--color-muted)] mb-6">Нет избранного — время полазить по базару</p>
-              <button onClick={() => navigate('/products')} className="px-6 py-3 rounded-full bg-[#22c55e] text-[#0d1512] text-sm font-bold hover:bg-[#16a34a] transition-colors shadow-[0_8px_32px_-8px_rgba(34,197,94,0.5)]">В каталог</button>
-            </div>
-          </div>
+          <EmptyState
+            icon={<Heart size={32} />}
+            message="Нет избранного — время полазить по базару"
+            headingLevel="h2"
+            action={{ label: 'В каталог', onClick: () => navigate('/products') }}
+          />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             {products.map((product, i) => {

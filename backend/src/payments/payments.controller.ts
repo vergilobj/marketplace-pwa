@@ -100,10 +100,33 @@ export class PaymentsController {
       paymentStatus === 'finished' ||
       paymentStatus === 'confirmed'
     ) {
-      if (orderId) {
-        await this.paymentsService.processSuccessfulPayment(orderId);
-        this.logger.log(`Order ${orderId} marked as paid via IPN`);
+      if (!orderId) {
+        // Деньги пришли без привязки к заказу — молча терять нельзя.
+        this.logger.error(
+          `ALERT legacy IPN: finished без order_id, body=${JSON.stringify(body)}`,
+        );
+        return { status: 'ok' };
       }
+
+      // NH7: legacy-путь раньше подтверждал заказ БЕЗ сверки суммы — тот же
+      // класс дыры, что B7, но в старом провайдере. Проверяем:
+      //   1) заказ существует;
+      //   2) у заказа есть legacy-транзакция NowPayments (paymod-заказы
+      //      подтверждаются только своим webhook — не подпускаем чужой IPN);
+      //   3) фактически оплаченная сумма совпадает с order.amount в допуске.
+      const check = await this.paymentsService.verifyLegacyIpnPayment(
+        orderId,
+        body,
+      );
+      if (!check.ok) {
+        this.logger.error(
+          `ALERT legacy IPN: order=${orderId} НЕ подтверждён — ${check.reason}`,
+        );
+        return { status: 'ok', confirmed: false, reason: check.reason };
+      }
+
+      await this.paymentsService.processSuccessfulPayment(orderId);
+      this.logger.log(`Order ${orderId} marked as paid via IPN`);
     }
 
     return { status: 'ok' };
