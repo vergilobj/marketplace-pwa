@@ -4,10 +4,14 @@ import { getProducts } from '../api/products';
 import ProductCard from '../components/ProductCard';
 import { CreateMenu } from '../components/CreateMenu';
 import { formatPrice } from '../utils/format';
+import { mergeUniqueById } from '../utils/mergeUnique';
 import { useDebounced } from '../hooks/useDebounced';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 const PAGE_SIZE = 24;
+
+/** Ключ «какой набор фильтров соответствует текущим данным». */
+const productsKey = (s: SortType, q: string) => `${s}\u0000${q}`;
 
 const sortOptions: { value: SortType; label: string; icon: React.ReactNode }[] = [
   { value: 'newest', label: 'Свежее', icon: <Clock size={14} /> },
@@ -18,20 +22,22 @@ const sortOptions: { value: SortType; label: string; icon: React.ReactNode }[] =
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [sort, setSort] = useState<SortType>('newest');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  // Скелетон — производное: фильтры разошлись с загруженным набором (dataKey).
+  const [dataKey, setDataKey] = useState<string | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
 
   // R10: поиск уходит на сервер, а не фильтрует первые 24 загруженных записи
   const debouncedSearch = useDebounced(search, 300);
+  const queryKey = productsKey(sort, debouncedSearch);
+  const loading = dataKey !== queryKey;
 
   const loadProducts = useCallback(async (pageNum: number, reset: boolean) => {
-    if (reset) setLoading(true);
-    else setLoadingMore(true);
+    if (!reset) setLoadingMore(true);
     try {
       const res = await getProducts({
         page: pageNum,
@@ -41,21 +47,44 @@ export default function ProductsPage() {
       });
       const items = res.items || [];
       if (reset) { setProducts(items); }
-      else setProducts(prev => [...prev, ...items]);
+      else setProducts(prev => mergeUniqueById(prev, items));
       setHasMore(res.page < res.pages);
       setPage(pageNum + 1);
     } finally {
-      setLoading(false);
       setLoadingMore(false);
     }
   }, [sort, debouncedSearch]);
 
+  // Смена фильтра/поиска → новая выдача с первой страницы.
+  // Запрос уходит из эффекта, state-апдейты — в .then/.finally: синхронного
+  // setState в теле эффекта нет. Пока dataKey не догонит queryKey, скелетон
+  // показывается сам (loading — производное), сбрасывать состояние не нужно.
   useEffect(() => {
-    setProducts([]);
-    setPage(1);
-    setHasMore(true);
-    loadProducts(1, true);
-  }, [sort, debouncedSearch, loadProducts]);
+    const key = productsKey(sort, debouncedSearch);
+    let cancelled = false;
+    getProducts({
+      page: 1,
+      limit: PAGE_SIZE,
+      sort,
+      search: debouncedSearch.trim() || undefined,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setProducts(res.items || []);
+        setHasMore(res.page < res.pages);
+        setPage(2);
+      })
+      .catch((e) => {
+        console.error('Failed to load products', e);
+      })
+      .finally(() => {
+        // Набор помечается обработанным даже при ошибке — иначе скелетон зависнет.
+        if (!cancelled) setDataKey(key);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sort, debouncedSearch]);
 
   useEffect(() => {
     const el = loaderRef.current;

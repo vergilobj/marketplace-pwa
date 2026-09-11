@@ -348,7 +348,7 @@ export class DealService {
     });
 
     // Согласованная цена ещё не зафиксирована — пока NEGOTIATING.
-    const statusPatch: any = { status: DealStatus.NEGOTIATING, lastMsgAt: new Date(), msgCount: { increment: 1 } };
+    const statusPatch: Prisma.DealUpdateInput = { status: DealStatus.NEGOTIATING, lastMsgAt: new Date(), msgCount: { increment: 1 } };
     await this.prisma.deal.update({
       where: { id: deal.id },
       data: statusPatch,

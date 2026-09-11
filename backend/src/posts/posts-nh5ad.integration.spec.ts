@@ -34,7 +34,6 @@ import { toRaw } from '../payments/money.util';
 
 describe('NH5-ad: реклама не подтверждается без депозита (integration)', () => {
   const prisma = new PrismaService();
-  const ledger = new LedgerService(prisma);
   const settings = new SettingsService(prisma);
   const audit = new AuditService(prisma);
 
@@ -43,6 +42,8 @@ describe('NH5-ad: реклама не подтверждается без деп
     createNotification: jest.fn().mockResolvedValue(null),
     sendToUser: jest.fn().mockResolvedValue(null),
   } as unknown as NotificationsService;
+
+  const ledger = new LedgerService(prisma, notify);
 
   const escrow = new EscrowService(prisma, ledger, settings, notify);
   const adActivation = new AdActivationHook();

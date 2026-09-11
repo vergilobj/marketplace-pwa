@@ -21,7 +21,14 @@ export default function DictateButton({ onResult, size = 18, className = '' }: D
   const [listening, setListening] = useState(false);
   const stopRef = useRef<(() => void) | null>(null);
   const onResultRef = useRef(onResult);
-  onResultRef.current = onResult;
+
+  /**
+   * Запись в ref во время рендера запрещена (react-hooks/refs): рендер должен
+   * быть чистым. Синхронизируем актуальный колбэк после коммита, в эффекте.
+   */
+  useEffect(() => {
+    onResultRef.current = onResult;
+  }, [onResult]);
 
   useEffect(() => {
     return () => stopRef.current?.();

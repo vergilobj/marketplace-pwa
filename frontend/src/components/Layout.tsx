@@ -6,20 +6,9 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import PageTransition from './PageTransition';
 import { CreateMenu } from './CreateMenu';
+import { isNavActive } from './navActive';
 
 const GS = { background: '#22c55e' } as const;
-
-/**
- * R14: единая проверка активного пункта меню.
- * Точное совпадение для корня, startsWith для вложенных путей
- * (`/products/123` подсвечивает «Каталог», `/bazar?...` — «Базар»).
- * Ровно один активный пункт гарантирован тем, что все href в меню
- * не являются префиксами друг друга.
- */
-export function isNavActive(pathname: string, href: string) {
-  if (href === '/') return pathname === '/';
-  return pathname === href || pathname.startsWith(href + '/');
-}
 
 export default function Layout() {
   const [searchOpen, setSearchOpen] = useState(false);

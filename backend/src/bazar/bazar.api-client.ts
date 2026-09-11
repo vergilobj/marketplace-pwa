@@ -14,13 +14,18 @@ export interface BazarRef {
 
 export interface BazarAction {
   intent: string;
-  payload?: Record<string, any>;
+  payload?: Record<string, unknown>;
 }
 
 export interface BazarResponse {
   text: string;
   refs?: BazarRef[];
   action?: BazarAction;
+}
+
+/** Урезанная форма OpenAI-совместимого ответа /chat/completions. */
+interface ChatCompletionResponse {
+  choices?: { message?: { content?: string } }[];
 }
 
 @Injectable()
@@ -73,7 +78,7 @@ export class BazarApiClient {
       throw new Error('bazar_error');
     }
 
-    const data: any = await res.json().catch(() => null);
+    const data = (await res.json().catch(() => null)) as ChatCompletionResponse | null;
     const content = data?.choices?.[0]?.message?.content ?? '';
     return this.parseContent(content);
   }
@@ -92,8 +97,8 @@ export class BazarApiClient {
 
     if (refsM) {
       try {
-        const refs = JSON.parse(refsM[1]);
-        out.refs = Array.isArray(refs) ? refs : [];
+        const refs: unknown = JSON.parse(refsM[1]);
+        out.refs = Array.isArray(refs) ? (refs as BazarRef[]) : [];
       } catch {
         /* broken refs — ignore */
       }
@@ -101,7 +106,7 @@ export class BazarApiClient {
 
     if (actionM) {
       try {
-        const action = JSON.parse(actionM[1]);
+        const action = JSON.parse(actionM[1]) as BazarAction | null;
         if (action && typeof action === 'object' && action.intent) {
           out.action = action;
         }

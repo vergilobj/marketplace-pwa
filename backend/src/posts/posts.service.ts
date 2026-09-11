@@ -8,7 +8,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { EscrowStatus, OrderStatus } from '@prisma/client';
+import { EscrowStatus, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { SettingsService } from '../settings/settings.service';
@@ -189,7 +189,7 @@ export class PostsService implements OnModuleInit {
     const skip = (page - 1) * limit;
     const now = new Date();
 
-    const orderBy: any[] = [];
+    const orderBy: Prisma.PostOrderByWithRelationInput[] = [];
     switch (params.sort) {
       case 'popular':
         orderBy.push({ likes: { _count: 'desc' } });
@@ -208,7 +208,7 @@ export class PostsService implements OnModuleInit {
         { isAd: true, isPinned: true, adExpireDate: { gte: now } },
       ],
     };
-    const where: any = search
+    const where: Prisma.PostWhereInput = search
       ? {
           AND: [
             visibility,
@@ -433,7 +433,7 @@ export class PostsService implements OnModuleInit {
 
     const now = new Date();
 
-    const orderBy: any[] = [];
+    const orderBy: Prisma.PostOrderByWithRelationInput[] = [];
     switch (sort) {
       case 'popular':
         orderBy.push({ likes: { _count: 'desc' } });
@@ -454,7 +454,7 @@ export class PostsService implements OnModuleInit {
         { isAd: true, isPinned: true, adExpireDate: { gte: now } },
       ],
     };
-    const where: any = search
+    const where: Prisma.PostWhereInput = search
       ? {
           AND: [
             visibility,
@@ -510,7 +510,7 @@ export class PostsService implements OnModuleInit {
     const page = params.page || 1;
     const limit = params.limit || 20;
     const skip = (page - 1) * limit;
-    const where: any = {};
+    const where: Prisma.PostWhereInput = {};
     if (params.search) {
       where.OR = [
         { title: { contains: params.search, mode: 'insensitive' } },

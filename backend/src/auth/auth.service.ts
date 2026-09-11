@@ -14,6 +14,9 @@ import { AuditService } from '../common/audit/audit.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
+/** Минимальный набор полей пользователя, нужный для подписи JWT. */
+type TokenUser = { id: string; phone: string; role: string };
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -115,7 +118,7 @@ export class AuthService {
     return this.generateTokens(user);
   }
 
-  private generateTokens(user: any) {
+  private generateTokens(user: TokenUser) {
     const payload = { sub: user.id, phone: user.phone, role: user.role };
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, {

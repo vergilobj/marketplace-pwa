@@ -9,8 +9,13 @@ import toast from 'react-hot-toast';
 import { isInternalVideo } from '../api/upload';
 import { resolveMedia } from '../utils/media';
 import Badge from './ui/Badge';
+import type { ApiPost } from '../api/types';
 
-interface Props { post: any; onDelete?: (id: string) => void; onEdit?: (post: any) => void; }
+interface Props {
+  post: ApiPost;
+  onDelete?: (id: string) => void;
+  onEdit?: (post: ApiPost) => void;
+}
 
 export default function PostCard({ post, onDelete, onEdit }: Props) {
   const navigate = useNavigate();
@@ -98,7 +103,7 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
         </button>
         <button onClick={e => { e.stopPropagation(); navigate(`/posts/${post.id}`); }} aria-label="Комментарии" className="flex items-center gap-1.5 px-2.5 min-h-[44px] rounded-md text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
           <MessageCircle size={15} />
-          {post.commentCount > 0 && post.commentCount}
+          {post.commentCount ? post.commentCount : null}
         </button>
       </div>
     </div>

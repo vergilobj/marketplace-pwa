@@ -14,68 +14,97 @@ import BazarChat from '../components/bazar/BazarChat';
 import DictateButton from '../components/DictateButton';
 import { CreateMenu } from '../components/CreateMenu';
 import { useDebounced } from '../hooks/useDebounced';
+import { mergeUniqueById } from '../utils/mergeUnique';
+import { readFeedCache, writeFeedCache } from './feedCache';
+import type { ApiPost, ApiProduct } from '../api/types';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 type TabType = 'all' | 'posts' | 'products' | 'ads';
 
+/**
+ * ApiProduct.type — это ProductType из схемы ('PHYSICAL' | 'DIGITAL').
+ * В ленте поле `type` переиспользовано под дискриминант, поэтому у товара
+ * оно исключается через Omit и подставляется заново.
+ */
+type FeedProductItem = Omit<ApiProduct, 'type'> & { type: 'product' };
+type FeedPostItem = ApiPost & { type: 'post' };
+
+/**
+ * Элемент смешанной ленты. Дискриминант `type` отличает товар от поста.
+ * Через Extract<> каждый вариант достаётся по отдельности — так в JSX
+ * сужение по `item.type === 'product'` реально работает, без кастов.
+ */
+type FeedItem = FeedProductItem | FeedPostItem;
+
 const PAGE_SIZE = 20;
+
+/** Ключ «какой набор фильтров соответствует текущим данным». */
+const feedKey = (s: SortType, q: string) => `${s}\u0000${q}`;
 
 export default function FeedPage() {
   const navigate = useNavigate();
   const [sp] = useSearchParams();
   const { isAdmin, isAuthenticated } = useAuth();
   const { cart, addToCart, updateQuantity } = useApp();
-  const [posts, setPosts] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [totalPosts, setTotalPosts] = useState(0);
-  const [totalProducts, setTotalProducts] = useState(0);
-  const [loading, setLoading] = useState(true);
+  // Кэш читается синхронно при инициализации состояния, а не в эффекте:
+  // при возврате с карточки список уже в первом рендере, без «быстрой прогрузки».
+  // При активном поиске кэш не подходит — там другой набор данных.
+  const [cache] = useState(() => (sp.get('search') ? null : readFeedCache()));
+  const [posts, setPosts] = useState<ApiPost[]>(() => cache?.posts ?? []);
+  const [products, setProducts] = useState<ApiProduct[]>(() => cache?.products ?? []);
+  const [totalPosts, setTotalPosts] = useState(() => cache?.totalPosts ?? 0);
+  const [totalProducts, setTotalProducts] = useState(() => cache?.totalProducts ?? 0);
+  const [postsPage, setPostsPage] = useState(() => cache?.postsPage ?? 1);
+  const [productsPage, setProductsPage] = useState(() => cache?.productsPage ?? 1);
+  const [hasMorePosts, setHasMorePosts] = useState(() => cache?.hasMorePosts ?? true);
+  const [hasMoreProducts, setHasMoreProducts] = useState(() => cache?.hasMoreProducts ?? true);
+  // Скелетон — ПРОИЗВОДНОЕ от того, совпадают ли фильтры с уже загруженными
+  // данными (dataKey). Никакого setLoading в эффекте: смена сортировки/поиска
+  // сама делает queryKey ≠ dataKey, а завершённая загрузка их выравнивает.
+  const [dataKey, setDataKey] = useState<string | null>(() => (cache ? feedKey('newest', sp.get('search') || '') : null));
   const [loadingMore, setLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [sort, setSort] = useState<SortType>('newest');
   const [search, setSearch] = useState(() => sp.get('search') || '');
   // R10: поиск уходит на сервер с дебаунсом, а не фильтрует 20 загруженных записей
   const debouncedSearch = useDebounced(search, 300);
-
-  const [postsPage, setPostsPage] = useState(1);
-  const [productsPage, setProductsPage] = useState(1);
-  const [hasMorePosts, setHasMorePosts] = useState(true);
-  const [hasMoreProducts, setHasMoreProducts] = useState(true);
   const loaderRef = useRef<HTMLDivElement>(null);
+  const queryKey = feedKey(sort, debouncedSearch);
+  const loading = dataKey !== queryKey;
 
+  // Первая страница ленты. Запрос уходит из эффекта, а state-апдейты живут
+  // в .then/.finally — синхронного setState в теле эффекта нет, каскадных
+  // рендеров нет. Смена сортировки/поиска делает queryKey ≠ dataKey, поэтому
+  // скелетон показывается сам, без отдельного setLoading.
   useEffect(() => {
-    // Восстанавливаем закэшированные данные мгновенно, без «быстрой прогрузки».
-    // При активном поиске кэш не подходит — там другой набор данных.
-    const cached = debouncedSearch ? null : sessionStorage.getItem('feed_cache');
-    let restored = false;
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (parsed.posts?.length || parsed.products?.length) {
-          setPosts(parsed.posts || []);
-          setProducts(parsed.products || []);
-          setTotalPosts(parsed.totalPosts || parsed.posts?.length || 0);
-          setTotalProducts(parsed.totalProducts || parsed.products?.length || 0);
-          setPostsPage(parsed.postsPage || 2);
-          setProductsPage(parsed.productsPage || 2);
-          setHasMorePosts(parsed.hasMorePosts ?? true);
-          setHasMoreProducts(parsed.hasMoreProducts ?? true);
-          setLoading(false);
-          restored = true;
-        }
-      } catch {}
-    }
-    if (!restored) {
-      setPosts([]);
-      setProducts([]);
-      setPostsPage(1);
-      setProductsPage(1);
-      setHasMorePosts(true);
-      setHasMoreProducts(true);
-      setLoading(true);
-    }
-    loadInitial();
-  }, [sort, activeTab, debouncedSearch]);
+    const key = feedKey(sort, debouncedSearch);
+    let cancelled = false;
+    Promise.all([
+      getFeed({ page: 1, limit: PAGE_SIZE, sort, search: debouncedSearch.trim() || undefined }),
+      getProducts({ page: 1, limit: PAGE_SIZE, sort: sort === 'price_asc' ? 'price_asc' : sort === 'price_desc' ? 'price_desc' : sort === 'popular' ? 'popular' : 'newest', search: debouncedSearch.trim() || undefined }),
+    ])
+      .then(([postRes, prodRes]) => {
+        if (cancelled) return;
+        setPosts(postRes.items || []);
+        setProducts(prodRes.items || []);
+        setTotalPosts(postRes.total || postRes.items?.length || 0);
+        setTotalProducts(prodRes.total || prodRes.items?.length || 0);
+        setHasMorePosts(postRes.page < postRes.pages);
+        setHasMoreProducts(prodRes.page < prodRes.pages);
+        setPostsPage(2);
+        setProductsPage(2);
+      })
+      .catch((e) => {
+        console.error('Failed to load feed', e);
+      })
+      .finally(() => {
+        // Набор помечается обработанным даже при ошибке — иначе скелетон зависнет.
+        if (!cancelled) setDataKey(key);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sort, debouncedSearch]);
 
   // Восстановление скролла после рендера
   useEffect(() => {
@@ -91,32 +120,11 @@ export default function FeedPage() {
   const saveScrollAndNavigate = (to: string) => {
     sessionStorage.setItem('feed_scroll', String(window.scrollY));
     // Кэшируем текущие данные, чтобы при возврате не было «быстрой прогрузки»
-    sessionStorage.setItem('feed_cache', JSON.stringify({
+    writeFeedCache({
       posts, products, totalPosts, totalProducts,
       postsPage, productsPage, hasMorePosts, hasMoreProducts,
-    }));
+    });
     navigate(to);
-  };
-
-  const loadInitial = async () => {
-    try {
-      const [postRes, prodRes] = await Promise.all([
-        getFeed({ page: 1, limit: PAGE_SIZE, sort, search: debouncedSearch.trim() || undefined }),
-        getProducts({ page: 1, limit: PAGE_SIZE, sort: sort === 'price_asc' ? 'price_asc' : sort === 'price_desc' ? 'price_desc' : sort === 'popular' ? 'popular' : 'newest', search: debouncedSearch.trim() || undefined }),
-      ]);
-      setPosts(postRes.items || []);
-      setProducts(prodRes.items || []);
-      setTotalPosts(postRes.total || postRes.items?.length || 0);
-      setTotalProducts(prodRes.total || prodRes.items?.length || 0);
-      setHasMorePosts(postRes.page < postRes.pages);
-      setHasMoreProducts(prodRes.page < prodRes.pages);
-      setPostsPage(2);
-      setProductsPage(2);
-    } catch (e) {
-      console.error('Failed to load feed', e);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const loadMore = useCallback(async () => {
@@ -127,13 +135,13 @@ export default function FeedPage() {
       const isProductTab = activeTab === 'products';
       if ((isPostTab || activeTab === 'all') && hasMorePosts) {
         const res = await getFeed({ page: postsPage, limit: PAGE_SIZE, sort, search: debouncedSearch.trim() || undefined });
-        setPosts(prev => [...prev, ...(res.items || [])]);
+        setPosts(prev => mergeUniqueById(prev, res.items || []));
         setHasMorePosts(res.page < res.pages);
         setPostsPage(p => p + 1);
       }
       if ((isProductTab || activeTab === 'all') && hasMoreProducts) {
         const res = await getProducts({ page: productsPage, limit: PAGE_SIZE, sort: sort === 'price_asc' ? 'price_asc' : sort === 'price_desc' ? 'price_desc' : sort === 'popular' ? 'popular' : 'newest', search: debouncedSearch.trim() || undefined });
-        setProducts(prev => [...prev, ...(res.items || [])]);
+        setProducts(prev => mergeUniqueById(prev, res.items || []));
         setHasMoreProducts(res.page < res.pages);
         setProductsPage(p => p + 1);
       }
@@ -165,7 +173,7 @@ export default function FeedPage() {
     try { await api.delete('/posts/' + id); setPosts(p => p.filter(x => x.id !== id)); toast.success('Удалён'); } catch { toast.error('Ошибка'); }
   };
 
-  const togglePostLike = async (post: any, e: React.MouseEvent) => {
+  const togglePostLike = async (post: ApiPost, e: React.MouseEvent) => {
     e.stopPropagation();
     const liked = post.likedByMe || false;
     const likes = post.likeCount || 0;
@@ -184,13 +192,13 @@ export default function FeedPage() {
 
   // Смешанная лента с живым ритмом
   const items = (() => {
-    const postsArr = regular.map(p => ({ ...p, type: 'post' as const }));
-    const prodArr = fpr.map(p => ({ ...p, type: 'product' as const }));
+    const postsArr: FeedPostItem[] = regular.map(p => ({ ...p, type: 'post' as const }));
+    const prodArr: FeedProductItem[] = fpr.map(p => ({ ...p, type: 'product' as const }));
     if (activeTab === 'posts') return postsArr;
     if (activeTab === 'products') return prodArr;
-    if (activeTab === 'ads') return ads.map(p => ({ ...p, type: 'post' as const }));
-    const adsArr = ads.map(p => ({ ...p, type: 'post' as const }));
-    const mixed: any[] = [];
+    const adsArr: FeedPostItem[] = ads.map(p => ({ ...p, type: 'post' as const }));
+    if (activeTab === 'ads') return adsArr;
+    const mixed: FeedItem[] = [];
     let pi = 0, ti = 0;
     const seq = [2, 1, 3, 2, 1, 4, 2, 3, 1, 2];
     let i = 0;
@@ -326,8 +334,8 @@ export default function FeedPage() {
           >
             {items.map((item) => {
               if (item.type === 'product') {
-                const inCart = !!cart.find((i: any) => i.productId === item.id);
-                const qty = cart.find((i: any) => i.productId === item.id)?.quantity || 1;
+                const inCart = !!cart.find((i) => i.productId === item.id);
+                const qty = cart.find((i) => i.productId === item.id)?.quantity || 1;
 
                 // Рекламный товар — вертикальная карточка: картинка сверху, инфо + кнопка снизу
                 if (item.isAd) {
@@ -420,11 +428,11 @@ export default function FeedPage() {
                   <div className="flex items-center gap-2 mt-2.5">
                     <button onClick={(e) => togglePostLike(item, e)} className={`flex items-center justify-center gap-1.5 px-2.5 min-h-[44px] min-w-[44px] rounded-lg text-xs font-medium transition-colors ${item.likedByMe ? 'text-[#22c55e] bg-[rgba(34,197,94,0.1)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)]'}`}>
                       <Heart size={14} fill={item.likedByMe ? 'currentColor' : 'none'} />
-                      {item.likeCount > 0 && item.likeCount}
+                      {(item.likeCount ?? 0) > 0 && item.likeCount}
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); saveScrollAndNavigate(`/posts/${item.id}`); }} className="flex items-center justify-center gap-1.5 px-2.5 min-h-[44px] min-w-[44px] rounded-lg text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] transition-colors">
                       <MessageCircle size={14} />
-                      {item.commentCount > 0 && item.commentCount}
+                      {(item.commentCount ?? 0) > 0 && item.commentCount}
                     </button>
                     {isAdmin && <button onClick={(e) => { e.stopPropagation(); delPost(item.id); }} className="tap-link px-1 ml-auto text-[10px] text-red-400 hover:underline">удалить</button>}
                   </div>

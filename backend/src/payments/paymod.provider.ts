@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PaymentProvider, PaymentResult } from './payment.provider';
+import { PaymentMetadata, PaymentProvider, PaymentResult } from './payment.provider';
 import { PaymodService } from './paymod.service';
 
 /**
@@ -20,7 +20,7 @@ export class PaymodProvider extends PaymentProvider {
   async createPayment(
     amount: number,
     orderId: string,
-    metadata?: any,
+    metadata?: PaymentMetadata,
   ): Promise<PaymentResult> {
     const chain = metadata?.chain || 'bsc';
     const token = metadata?.token || 'USDT';

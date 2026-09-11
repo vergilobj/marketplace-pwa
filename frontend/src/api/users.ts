@@ -1,11 +1,17 @@
 import api from './axios';
+import type { ApiUser, ApiUserStats, AuthTokens, BecomeSellerResponse } from './types';
 
-export const getProfile = () => api.get('/users/me').then(r => r.data);
+export const getProfile = () =>
+  api.get<ApiUser>('/users/me').then(r => r.data);
+
 export const updateProfile = (data: { name?: string; phone?: string }) =>
-  api.patch('/users/me', data).then(r => r.data);
-export const getStats = () => api.get('/users/me/stats').then(r => r.data);
+  api.patch<ApiUser>('/users/me', data).then(r => r.data);
+
+export const getStats = () =>
+  api.get<ApiUserStats>('/users/me/stats').then(r => r.data);
+
 export const becomeSeller = () =>
-  api.post('/users/become-seller').then(r => r.data as { user: any; accessToken: string });
+  api.post<BecomeSellerResponse>('/users/become-seller').then(r => r.data);
 
 /** §4.6: раздельные балансы. */
 export type BalanceResponse = {
@@ -18,7 +24,7 @@ export type BalanceResponse = {
 };
 
 export const getBalance = () =>
-  api.get('/users/me/balance').then(r => r.data as BalanceResponse);
+  api.get<BalanceResponse>('/users/me/balance').then(r => r.data);
 
 export type LedgerEntryItem = {
   id: string;
@@ -37,4 +43,6 @@ export type LedgerResponse = {
 };
 
 export const getLedger = (params?: { limit?: number; cursor?: string }) =>
-  api.get('/users/me/ledger', { params }).then(r => r.data as LedgerResponse);
+  api.get<LedgerResponse>('/users/me/ledger', { params }).then(r => r.data);
+
+export type { AuthTokens };

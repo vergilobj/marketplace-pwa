@@ -9,6 +9,7 @@ import { uploadImage, uploadVideo } from '../api/upload';
 import { getVideoEmbed } from '../utils/video';
 import { formatPrice } from '../utils/format';
 import DictateButton from '../components/DictateButton';
+import { errorMessage } from '../utils/error';
 
 export default function CreateProductPage() {
   const navigate = useNavigate();
@@ -57,8 +58,8 @@ export default function CreateProductPage() {
     try {
       const url = await uploadVideo(file);
       setVideoUrl(url);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка при загрузке видео');
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Ошибка при загрузке видео'));
       setVideoFile(null);
       setVideoPreview('');
     } finally {
@@ -96,8 +97,8 @@ export default function CreateProductPage() {
       });
 
       navigate('/products');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка при создании товара');
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Ошибка при создании товара'));
     } finally {
       setLoading(false);
     }

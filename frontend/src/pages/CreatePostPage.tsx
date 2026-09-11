@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileText, ImagePlus, Video, X } from 'lucide-react';
 import { createPost } from '../api/posts';
 import { uploadImage, uploadVideo } from '../api/upload';
+import { errorMessage } from '../utils/error';
 
 export default function CreatePostPage() {
   const navigate = useNavigate();
@@ -44,8 +45,8 @@ export default function CreatePostPage() {
     try {
       const url = await uploadVideo(file);
       setVideoUrl(url);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка при загрузке видео');
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Ошибка при загрузке видео'));
       setVideoFile(null);
       setVideoPreview('');
     } finally {
@@ -78,8 +79,8 @@ export default function CreatePostPage() {
         media: uploadedUrls.length > 0 ? uploadedUrls : undefined,
       });
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка при создании поста');
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Ошибка при создании поста'));
     } finally {
       setLoading(false);
     }

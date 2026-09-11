@@ -8,6 +8,8 @@ import toast from 'react-hot-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatPrice } from "../utils/format";
 import { useAuth } from '../hooks/useAuth';
+import { errorMessage } from '../utils/error';
+import type { ApiOrder } from '../api/types';
 
 const statusConfig: Record<string, { icon: React.ReactNode; cls: string; label: string }> = {
   PENDING: { icon: <Clock size={14} />, cls: 'text-amber-400 bg-amber-400/10', label: 'ждёт' },
@@ -29,7 +31,7 @@ type PayModalState = {
 
 export default function OrdersPage() {
   const { user } = useAuth();
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -61,7 +63,6 @@ export default function OrdersPage() {
       } catch { /* продолжаем поллить */ }
     }, 5000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pay?.orderId, pay?.depositAddress]);
 
   const handleStatus = async (id: string, status: string) => { try { await updateOrderStatus(id, status); toast.success('Статус обновлён'); fetchOrders(); } catch { toast.error('Ошибка'); } };
@@ -73,14 +74,14 @@ export default function OrdersPage() {
       await confirmOrderReceipt(id);
       toast.success('Получение подтверждено, деньги отправлены продавцу');
       fetchOrders();
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || 'Не удалось подтвердить');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось подтвердить'));
     } finally {
       setConfirming(null);
     }
   };
 
-  const handlePay = async (order: any) => {
+  const handlePay = async (order: ApiOrder) => {
     setCreatingPay(true);
     try {
       const t = toast.loading('Создаю платёж…');
@@ -93,8 +94,8 @@ export default function OrdersPage() {
         clientRef: res.clientRef || null,
         status: res.status || 'PENDING',
       });
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || 'Не удалось создать платёж');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось создать платёж'));
     } finally {
       setCreatingPay(false);
     }

@@ -1,6 +1,6 @@
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { AppProvider } from './context/AppContext';
+import { AppProvider } from './context/AppProvider';
 import { Toaster } from 'react-hot-toast';
 import './index.css';
 

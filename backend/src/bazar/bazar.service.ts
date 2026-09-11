@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { BazarMessage, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { BazarApiClient } from './bazar.api-client';
+import { BazarApiClient, BazarRef } from './bazar.api-client';
 import { CatalogSearchService } from './catalog-search.service';
 import { IntentDispatcher, type IntentAction } from './intent-dispatcher.service';
 import { AutopilotService } from './autopilot.service';
@@ -18,7 +19,7 @@ export class BazarService {
   ) {}
 
   /** Идемпотентное приветствие нового юзера. Личность — из SOUL профиля bazar. */
-  async ensureWelcome(userId: string): Promise<{ created: boolean; message?: any }> {
+  async ensureWelcome(userId: string): Promise<{ created: boolean; message?: BazarMessage }> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.bazarWelcomed) return { created: false };
 
@@ -27,7 +28,7 @@ export class BazarService {
     const userMessage = `Поприветствуй нового пользователя ${user.name ?? 'друг'}. Расскажи что ты поможешь найти товары/услуги на площадке.`;
 
     let text: string;
-    let refs: any[] = [];
+    let refs: BazarRef[] = [];
     try {
       const welcome = await this.apiClient.complete(
         [{ role: 'user', content: userMessage }],
@@ -46,7 +47,7 @@ export class BazarService {
         userId,
         role: 'ASSISTANT',
         text,
-        refs,
+        refs: refs as unknown as Prisma.InputJsonValue,
         meta: { intent: 'welcome' },
       },
     });
@@ -311,17 +312,24 @@ export class BazarService {
     return false;
   }
 
-  private parseJsonBlock(text: string): any {
+  private parseJsonBlock(text: string): Record<string, unknown> {
     // Извлекаем первый JSON-объект из текста (в фенсах или без).
     const fenced = text.match(/```(?:json)?\n([\s\S]*?)```/);
     const candidate = fenced ? fenced[1] : text;
     try {
       const start = candidate.indexOf('{');
       const end = candidate.lastIndexOf('}');
+      let raw: string;
       if (start >= 0 && end > start) {
-        return JSON.parse(candidate.slice(start, end + 1));
+        raw = candidate.slice(start, end + 1);
+      } else {
+        raw = candidate;
       }
-      return JSON.parse(candidate);
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+      return { raw: text };
     } catch {
       return { raw: text };
     }

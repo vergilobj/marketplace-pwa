@@ -36,7 +36,7 @@ export class UsersService {
     const page = params.page || 1;
     const limit = params.limit || 20;
     const skip = (page - 1) * limit;
-    const where: any = {};
+    const where: Prisma.UserWhereInput = {};
     if (params.search) {
       where.OR = [
         { name: { contains: params.search, mode: 'insensitive' } },
@@ -454,7 +454,8 @@ export class UsersService {
           payoutError: result.error ?? null,
         },
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       // D3 (остаток): ответ paymod мог ПОТЕРЯТЬСЯ (таймаут/5xx/рестарт), а
       // выплата при этом реально ушла в сеть. Раньше catch слепо делал
       // reversal: админ одобрял повторно, idempotencyKey и client_ref были
@@ -476,7 +477,7 @@ export class UsersService {
           data: {
             payoutTxHash: recovered.tx_hash ?? undefined,
             payoutStatus: 'SUBMITTED',
-            payoutError: `response lost, recovered via idempotency_key: ${err?.message ?? err}`,
+            payoutError: `response lost, recovered via idempotency_key: ${msg}`,
           },
         });
       }
@@ -525,13 +526,14 @@ export class UsersService {
       if (status === 'failed' || status === 'error') return null; // выплата не ушла
       // submitted/confirmed/swept/pending — выплата инициирована.
       return { tx_hash: existing.tx_hash ?? null, status };
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       this.logger.error(
-        `recoverPayout(${idempotencyKey}) failed: ${e?.message ?? e} — ` +
+        `recoverPayout(${idempotencyKey}) failed: ${msg} — ` +
           `cannot confirm payout state, refusing blind reversal`,
       );
       throw new BadRequestException(
-        `Не удалось подтвердить состояние выплаты: ${e?.message ?? e}`,
+        `Не удалось подтвердить состояние выплаты: ${msg}`,
       );
     }
   }

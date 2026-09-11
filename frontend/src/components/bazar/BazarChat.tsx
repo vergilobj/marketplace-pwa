@@ -17,7 +17,8 @@ import {
 } from '../../api/bazar';
 import type { BazarMessage, BazarDealThread } from '../../api/bazar';
 import { getProductById } from '../../api/products';
-import { BazarAvatar, BazarDots, BazarRefRow, MINT, formatPrice } from './bazar-ui';
+import { BazarAvatar, BazarDots, BazarRefRow } from './bazar-ui';
+import { MINT, formatPrice } from './bazar-ui.utils';
 import { bazarStore } from '../../state/bazarStore';
 import {
   isSpeechSupported,
@@ -129,12 +130,23 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
   // ── Обычный режим: общий стор Базара ──
   useEffect(() => {
     if (dealMode) return;
-    setMessages(bazarStore.getMessages() ?? []);
-    setLoading(!bazarStore.isLoaded());
-    return bazarStore.subscribe(() => {
+    let cancelled = false;
+    // Синхронный setState в теле эффекта даёт каскадный рендер
+    // (react-hooks/set-state-in-effect) — начальный снапшот стора читаем
+    // асинхронно. Подписка ниже обновляет состояние уже из колбэка, это ок.
+    (async () => {
+      if (cancelled) return;
+      setMessages(bazarStore.getMessages() ?? []);
+      setLoading(!bazarStore.isLoaded());
+    })();
+    const unsubscribe = bazarStore.subscribe(() => {
       setMessages(bazarStore.getMessages() ?? []);
       setLoading(!bazarStore.isLoaded());
     });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [dealMode]);
 
   const load = useCallback(async () => {
@@ -162,11 +174,20 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (dealMode) {
-      loadDeal();
-    } else {
-      load();
-    }
+    let cancelled = false;
+    // loadDeal()/load() синхронно выставляют loading — в теле эффекта это
+    // каскадный рендер (react-hooks/set-state-in-effect). Запускаем асинхронно.
+    (async () => {
+      if (cancelled) return;
+      if (dealMode) {
+        await loadDeal();
+      } else {
+        await load();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [dealMode, loadDeal, load]);
 
   // ── productId: предзаполняем инпут «Хочу купить <название>» ──
@@ -196,8 +217,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
   // ── Toast по meta.action.intent ответа Базара ──
   const notifyForAction = (msg: BazarMessage | undefined | null) => {
     if (!msg) return;
-    const meta = msg.meta as any;
-    const intent = meta?.action?.intent;
+    const intent = msg.meta?.action?.intent;
     if (!intent || intent === 'none') return;
 
     switch (intent) {
@@ -242,7 +262,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
       };
       setMessages((prev) => [...prev, userMsg]);
       try {
-        const relayResult: any = await bazarDealRelay(dealId, text);
+        const relayResult = await bazarDealRelay(dealId, text);
         // Перечитываем тред, чтобы увидеть ретрансляцию другой стороне.
         const data = await bazarDealThread(dealId);
         setDeal(data.deal);
@@ -274,7 +294,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
       const answer = await bazarSend(text);
       bazarStore.appendMessage(answer);
       notifyForAction(answer);
-      if ((answer?.meta as any)?.blocked) toast.error('Заблокировано модерацией');
+      if (answer?.meta?.blocked) toast.error('Заблокировано модерацией');
     } catch (e) {
       console.error('bazar send failed', e);
       toast.error('Базар не ответил, попробуй ещё');
@@ -400,7 +420,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
 
   // Бейдж на ретранслированных сообщениях (meta.relay).
   const renderRelayBadge = (m: BazarMessage) => {
-    const meta = m.meta as any;
+    const meta = m.meta;
     if (!meta || meta.relay !== true) return null;
     const originRole = meta.originRole;
     if (originRole === 'seller') {

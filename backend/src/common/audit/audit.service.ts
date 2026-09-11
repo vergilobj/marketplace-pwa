@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -25,7 +26,7 @@ export class AuditService {
           entityId: params.entityId ?? null,
           ip: params.ip ?? null,
           userAgent: params.userAgent ?? null,
-          metadata: params.metadata as any ?? undefined,
+          metadata: (params.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
         }
       });
     } catch (err) {

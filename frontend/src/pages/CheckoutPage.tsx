@@ -7,8 +7,10 @@ import { createOrder, getOrderPaymentStatus } from '../api/orders';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatPrice } from '../utils/format';
 import toast from 'react-hot-toast';
+import { errorMessage } from '../utils/error';
+import type { ApiOrder } from '../api/types';
 
-type Payment = { depositAddress?: string | null; clientRef?: string | null; status?: string; };
+type Payment = { depositAddress?: string | null; clientRef?: string | null; status?: string | null; };
 
 type Invoice = {
   orderId: string | null;
@@ -44,7 +46,7 @@ export default function CheckoutPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const invoicesRef = useRef<Invoice[]>([]);
   const successRef = useRef(false);
-  const total = cart.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
+  const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
   useEffect(() => { invoicesRef.current = invoices; }, [invoices]);
 
@@ -98,7 +100,6 @@ export default function CheckoutPage() {
     poll();
     pollRef.current = setInterval(poll, 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payable.length, allPaid]);
 
   // Все позиции оплачены → закрываем корзину
@@ -109,8 +110,7 @@ export default function CheckoutPage() {
     toast.success('Все позиции оплачены!');
     clearCart();
     navigate('/orders');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPaid]);
+  }, [allPaid, clearCart, navigate]);
 
   const handleOrder = async () => {
     setLoading(true);
@@ -119,7 +119,7 @@ export default function CheckoutPage() {
     const failed: string[] = [];
     for (const item of cart) {
       try {
-        const res: any = await createOrder(item.productId, item.price * item.quantity);
+        const res: ApiOrder = await createOrder(item.productId, item.price * item.quantity);
         const pay: Payment = res?.payment || {};
         created.push({
           orderId: res?.id ?? null,
@@ -131,8 +131,8 @@ export default function CheckoutPage() {
           clientRef: pay.clientRef || null,
           status: pay.status || 'PENDING',
         });
-      } catch (e: any) {
-        failed.push(`${item.title} (${e.response?.data?.message || 'ошибка'})`);
+      } catch (e: unknown) {
+        failed.push(`${item.title} (${errorMessage(e, 'ошибка')})`);
       }
     }
     setInvoices(created);
@@ -205,7 +205,7 @@ export default function CheckoutPage() {
           {cart.length > 0 && (
             <>
               <div className="space-y-3 mb-6 mt-4">
-                {cart.map((item: any) => (
+                {cart.map((item) => (
                   <div key={item.productId} className="flex justify-between items-center py-2 border-b border-[var(--color-border)]">
                     <span className="text-sm text-[var(--color-text)]">{item.title} × {item.quantity}</span>
                     <span className="text-sm font-bold text-[#22c55e]">{formatPrice(item.price * item.quantity)}</span>

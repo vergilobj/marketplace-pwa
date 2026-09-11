@@ -8,11 +8,12 @@ import { User, Settings, TrendingUp, Gift, LogOut, Save, ShieldCheck, Store, Meg
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { CreateMenu } from '../components/CreateMenu';
+import type { ApiUser, ApiUserStats } from '../api/types';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<any>(null);
-  const [stats, setStats] = useState<any>(null);
+  const [profile, setProfile] = useState<ApiUser | null>(null);
+  const [stats, setStats] = useState<ApiUserStats | null>(null);
   const [balances, setBalances] = useState<BalanceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -32,7 +33,7 @@ export default function ProfilePage() {
     try {
       const res = await becomeSeller();
       if (res?.accessToken) localStorage.setItem('accessToken', res.accessToken);
-      setProfile((p: any) => ({ ...p, ...res?.user, role: res?.user?.role || 'SELLER' }));
+      setProfile((p) => ({ ...p, ...res?.user, role: res?.user?.role || 'SELLER' }) as ApiUser);
       toast.success('Теперь ты можешь продавать');
     } catch {
       toast.error('Не удалось стать продавцом');
@@ -83,7 +84,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <h2 className="text-lg font-extrabold text-[var(--color-text)]">{profile?.name || 'Пользователь'}</h2>
-              <p className="text-[var(--color-muted)] text-sm">{formatPhone(profile?.phone)}</p>
+              <p className="text-[var(--color-muted)] text-sm">{formatPhone(profile?.phone || '')}</p>
               <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-[#22c55e]/10 text-[#22c55e] text-[11px] font-bold">
                 {profile?.role === 'ADMIN' ? 'Админ' : profile?.role === 'SELLER' ? 'Продавец' : 'Покупатель'}
               </span>
@@ -142,7 +143,7 @@ export default function ProfilePage() {
               { label: 'Заработано', value: formatPrice(stats.soldEarned || 0), icon: <TrendingUp size={16} />, color: '#22c55e' },
               { label: 'Рефералы', value: formatPrice(stats.referralEarned || 0), icon: <User size={16} /> },
               { label: 'Реф. бонусы', value: formatPrice(balances?.bonusBalance ?? stats.bonusBalance ?? 0), icon: <TrendingUp size={16} /> },
-            ].map((s: any, i) => (
+            ].map((s, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4">
                 <div className="w-9 h-9 mb-2 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)', color: s.color || '#22c55e' }}>{s.icon}</div>
                 <div className="text-lg font-extrabold" style={{ color: s.color || 'var(--color-text)' }}>{s.value}</div>

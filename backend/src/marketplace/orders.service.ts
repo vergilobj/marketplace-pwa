@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { EscrowStatus, OrderStatus } from '@prisma/client';
+import { EscrowStatus, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -208,10 +208,10 @@ export class OrdersService {
   }
 
   async findMyOrders(userId: string, role: string, status?: string) {
-    const where: any =
+    const where: Prisma.OrderWhereInput =
       role === 'SELLER' ? { sellerId: userId } : { buyerId: userId };
     if (status) {
-      where.status = status;
+      where.status = status as OrderStatus;
     }
     return this.prisma.order.findMany({
       where,

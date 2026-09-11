@@ -14,6 +14,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { UserRole } from '@prisma/client';
 
 @Controller('notifications')
 export class NotificationsController {
@@ -82,9 +83,14 @@ export class NotificationsController {
     @Body('message') message: string,
     @Body('role') role?: string,
   ) {
-    // Получаем всех пользователей (или по роли)
+    // Получаем всех пользователей (или по роли).
+    // role приходит строкой из body — сужаем до enum, невалидное значение
+    // отдаст пустой список (Prisma отфильтрует), это осознанное поведение.
+    const roleFilter = role && (Object.values(UserRole) as string[]).includes(role)
+      ? (role as UserRole)
+      : undefined;
     const users = await this.prisma.user.findMany({
-      where: role ? { role: role as any } : {},
+      where: roleFilter ? { role: roleFilter } : {},
       select: { id: true },
     });
 

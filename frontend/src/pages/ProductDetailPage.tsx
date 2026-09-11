@@ -11,20 +11,26 @@ import { resolveMedia } from '../utils/media';
 import { getVideoEmbed } from '../utils/video';
 import { formatPrice } from '../utils/format';
 import toast from 'react-hot-toast';
+import { errorMessage } from '../utils/error';
+import type { ApiProduct } from '../api/types';
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { addToCart, toggleFavorite, isFavorite } = useApp();
-  const [product, setProduct] = useState<any>(null);
+  const [product, setProduct] = useState<ApiProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [error, setError] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [similar, setSimilar] = useState<any[]>([]);
+  const [similar, setSimilar] = useState<ApiProduct[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [payment, setPayment] = useState<{ depositAddress?: string; status?: string; orderId?: string } | null>(null);
+  const [payment, setPayment] = useState<{
+    depositAddress?: string | null;
+    status?: string | null;
+    orderId?: string;
+  } | null>(null);
   const [activeImg, setActiveImg] = useState(0);
   const similarRef = useRef<HTMLDivElement>(null);
 
@@ -76,8 +82,8 @@ export default function ProductDetailPage() {
       } else {
         navigate(`/orders?highlight=${order.id}`);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка при создании заказа');
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Ошибка при создании заказа'));
     } finally {
       setBuying(false);
     }
@@ -91,13 +97,16 @@ export default function ProductDetailPage() {
     );
   }
 
-  if (error && !product) {
+  // Загрузка завершена, но товара нет: сюда попадаем и по явной ошибке,
+  // и если запрос отработал вхолостую. Дальше рендер идёт по непустому
+  // product, поэтому сужаем тип один раз здесь.
+  if (!product) {
     return (
       <div className="max-w-xl mx-auto px-6 py-24 text-center">
         <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center">
           <PackageX size={28} className="text-[#22c55e]" />
         </div>
-        <h1 className="text-2xl font-extrabold text-[var(--color-text)] mb-2">{error}</h1>
+        <h1 className="text-2xl font-extrabold text-[var(--color-text)] mb-2">{error || 'Товар не найден'}</h1>
         <p className="text-sm text-[var(--color-muted)] mb-8">
           Возможно, товар сняли с продажи или ссылка устарела.
         </p>
@@ -309,7 +318,7 @@ export default function ProductDetailPage() {
             </div>
           </div>
           <div ref={similarRef} className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar">
-            {similar.map((s: any) => (
+            {similar.map((s) => (
               <div
                 key={s.id}
                 onClick={() => { navigate(`/products/${s.id}`); window.scrollTo({ top: 0 }); }}

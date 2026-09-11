@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
-import { PaymentProvider, PaymentResult } from './payment.provider';
+import { PaymentMetadata, PaymentProvider, PaymentResult } from './payment.provider';
 
 @Injectable()
 export class NowPaymentsProvider extends PaymentProvider {
@@ -23,7 +23,7 @@ export class NowPaymentsProvider extends PaymentProvider {
   async createPayment(
     amount: number,
     orderId: string,
-    metadata?: any,
+    metadata?: PaymentMetadata,
   ): Promise<PaymentResult> {
     const ipnUrl = this.config.get('NOWPAYMENTS_IPN_URL');
     if (!ipnUrl) {

@@ -26,6 +26,7 @@ import {
   formatTimeLeft,
   isAdPaymentFinal,
 } from '../utils/adPayment';
+import { errorMessage } from '../utils/error';
 
 type Step = 'form' | 'pay' | 'paid';
 
@@ -34,7 +35,7 @@ type Invoice = {
   amount: number;
   depositAddress: string | null;
   clientRef: string | null;
-  status: string;
+  status: string | null;
 };
 
 export default function CreateAdPage() {
@@ -51,6 +52,15 @@ export default function CreateAdPage() {
   const [redirectIn, setRedirectIn] = useState(8);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  /**
+   * Экран успеха — ПРОИЗВОДНОЕ от статуса счёта, а не отдельный setState в
+   * эффекте. Оплата подтверждается на бэкенде (webhook → хук), поллинг видит
+   * финальный статус — и UI сразу рисует «Реклама активирована», без лишнего
+   * каскадного рендера.
+   */
+  const adPaid = step === 'pay' && !!invoice && isAdPaymentFinal(invoice.status);
+  const viewStep: Step = adPaid ? 'paid' : step;
+
   useEffect(
     () => () => {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -62,7 +72,7 @@ export default function CreateAdPage() {
   const startPayment = useCallback(
     async (orderId: string, amount: number) => {
       try {
-        const pay: any = await payOrder(orderId);
+        const pay = await payOrder(orderId);
         setInvoice({
           orderId,
           amount,
@@ -77,12 +87,11 @@ export default function CreateAdPage() {
         }
         setStep('pay');
         return true;
-      } catch (err: any) {
+      } catch (err: unknown) {
         setInvoice({ orderId, amount, depositAddress: null, clientRef: null, status: 'PENDING' });
         setStep('pay');
         setError(
-          err?.response?.data?.message ||
-            'Не удалось получить платёжный адрес. Попробуйте ещё раз.',
+          errorMessage(err, 'Не удалось получить платёжный адрес. Попробуйте ещё раз.'),
         );
         return false;
       }
@@ -111,8 +120,8 @@ export default function CreateAdPage() {
       const amount = Number(post?.order?.amount ?? 0);
       const ok = await startPayment(orderId, amount);
       if (ok) toast.success('Счёт создан. Оплатите USDT (BSC).');
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Ошибка при создании рекламы');
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Ошибка при создании рекламы'));
     } finally {
       setLoading(false);
     }
@@ -129,7 +138,7 @@ export default function CreateAdPage() {
 
   // Таймер окна оплаты (15 минут, как в чеккауте товара).
   useEffect(() => {
-    if (step !== 'pay' || !expiresAt) return;
+    if (viewStep !== 'pay' || !expiresAt) return;
     const tick = () => {
       const left = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
       setTimeLeft(left);
@@ -142,18 +151,19 @@ export default function CreateAdPage() {
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [step, expiresAt]);
+  }, [viewStep, expiresAt]);
 
   // Поллинг статуса: GET /payments/order/:orderId/status (PENDING → CONFIRMED/SWEPT).
   useEffect(() => {
-    if (step !== 'pay' || !invoice?.depositAddress || expired) return;
+    if (viewStep !== 'pay' || !invoice?.depositAddress || expired) return;
     if (isAdPaymentFinal(invoice.status)) return;
     const orderId = invoice.orderId;
     const poll = async () => {
       try {
-        const st: any = await getOrderPaymentStatus(orderId);
-        if (st?.status) {
-          setInvoice((prev) => (prev ? { ...prev, status: st.status } : prev));
+        const st = await getOrderPaymentStatus(orderId);
+        const nextStatus = st?.status;
+        if (nextStatus) {
+          setInvoice((prev) => (prev ? { ...prev, status: nextStatus } : prev));
         }
       } catch {
         /* сеть мигнула — продолжаем поллить */
@@ -164,26 +174,27 @@ export default function CreateAdPage() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [step, invoice?.orderId, invoice?.depositAddress, invoice?.status, expired]);
+  }, [viewStep, invoice?.orderId, invoice?.depositAddress, invoice?.status, expired]);
 
   // Депозит подтверждён → активация рекламы уже произошла на бэкенде (webhook → хук).
+  // Здесь только побочные действия (остановить поллинг, показать тост):
+  // сам переход на экран успеха делает производный viewStep.
   useEffect(() => {
-    if (step !== 'pay' || !invoice || !isAdPaymentFinal(invoice.status)) return;
+    if (!adPaid) return;
     if (pollRef.current) clearInterval(pollRef.current);
-    setStep('paid');
     toast.success('Оплата подтверждена — реклама активирована');
-  }, [step, invoice]);
+  }, [adPaid]);
 
   // Редирект с экрана успеха.
   useEffect(() => {
-    if (step !== 'paid') return;
+    if (viewStep !== 'paid') return;
     const t = setInterval(() => setRedirectIn((s) => s - 1), 1000);
     return () => clearInterval(t);
-  }, [step]);
+  }, [viewStep]);
 
   useEffect(() => {
-    if (step === 'paid' && redirectIn <= 0) navigate('/my-products');
-  }, [step, redirectIn, navigate]);
+    if (viewStep === 'paid' && redirectIn <= 0) navigate('/my-products');
+  }, [viewStep, redirectIn, navigate]);
 
   const copyAddress = async () => {
     const addr = invoice?.depositAddress;
@@ -213,11 +224,11 @@ export default function CreateAdPage() {
         <div className="flex items-center gap-3 mb-6">
           <Megaphone className="w-6 h-6 text-[#22c55e]" />
           <h1 className="text-2xl font-bold text-[var(--color-text)]">
-            {step === 'form' ? 'Рекламный пост' : step === 'pay' ? 'Оплата рекламы' : 'Реклама активирована'}
+            {viewStep === 'form' ? 'Рекламный пост' : viewStep === 'pay' ? 'Оплата рекламы' : 'Реклама активирована'}
           </h1>
         </div>
 
-        {step === 'form' && (
+        {viewStep === 'form' && (
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               label="Заголовок"
@@ -254,7 +265,7 @@ export default function CreateAdPage() {
           </form>
         )}
 
-        {step === 'pay' && invoice && (
+        {viewStep === 'pay' && invoice && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-[var(--color-muted)]">К оплате</span>
@@ -324,7 +335,7 @@ export default function CreateAdPage() {
           </div>
         )}
 
-        {step === 'paid' && (
+        {viewStep === 'paid' && (
           <div className="space-y-5 text-center">
             <div className="w-16 h-16 mx-auto rounded-full bg-[#22c55e]/10 border border-[#22c55e]/30 flex items-center justify-center">
               <CheckCircle2 size={30} className="text-[#22c55e]" />

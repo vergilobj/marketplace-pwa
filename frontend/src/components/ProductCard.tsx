@@ -2,12 +2,13 @@ import { Heart, ShoppingCart, Plus, Minus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { formatPrice } from "../utils/format";
+import type { ApiProduct } from '../api/types';
 
-export default function ProductCard({ product }: { product: any }) {
+export default function ProductCard({ product }: { product: ApiProduct }) {
   const navigate = useNavigate();
   const { cart, addToCart, updateQuantity, toggleFavorite, isFavorite } = useApp();
   const fav = isFavorite(product.id);
-  const cartItem = cart.find((item: any) => item.productId === product.id);
+  const cartItem = cart.find((item) => item.productId === product.id);
   const inCart = !!cartItem;
   const quantity = cartItem?.quantity || 1;
   const price = formatPrice(product.price);

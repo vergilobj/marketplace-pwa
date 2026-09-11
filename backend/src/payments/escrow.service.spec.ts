@@ -14,14 +14,15 @@ import { addDays, round2 } from './money.util';
 
 describe('EscrowService (integration)', () => {
   const prisma = new PrismaService();
-  const ledger = new LedgerService(prisma);
-  const settings = new SettingsService(prisma);
 
   // Уведомления глушим: тест про деньги, не про OneSignal.
   const notify = {
     createNotification: jest.fn().mockResolvedValue(null),
     sendToUser: jest.fn().mockResolvedValue(null),
   } as unknown as NotificationsService;
+
+  const ledger = new LedgerService(prisma, notify);
+  const settings = new SettingsService(prisma);
 
   const escrow = new EscrowService(prisma, ledger, settings, notify);
 

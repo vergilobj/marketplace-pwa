@@ -10,7 +10,7 @@ export default function CartPage() {
   const navigate = useNavigate();
   const { cart, updateQuantity } = useApp();
 
-  const total = cart.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
+  const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
   const formatted = formatPrice(total);
 
   if (cart.length === 0) {
@@ -47,7 +47,7 @@ export default function CartPage() {
 
         <div className="space-y-3 mb-8">
           <AnimatePresence>
-            {cart.map((item: any) => (
+            {cart.map((item) => (
               <motion.div
                 key={item.productId}
                 layout

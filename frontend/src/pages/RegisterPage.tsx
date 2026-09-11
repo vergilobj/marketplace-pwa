@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { IMaskInput } from 'react-imask';
 import { register } from '../api/auth';
 import { unformatPhone } from '../utils/phone';
+import { errorMessage } from '../utils/error';
 import { Crown, Eye, EyeOff, ArrowLeft, Gift, ArrowRight } from 'lucide-react';
 
 export default function RegisterPage() {
@@ -29,7 +30,7 @@ export default function RegisterPage() {
       localStorage.setItem('accessToken', accessToken); localStorage.setItem('refreshToken', refreshToken);
       const payload = JSON.parse(atob(accessToken.split('.')[1])); localStorage.setItem('userId', payload.sub);
       navigate('/');
-    } catch (err: any) { setError(err.response?.data?.message || 'Ошибка регистрации'); } finally { setLoading(false); }
+    } catch (err: unknown) { setError(errorMessage(err, 'Ошибка регистрации')); } finally { setLoading(false); }
   };
 
   return (

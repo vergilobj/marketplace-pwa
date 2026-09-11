@@ -21,16 +21,32 @@ export default function LeadsPage() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    setLoading(true);
-    setError('');
-    bazarDeals('seller')
-      .then((d) => setDeals(Array.isArray(d) ? d : []))
+    let cancelled = false;
+    // setLoading/setError живут внутри цепочки промиса, а не синхронно в теле
+    // эффекта: синхронный setState здесь давал каскадный рендер на каждый вход.
+    Promise.resolve()
+      .then(() => {
+        if (cancelled) return undefined;
+        setLoading(true);
+        setError('');
+        return bazarDeals('seller');
+      })
+      .then((d) => {
+        if (cancelled || d === undefined) return;
+        setDeals(Array.isArray(d) ? d : []);
+      })
       .catch((e) => {
+        if (cancelled) return;
         console.error('leads load failed', e);
         setError('Не удалось загрузить лиды');
         setDeals([]);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [isAuthenticated]);
 
   if (loading) {

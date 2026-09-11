@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import React from 'react';
-import { AppProvider, useApp } from './AppContext';
+import { AppProvider } from './AppProvider';
+import { useApp } from './AppContext';
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};

@@ -1,4 +1,5 @@
 import api from './axios';
+import type { BazarMeta, BazarRelayResult } from './types';
 
 export interface BazarRef {
   type: string;
@@ -15,7 +16,7 @@ export interface BazarMessage {
   role: 'USER' | 'ASSISTANT';
   text?: string;
   refs?: BazarRef[] | null;
-  meta?: any;
+  meta?: BazarMeta | null;
   createdAt: string;
 }
 
@@ -77,7 +78,7 @@ export const bazarDealThread = (dealId: string) =>
   api.get<BazarDealThread>(`/bazar/deals/${dealId}`).then((res) => res.data);
 
 export const bazarDealRelay = (dealId: string, text: string) =>
-  api.post(`/bazar/deals/${dealId}/relay`, { text }).then((res) => res.data);
+  api.post<BazarRelayResult>(`/bazar/deals/${dealId}/relay`, { text }).then((res) => res.data);
 
 // Алиасы под названия из спеков сделок.
 export const dealThread = bazarDealThread;

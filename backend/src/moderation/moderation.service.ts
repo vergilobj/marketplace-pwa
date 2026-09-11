@@ -176,7 +176,9 @@ export class ModerationService {
         return { verdict: 'allow', reason: '', violations: [] };
       }
 
-      const data: any = await res.json().catch(() => null);
+      const data = (await res.json().catch(() => null)) as {
+        choices?: { message?: { content?: string } }[];
+      } | null;
       const content: string = data?.choices?.[0]?.message?.content ?? '';
       const parsed = this.parseLlmJson(content);
       if (!parsed) return { verdict: 'allow', reason: '', violations: [] };

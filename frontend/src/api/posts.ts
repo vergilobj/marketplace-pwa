@@ -1,11 +1,26 @@
 import api from './axios';
+import type { ApiPaginated, ApiPost } from './types';
 
-export const getPosts = (params?: { page?: number; limit?: number; sort?: string; search?: string }) =>
-  api.get('/posts', { params }).then(r => r.data);
-export const getFeed = (params?: { page?: number; limit?: number; sort?: string; search?: string }) =>
-  api.get('/posts/feed', { params }).then(r => r.data);
-export const createPost = (data: { title: string; content?: string; link?: string; media?: string[]; videoUrl?: string }) =>
-  api.post('/posts', data).then(r => r.data);
+export type FeedQuery = {
+  page?: number;
+  limit?: number;
+  sort?: string;
+  search?: string;
+};
+
+export const getPosts = (params?: FeedQuery) =>
+  api.get<ApiPaginated<ApiPost>>('/posts', { params }).then(r => r.data);
+
+export const getFeed = (params?: FeedQuery) =>
+  api.get<ApiPaginated<ApiPost>>('/posts/feed', { params }).then(r => r.data);
+
+export const createPost = (data: {
+  title: string;
+  content?: string;
+  link?: string;
+  media?: string[];
+  videoUrl?: string;
+}) => api.post<ApiPost>('/posts', data).then(r => r.data);
 
 /**
  * S1 (NH5-ad): рекламный заказ. Бэкенд возвращает созданный пост вместе с

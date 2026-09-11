@@ -1,7 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import toast from 'react-hot-toast';
+import { createContext, useContext } from 'react';
 
-interface CartItem {
+export interface CartItem {
   productId: string;
   title: string;
   price: number;
@@ -9,9 +8,21 @@ interface CartItem {
   media?: string[];
 }
 
-interface AppContextType {
+/**
+ * Минимум, который нужен корзине от товара. Именно поэтому здесь узкий тип,
+ * а не ApiProduct: в корзину кладут и товар из ленты, и из каталога, и из
+ * похожих — везде это одна и та же четвёрка полей.
+ */
+export interface CartProductInput {
+  id: string;
+  title: string;
+  price: number;
+  media?: string[];
+}
+
+export interface AppContextType {
   cart: CartItem[];
-  addToCart: (product: any) => void;
+  addToCart: (product: CartProductInput) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, delta: number) => void;
   moveToFavorites: (productId: string) => void;
@@ -21,79 +32,24 @@ interface AppContextType {
   isFavorite: (productId: string) => boolean;
 }
 
-const AppContext = createContext<AppContextType>({} as any);
+/**
+ * Контекст и хук useApp — без компонентов.
+ * react-refresh/only-export-components требует, чтобы файл либо экспортировал
+ * компоненты, либо не-компоненты, но не то и другое сразу: иначе Fast Refresh
+ * теряет состояние при правке. Поэтому сам AppProvider живёт в ./AppProvider,
+ * а этот модуль остаётся точкой импорта контекста и хука (его импортируют
+ * страницы и компоненты, менять их импорты не нужно).
+ */
+/**
+ * Дефолт — null, а не пустой объект: useApp ниже падает с внятной ошибкой,
+ * если компонент забыли обернуть в AppProvider. Раньше здесь стоял
+ * пустой объект, приведённый к типу, и обращение к методам падало
+ * невнятным TypeError.
+ */
+export const AppContext = createContext<AppContextType | null>(null);
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    const saved = localStorage.getItem('cart');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    const saved = localStorage.getItem('favorites');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  useEffect(() => { localStorage.setItem('cart', JSON.stringify(cart)); }, [cart]);
-  useEffect(() => { localStorage.setItem('favorites', JSON.stringify(favorites)); }, [favorites]);
-
-  const addToCart = (product: any) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.productId === product.id);
-      if (existing) {
-        toast.success('Добавлено в корзину');
-        return prev.map(item =>
-          item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-      toast.success('Добавлено в корзину');
-      return [...prev, { productId: product.id, title: product.title, price: product.price, quantity: 1, media: product.media }];
-    });
-  };
-
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.productId !== productId));
-    toast.success('Удалено из корзины');
-  };
-
-  const updateQuantity = (productId: string, delta: number) => {
-    setCart(prev =>
-      prev.map(item => {
-        if (item.productId === productId) {
-          const newQty = item.quantity + delta;
-          if (newQty <= 0) {
-            return null; // будет удалено фильтрацией
-          }
-          return { ...item, quantity: newQty };
-        }
-        return item;
-      }).filter(Boolean) as CartItem[]
-    );
-  };
-
-  const moveToFavorites = (productId: string) => {
-    const item = cart.find(i => i.productId === productId);
-    if (item) {
-      removeFromCart(productId);
-      toggleFavorite(productId);
-      toast.success('Товар отложен в избранное');
-    }
-  };
-
-  const clearCart = () => setCart([]);
-
-  const toggleFavorite = (productId: string) => {
-    setFavorites(prev =>
-      prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
-    );
-  };
-
-  const isFavorite = (productId: string) => favorites.includes(productId);
-
-  return (
-    <AppContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, moveToFavorites, clearCart, favorites, toggleFavorite, isFavorite }}>
-      {children}
-    </AppContext.Provider>
-  );
+export const useApp = (): AppContextType => {
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error('useApp must be used within AppProvider');
+  return ctx;
 };
-
-export const useApp = () => useContext(AppContext);

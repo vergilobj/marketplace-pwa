@@ -7,6 +7,8 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { formatPrice } from '../utils/format';
 import toast from 'react-hot-toast';
+import { errorMessage } from '../utils/error';
+import type { ApiWithdrawal } from '../api/types';
 
 const sc: Record<string, { i: React.ReactNode; v: string; l: string }> = {
   pending: { i: <Clock size={13} />, v: 'pending', l: 'На рассмотрении' },
@@ -22,7 +24,7 @@ const accountLabel: Record<string, string> = {
 };
 
 export default function WithdrawalsPage() {
-  const [list, setList] = useState<any[]>([]);
+  const [list, setList] = useState<ApiWithdrawal[]>([]);
   const [balances, setBalances] = useState<BalanceResponse | null>(null);
   const [ledger, setLedger] = useState<LedgerEntryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +35,7 @@ export default function WithdrawalsPage() {
   const fetch = async () => {
     try {
       const [w, b, l] = await Promise.all([
-        api.get('/users/me/withdrawals'),
+        api.get<ApiWithdrawal[]>('/users/me/withdrawals'),
         getBalance(),
         getLedger({ limit: 20 }).catch(() => ({ items: [], nextCursor: null })),
       ]);
@@ -61,7 +63,7 @@ export default function WithdrawalsPage() {
       await api.post('/users/me/withdrawal', { amount: a, toAddress: trimmed });
       toast.success('Заявка создана');
       setAmount(''); setWallet(''); fetch();
-    } catch (e: any) { toast.error(e.response?.data?.message || 'Ошибка'); }
+    } catch (e: unknown) { toast.error(errorMessage(e)); }
     finally { setReq(false); }
   };
 

@@ -4,7 +4,7 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
-import { BazarRole } from '@prisma/client';
+import { AutopilotRun, BazarRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { BazarApiClient } from './bazar.api-client';
 import { CatalogSearchService } from './catalog-search.service';
@@ -66,7 +66,7 @@ export class AutopilotService {
       await this.writeAssistant(userId, run.id, 1, text.text);
       await this.prisma.autopilotRun.update({
         where: { id: run.id },
-        data: { status: 'AWAITING_USER', lastStepAt: new Date(), context: { candidates } as any },
+        data: { status: 'AWAITING_USER', lastStepAt: new Date(), context: { candidates } as Prisma.InputJsonValue },
       });
 
       return { runId: run.id, text: text.text, candidates };
@@ -117,7 +117,7 @@ export class AutopilotService {
       const newStep = run.step + 1;
       await this.prisma.autopilotRun.update({
         where: { id: run.id },
-        data: { step: newStep, lastStepAt: new Date(), status: 'AWAITING_USER', context: { candidates } as any },
+        data: { step: newStep, lastStepAt: new Date(), status: 'AWAITING_USER', context: { candidates } as Prisma.InputJsonValue },
       });
       await this.writeAssistant(userId, run.id, newStep, next.text);
 
@@ -134,10 +134,10 @@ export class AutopilotService {
    */
   private async confirm(
     userId: string,
-    run: any,
+    run: AutopilotRun,
     event: { accept?: boolean; productId?: string; text?: string },
   ) {
-    let candidates: Candidate[] = (run.context as any)?.candidates ?? [];
+    let candidates: Candidate[] = (run.context as { candidates?: Candidate[] } | null)?.candidates ?? [];
 
     // Edge: кандидаты не сохранились — fallback на поиск по goal, не по тексту confirm.
     if (!candidates.length) {
@@ -146,7 +146,7 @@ export class AutopilotService {
       if (candidates.length) {
         await this.prisma.autopilotRun.update({
           where: { id: run.id },
-          data: { context: { candidates } as any },
+          data: { context: { candidates } as Prisma.InputJsonValue },
         });
       }
     }
@@ -255,10 +255,13 @@ export class AutopilotService {
     return null;
   }
 
-  private normalizeCandidates(products: any[]): Candidate[] {
+  /** Товары из CatalogSearchService: нужны только id/title/price, форму не гарантируем. */
+  private normalizeCandidates(
+    products: { id?: string; title?: string | null; price?: number | string | null }[],
+  ): Candidate[] {
     return products
       .filter((p) => p && p.id)
-      .map((p) => ({ id: p.id, title: p.title ?? '', price: Number(p.price) || 0 }));
+      .map((p) => ({ id: p.id as string, title: p.title ?? '', price: Number(p.price) || 0 }));
   }
 
   private async lastUserText(userId: string): Promise<string> {

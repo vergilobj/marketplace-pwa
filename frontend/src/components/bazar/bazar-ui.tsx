@@ -1,36 +1,14 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Package, MessageSquare, User, Receipt, ShoppingBasket } from 'lucide-react';
+import { ShoppingBasket } from 'lucide-react';
 import type { BazarRef } from '../../api/bazar';
-import { formatPrice as formatPriceImpl } from '../../utils/format';
+import { MINT, NEON_GREEN, REF_STYLE, formatPrice, refHref } from './bazar-ui.utils';
 
-export const NEON_GREEN = '#22c55e';
-export const MINT = '#34d399';
-
-const REF_STYLE: Record<string, { icon: React.ReactNode; label: string }> = {
-  PRODUCT: { icon: <Package size={13} />, label: 'Товар' },
-  POST: { icon: <MessageSquare size={13} />, label: 'Пост' },
-  USER: { icon: <User size={13} />, label: 'Продавец' },
-  ORDER: { icon: <Receipt size={13} />, label: 'Заказ' },
-};
-
-export function refHref(ref: BazarRef): string {
-  switch (ref.type) {
-    case 'PRODUCT':
-      return `/products/${ref.id}`;
-    case 'POST':
-      return `/posts/${ref.id}`;
-    case 'USER':
-      return `/profile`;
-    case 'ORDER':
-      return `/orders`;
-    default:
-      return '/';
-  }
-}
-
-/** R22: единый формат цены — тот же, что в utils/format (один источник истины). */
-export const formatPrice = formatPriceImpl;
+/**
+ * Только компоненты — константы и хелперы лежат в ./bazar-ui.utils
+ * (react-refresh/only-export-components: файл с компонентами не должен
+ * экспортировать функции/константы, иначе Fast Refresh ломается).
+ */
 
 /** Аватар Базара: тёмная плитка с тонкой зелёной рамкой, мятная корзина. */
 export function BazarAvatar({ size = 44 }: { size?: number }) {
@@ -66,13 +44,20 @@ export function BazarDots() {
   );
 }
 
-/** Мини-карточка товара/поста: тёмная плитка, тонкая зелёная рамка, монохромная иконка. */
-export function BazarRefCard({ ref, large = false }: { ref: BazarRef; large?: boolean }) {
-  const st = REF_STYLE[ref.type] ?? REF_STYLE.PRODUCT;
-  const hasImage = !!ref.media?.[0];
+/**
+ * Мини-карточка товара/поста: тёмная плитка, тонкая зелёная рамка, монохромная иконка.
+ *
+ * Проп называется `item`, а не `ref`: имя `ref` в React зарезервировано под
+ * ссылку на DOM-узел, и правило react-hooks/refs справедливо считает любое
+ * обращение к такому пропу чтением ref во время рендера.
+ */
+export function BazarRefCard({ item, large = false }: { item: BazarRef; large?: boolean }) {
+  const st = REF_STYLE[item.type] ?? REF_STYLE.PRODUCT;
+  const image = item.media?.[0];
+  const hasImage = !!image;
   return (
     <Link
-      to={refHref(ref)}
+      to={refHref(item)}
       className={`group block shrink-0 transition-transform duration-200 hover:-translate-y-0.5 ${large ? 'w-[240px]' : 'w-[200px]'}`}
     >
       <div
@@ -85,8 +70,8 @@ export function BazarRefCard({ ref, large = false }: { ref: BazarRef; large?: bo
         {hasImage && (
           <div className={`relative overflow-hidden ${large ? 'h-28' : 'h-24'}`}>
             <img
-              src={ref.media![0]}
-              alt={ref.title ?? ''}
+              src={image}
+              alt={item.title ?? ''}
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               loading="lazy"
             />
@@ -102,11 +87,11 @@ export function BazarRefCard({ ref, large = false }: { ref: BazarRef; large?: bo
             {st.label}
           </div>
           <div className="text-[13px] font-semibold text-white leading-snug line-clamp-2 mt-1">
-            {ref.title || st.label}
+            {item.title || st.label}
           </div>
-          {ref.price != null && (
+          {item.price != null && (
             <div className="mt-1.5 text-[13px] font-bold" style={{ color: MINT }}>
-              {formatPrice(ref.price)}
+              {formatPrice(item.price)}
             </div>
           )}
         </div>
@@ -121,7 +106,7 @@ export function BazarRefRow({ refs, large = false }: { refs: BazarRef[]; large?:
   return (
     <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 mt-3 w-full min-w-0 max-w-full [scrollbar-width:thin] [scrollbar-color:rgba(34,197,94,0.4)_transparent]">
       {refs.map((r, i) => (
-        <BazarRefCard key={i} ref={r} large={large} />
+        <BazarRefCard key={i} item={r} large={large} />
       ))}
     </div>
   );

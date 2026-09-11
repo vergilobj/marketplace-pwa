@@ -5,6 +5,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -75,7 +76,7 @@ export class ProductsService {
     const skip = (page - 1) * limit;
     const onlyActive = params.onlyActive !== false;
 
-    const orderBy: any[] = [];
+    const orderBy: Prisma.ProductOrderByWithRelationInput[] = [];
     switch (params.sort) {
       case 'price_asc':
         orderBy.push({ price: 'asc' });
@@ -94,7 +95,7 @@ export class ProductsService {
 
     // R10: серверный поиск по названию и описанию — не ограничен страницей пагинации
     const search = params.search?.trim();
-    const where: any = onlyActive ? { isActive: true } : {};
+    const where: Prisma.ProductWhereInput = onlyActive ? { isActive: true } : {};
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -186,7 +187,7 @@ export class ProductsService {
     const page = params.page || 1;
     const limit = params.limit || 20;
     const skip = (page - 1) * limit;
-    const where: any = {};
+    const where: Prisma.ProductWhereInput = {};
     if (params.search) {
       where.OR = [
         { title: { contains: params.search, mode: 'insensitive' } },

@@ -2,6 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma/prisma.service';
 
+/** Тело запроса к OneSignal REST API — набор полей известен лишь провайдеру. */
+type OneSignalBody = Record<string, unknown>;
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -67,7 +70,7 @@ export class NotificationsService {
   async sendToAll(
     headings: Record<string, string>,
     contents: Record<string, string>,
-    data?: any,
+    data?: OneSignalBody,
   ) {
     if (!this.hasKeys) {
       this.logger.warn('OneSignal keys missing — push skipped');
@@ -87,7 +90,7 @@ export class NotificationsService {
     userId: string,
     headings: Record<string, string>,
     contents: Record<string, string>,
-    data?: any,
+    data?: OneSignalBody,
   ) {
     if (!this.hasKeys) {
       this.logger.warn('OneSignal keys missing — push skipped');
@@ -103,7 +106,7 @@ export class NotificationsService {
     return this.sendNotification(body);
   }
 
-  private async sendNotification(body: any) {
+  private async sendNotification(body: OneSignalBody) {
     try {
       const response = await fetch(`${this.baseUrl}/notifications`, {
         method: 'POST',
@@ -114,7 +117,7 @@ export class NotificationsService {
         body: JSON.stringify(body),
       });
 
-      const result = await response.json();
+      const result = (await response.json()) as { id?: string } & Record<string, unknown>;
       if (!response.ok) {
         this.logger.error(`OneSignal error: ${JSON.stringify(result)}`);
       } else {

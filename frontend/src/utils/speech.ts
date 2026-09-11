@@ -1,13 +1,42 @@
 // Браузерный Web Speech API (SpeechRecognition) — локальное распознавание речи.
 // Не тянет npm-пакеты и не ходит на сервер: встроенная браузерная распознавалка.
 
+/**
+ * Минимальные структурные типы Web Speech API. В lib.dom.d.ts SpeechRecognition
+ * до сих пор не описан, поэтому объявляем только то, что реально используем.
+ */
+type SpeechRecognitionAlternative = {
+  transcript: string;
+  confidence: number;
+};
+
+type SpeechRecognitionResult = {
+  readonly length: number;
+  isFinal: boolean;
+  [index: number]: SpeechRecognitionAlternative;
+};
+
+type SpeechRecognitionResultList = {
+  readonly length: number;
+  [index: number]: SpeechRecognitionResult;
+};
+
+type SpeechRecognitionEvent = {
+  results: SpeechRecognitionResultList;
+};
+
+type SpeechRecognitionErrorEvent = {
+  error: string;
+  message?: string;
+};
+
 type SpeechRecognitionLike = {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
-  onresult: ((event: any) => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
   onend: (() => void) | null;
-  onerror: ((event: any) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
   start: () => void;
   stop: () => void;
   abort: () => void;
@@ -16,7 +45,10 @@ type SpeechRecognitionLike = {
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
 function getCtor(): SpeechRecognitionCtor | null {
-  const w = window as any;
+  const w = window as Window & {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
@@ -45,7 +77,7 @@ export function startDictation(
   rec.continuous = false;
   rec.interimResults = false;
 
-  rec.onresult = (event: any) => {
+  rec.onresult = (event: SpeechRecognitionEvent) => {
     const transcript = event?.results?.[0]?.[0]?.transcript;
     if (typeof transcript === 'string' && transcript.trim()) {
       onResult(transcript.trim());
@@ -60,7 +92,7 @@ export function startDictation(
   };
 
   rec.onend = finish;
-  rec.onerror = (event: any) => {
+  rec.onerror = (event: SpeechRecognitionErrorEvent) => {
     // 'no-speech' и 'aborted' — не ошибка с точки зрения UX, просто завершение.
     if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
       onError?.();
@@ -104,7 +136,7 @@ export function startContinuousDictation(
   rec.continuous = true;
   rec.interimResults = false;
 
-  rec.onresult = (event: any) => {
+  rec.onresult = (event: SpeechRecognitionEvent) => {
     const results = event?.results;
     if (!results) return;
     // Берём последний зафиксированный (isFinal) результат текущего события.
@@ -128,7 +160,7 @@ export function startContinuousDictation(
   };
 
   rec.onend = finish;
-  rec.onerror = (event: any) => {
+  rec.onerror = (event: SpeechRecognitionErrorEvent) => {
     if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
       onError?.();
     }
@@ -190,7 +222,9 @@ export function startAudioMeter(
       }
       stream = s;
 
-      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      const Ctx =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!Ctx) {
         stop();
         return;

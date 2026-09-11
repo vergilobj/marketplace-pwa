@@ -8,6 +8,17 @@ import { Users, ShoppingBag, Newspaper, Wallet, TrendingUp, Download, Plus, Tras
 import { formatPhone } from '../utils/phone';
 import { formatPrice } from "../utils/format";
 import { resolveMedia } from '../utils/media';
+import type {
+  ApiAdminDashboard,
+  ApiInvite,
+  ApiPost,
+  ApiProduct,
+  ApiSettings,
+  ApiTransaction,
+  ApiUser,
+  ApiWithdrawal,
+  UserRole,
+} from '../api/types';
 
 const statusMap: Record<string, string> = { pending: 'На рассмотрении', approved: 'Одобрена', rejected: 'Отклонена' };
 
@@ -22,45 +33,48 @@ const tabs = [
   { key: 'settings', label: 'Настройки', icon: <Settings size={15} /> },
 ];
 
+/** Post в админке приходит с relation author — берём это из ApiPost. */
+type AdminPost = ApiPost & { author?: { id: string; name?: string | null } | null };
+
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [dashboard, setDashboard] = useState<any>(null);
-  const [users, setUsers] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [posts, setPosts] = useState<any[]>([]);
-  const [invites, setInvites] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [withdrawals, setWithdrawals] = useState<any[]>([]);
-  const [settings, setSettings] = useState<any>({});
+  const [dashboard, setDashboard] = useState<ApiAdminDashboard | null>(null);
+  const [users, setUsers] = useState<ApiUser[]>([]);
+  const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [posts, setPosts] = useState<AdminPost[]>([]);
+  const [invites, setInvites] = useState<ApiInvite[]>([]);
+  const [transactions, setTransactions] = useState<ApiTransaction[]>([]);
+  const [withdrawals, setWithdrawals] = useState<ApiWithdrawal[]>([]);
+  const [settings, setSettings] = useState<ApiSettings>({});
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [copied, setCopied] = useState('');
 
-  useEffect(() => { api.get('/admin/dashboard').then(r => setDashboard(r.data)).catch(() => {}); }, []);
+  useEffect(() => { api.get<ApiAdminDashboard>('/admin/dashboard').then(r => setDashboard(r.data)).catch(() => {}); }, []);
 
   useEffect(() => {
     const q = search ? `?search=${search}` : '';
     switch (activeTab) {
-      case 'users': api.get(`/users${q}`).then(r => setUsers(r.data.items || [])).finally(() => setLoading(false)); break;
-      case 'products': api.get(`/products/admin/list${q}`).then(r => setProducts(r.data.items || [])).finally(() => setLoading(false)); break;
-      case 'posts': api.get(`/posts/admin/list${q}`).then(r => setPosts(r.data.items || [])).finally(() => setLoading(false)); break;
+      case 'users': api.get<{ items: ApiUser[] }>(`/users${q}`).then(r => setUsers(r.data.items || [])).finally(() => setLoading(false)); break;
+      case 'products': api.get<{ items: ApiProduct[] }>(`/products/admin/list${q}`).then(r => setProducts(r.data.items || [])).finally(() => setLoading(false)); break;
+      case 'posts': api.get<{ items: AdminPost[] }>(`/posts/admin/list${q}`).then(r => setPosts(r.data.items || [])).finally(() => setLoading(false)); break;
       case 'invites': getInvites().then(setInvites).finally(() => setLoading(false)); break;
-      case 'transactions': api.get(`/payments/transactions`).then(r => setTransactions(r.data.items || [])).finally(() => setLoading(false)); break;
-      case 'withdrawals': api.get('/users/admin/withdrawals').then(r => setWithdrawals(r.data || [])).finally(() => setLoading(false)); break;
-      case 'settings': api.get('/settings').then(r => setSettings(r.data || {})).finally(() => setLoading(false)); break;
+      case 'transactions': api.get<{ items: ApiTransaction[] }>(`/payments/transactions`).then(r => setTransactions(r.data.items || [])).finally(() => setLoading(false)); break;
+      case 'withdrawals': api.get<ApiWithdrawal[]>('/users/admin/withdrawals').then(r => setWithdrawals(r.data || [])).finally(() => setLoading(false)); break;
+      case 'settings': api.get<ApiSettings>('/settings').then(r => setSettings(r.data || {})).finally(() => setLoading(false)); break;
       default: queueMicrotask(() => setLoading(false));
     }
   }, [activeTab, search]);
 
-  const handleCreateInvite = async () => { try { const r = await createInvite(); setInvites(prev => [...prev, r.data]); toast.success('Инвайт создан'); } catch { toast.error('Ошибка'); } };
+  const handleCreateInvite = async () => { try { const r = await createInvite(); setInvites(prev => [...prev, r]); toast.success('Инвайт создан'); } catch { toast.error('Ошибка'); } };
   const handleDeleteInvite = async (code: string) => { try { await deleteInvite(code); setInvites(prev => prev.filter(i => i.code !== code)); toast.success('Удалён'); } catch { toast.error('Ошибка'); } };
   const handleCopyInvite = (code: string) => { navigator.clipboard.writeText(code); setCopied(code); toast.success('Скопировано!'); setTimeout(() => setCopied(''), 2000); };
-  const handleChangeRole = async (userId: string, role: string) => { try { await api.patch(`/users/${userId}/role`, { role }); setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u)); toast.success('Роль изменена'); } catch { toast.error('Ошибка'); } };
+  const handleChangeRole = async (userId: string, role: UserRole) => { try { await api.patch(`/users/${userId}/role`, { role }); setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u)); toast.success('Роль изменена'); } catch { toast.error('Ошибка'); } };
   const handleToggleProduct = async (id: string) => { try { await api.patch(`/products/${id}/toggle-active`); setProducts(prev => prev.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p)); } catch { toast.error('Ошибка'); } };
   const handleTogglePost = async (id: string) => { try { await api.patch(`/posts/${id}/toggle-visibility`); setPosts(prev => prev.map(p => p.id === id ? { ...p, isHidden: !p.isHidden } : p)); } catch { toast.error('Ошибка'); } };
   const handleApproveWithdrawal = async (id: string) => { try { await api.patch(`/users/admin/withdrawals/${id}/approve`); setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'approved' } : w)); } catch { toast.error('Ошибка'); } };
   const handleRejectWithdrawal = async (id: string) => { try { await api.patch(`/users/admin/withdrawals/${id}/reject`); setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'rejected' } : w)); } catch { toast.error('Ошибка'); } };
-  const handleUpdateSetting = async (key: string, value: string) => { try { await api.put('/settings', { key, value }); setSettings((prev: any) => ({ ...prev, [key]: value })); toast.success('Сохранено'); } catch { toast.error('Ошибка'); } };
+  const handleUpdateSetting = async (key: string, value: string) => { try { await api.put('/settings', { key, value }); setSettings((prev) => ({ ...prev, [key]: value })); toast.success('Сохранено'); } catch { toast.error('Ошибка'); } };
 
   const renderDashboard = () => (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -81,7 +95,7 @@ export default function AdminPage() {
 
   const renderUsers = () => (
     <div className="space-y-2">
-      {users.map((u: any) => (
+      {users.map((u) => (
         <div key={u.id} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#22c55e] to-[#34d399] text-[#0d1512] text-xs font-bold flex items-center justify-center">{(u.name || '?')[0].toUpperCase()}</div>
@@ -92,7 +106,7 @@ export default function AdminPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${u.role === 'ADMIN' ? 'bg-red-400/10 text-red-400' : u.role === 'SELLER' ? 'bg-[#22c55e]/10 text-[#22c55e]' : 'bg-white/[0.04] text-[var(--color-muted)]'}`}>{u.role}</span>
-            <select value={u.role} onChange={e => handleChangeRole(u.id, e.target.value)} className="bg-[rgba(255,255,255,0.04)] border border-[var(--color-border)] rounded-lg px-2 py-1 text-xs text-[var(--color-text)] outline-none">
+            <select value={u.role} onChange={e => handleChangeRole(u.id, e.target.value as UserRole)} className="bg-[rgba(255,255,255,0.04)] border border-[var(--color-border)] rounded-lg px-2 py-1 text-xs text-[var(--color-text)] outline-none">
               <option value="BUYER">BUYER</option>
               <option value="SELLER">SELLER</option>
               <option value="ADMIN">ADMIN</option>
@@ -105,7 +119,7 @@ export default function AdminPage() {
 
   const renderProducts = () => (
     <div className="space-y-2">
-      {products.map((p: any) => (
+      {products.map((p) => (
         <div key={p.id} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[var(--color-border)] overflow-hidden shrink-0">{p.media?.[0] && <img src={resolveMedia(p.media[0])} alt="" className="w-full h-full object-cover" />}</div>
@@ -122,7 +136,7 @@ export default function AdminPage() {
 
   const renderPosts = () => (
     <div className="space-y-2">
-      {posts.map((p: any) => (
+      {posts.map((p) => (
         <div key={p.id} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-[var(--color-text)] truncate">{p.title}</p>
@@ -138,7 +152,7 @@ export default function AdminPage() {
     <div>
       <button onClick={handleCreateInvite} className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#22c55e] text-[#0d1512] text-sm font-bold hover:bg-[#16a34a] transition-all shadow-[0_8px_32px_-8px_rgba(34,197,94,0.5)] mb-4"><Plus size={15} /> Создать инвайт</button>
       <div className="space-y-2">
-        {invites.map((inv: any) => (
+        {invites.map((inv) => (
           <div key={inv.code} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <code className="text-sm font-mono font-bold text-[#22c55e] bg-[#22c55e]/5 px-3 py-1.5 rounded-lg">{inv.code}</code>
@@ -156,7 +170,7 @@ export default function AdminPage() {
 
   const renderTransactions = () => (
     <div className="space-y-2">
-      {transactions.map((t: any) => (
+      {transactions.map((t) => (
         <div key={t.id} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-[var(--color-text)]">{t.type}</p>
@@ -164,7 +178,7 @@ export default function AdminPage() {
           </div>
           <div className="text-right">
             <p className="text-sm font-bold text-[var(--color-text)]">{formatPrice(t.amount)}</p>
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${t.status === 'success' ? 'bg-[#22c55e]/10 text-[#22c55e]' : 'bg-amber-400/10 text-amber-400'}`}>{t.status}</span>
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${t.status === 'CONFIRMED' ? 'bg-[#22c55e]/10 text-[#22c55e]' : 'bg-amber-400/10 text-amber-400'}`}>{t.status}</span>
           </div>
         </div>
       ))}
@@ -173,7 +187,7 @@ export default function AdminPage() {
 
   const renderWithdrawals = () => (
     <div className="space-y-2">
-      {withdrawals.map((w: any) => (
+      {withdrawals.map((w) => (
         <div key={w.id} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-[var(--color-text)]">{formatPrice(w.amount)}</p>
@@ -206,7 +220,7 @@ export default function AdminPage() {
           <div key={f.key}>
             <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">{f.label}</label>
             <div className="flex gap-2">
-              <input value={val} onChange={e => setSettings((prev: any) => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder} className="flex-1 px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-all" />
+              <input value={val} onChange={e => setSettings((prev) => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder} className="flex-1 px-4 py-2.5 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-all" />
               <button onClick={() => handleUpdateSetting(f.key, val)} className="px-4 py-2.5 rounded-full bg-[#22c55e] text-[#0d1512] text-sm font-bold hover:bg-[#16a34a] transition-all shadow-[0_8px_32px_-8px_rgba(34,197,94,0.5)]">Сохранить</button>
             </div>
           </div>

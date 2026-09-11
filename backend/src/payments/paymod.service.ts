@@ -111,9 +111,10 @@ export class PaymodService {
         status: string;
         error?: string | null;
       }>('GET', `/v1/payout/${encodeURIComponent(idempotencyKey)}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       // 404 приходит как Error('paymod error: 404 ...') — выплаты нет.
-      if (String(err?.message ?? '').includes('404')) return null;
+      if (msg.includes('404')) return null;
       throw err;
     }
   }

@@ -7,15 +7,16 @@ import { useApp } from '../context/AppContext';
 import { getProducts } from '../api/products';
 import { formatPrice } from "../utils/format";
 import { resolveMedia } from '../utils/media';
+import type { ApiProduct } from '../api/types';
 
 export default function FavoritesPage() {
   const navigate = useNavigate();
   const { favorites, cart, toggleFavorite, addToCart, updateQuantity } = useApp();
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getProducts({ limit: 2000 }).then(res => setProducts((res.items || []).filter((p: any) => favorites.includes(p.id)))).finally(() => setLoading(false));
+    getProducts({ limit: 2000 }).then(res => setProducts((res.items || []).filter(p => favorites.includes(p.id)))).finally(() => setLoading(false));
   }, [favorites]);
 
   if (loading) return (
@@ -45,7 +46,7 @@ export default function FavoritesPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
             {products.map((product, i) => {
               const price = formatPrice(product.price);
-              const ci = cart.find((item: any) => item.productId === product.id);
+              const ci = cart.find((item) => item.productId === product.id);
               const inC = !!ci;
               const q = ci?.quantity || 1;
               return (

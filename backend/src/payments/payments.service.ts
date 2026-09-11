@@ -6,7 +6,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { LedgerAccount } from '@prisma/client';
+import { LedgerAccount, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { NowPaymentsProvider } from './nowpayments.provider';
@@ -580,7 +580,7 @@ export class PaymentsService {
     const page = filters?.page || 1;
     const limit = filters?.limit || 20;
     const skip = (page - 1) * limit;
-    const where: any = {};
+    const where: Prisma.TransactionWhereInput = {};
     if (filters?.type) {
       where.type = filters.type;
     }

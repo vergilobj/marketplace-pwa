@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { IMaskInput } from 'react-imask';
 import { login } from '../api/auth';
 import { unformatPhone } from '../utils/phone';
+import { errorMessage } from '../utils/error';
 import { KeyRound, Eye, EyeOff, ArrowLeft, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
@@ -29,8 +30,8 @@ export default function LoginPage() {
       const payload = JSON.parse(atob(accessToken.split('.')[1]));
       localStorage.setItem('userId', payload.sub);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка входа');
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Ошибка входа'));
     } finally { setLoading(false); }
   };
 
