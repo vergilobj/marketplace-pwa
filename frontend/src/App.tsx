@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import { useAuth } from './hooks/useAuth';
 
@@ -38,7 +38,9 @@ function Lazy({ children }: { children: React.ReactNode }) {
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) {
   const { isAuthenticated, user } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  // location.state.from — чтобы после логина вернуть юзера туда, откуда выкинуло.
+  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location }} />;
   if (requiredRole && user?.role !== requiredRole && user?.role !== 'ADMIN') return <Navigate to="/" replace />;
   return <>{children}</>;
 }

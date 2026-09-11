@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { IMaskInput } from 'react-imask';
 import { login } from '../api/auth';
 import { unformatPhone } from '../utils/phone';
 import { errorMessage } from '../utils/error';
+import { decodeJwtPayload } from '../hooks/useAuth';
 import { KeyRound, Eye, EyeOff, ArrowLeft, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [form, setForm] = useState({ phone: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,9 +29,14 @@ export default function LoginPage() {
       const { accessToken, refreshToken } = await login(unformatPhone(form.phone), form.password);
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
-      const payload = JSON.parse(atob(accessToken.split('.')[1]));
-      localStorage.setItem('userId', payload.sub);
-      navigate('/');
+      // Декод не должен ронять редирект: битый/нестандартный payload — не повод
+      // остаться на /login с уже записанным токеном (decodeJwtPayload не бросает).
+      const payload = decodeJwtPayload(accessToken);
+      if (payload?.sub) localStorage.setItem('userId', payload.sub);
+      // Возврат на страницу, с которой выкинуло на логин (ProtectedRoute кладёт
+      // location.state.from), иначе — на главную.
+      const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+      navigate(from && from !== '/login' ? from : '/', { replace: true });
     } catch (err: unknown) {
       setError(errorMessage(err, 'Ошибка входа'));
     } finally { setLoading(false); }

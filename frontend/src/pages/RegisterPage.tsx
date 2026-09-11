@@ -5,6 +5,7 @@ import { IMaskInput } from 'react-imask';
 import { register } from '../api/auth';
 import { unformatPhone } from '../utils/phone';
 import { errorMessage } from '../utils/error';
+import { decodeJwtPayload } from '../hooks/useAuth';
 import { Crown, Eye, EyeOff, ArrowLeft, Gift, ArrowRight } from 'lucide-react';
 
 export default function RegisterPage() {
@@ -28,8 +29,10 @@ export default function RegisterPage() {
     try {
       const { accessToken, refreshToken } = await register(unformatPhone(form.phone), form.name, form.password, form.inviteCode);
       localStorage.setItem('accessToken', accessToken); localStorage.setItem('refreshToken', refreshToken);
-      const payload = JSON.parse(atob(accessToken.split('.')[1])); localStorage.setItem('userId', payload.sub);
-      navigate('/');
+      // Тот же фикс, что и в LoginPage: декод не должен блокировать редирект.
+      const payload = decodeJwtPayload(accessToken);
+      if (payload?.sub) localStorage.setItem('userId', payload.sub);
+      navigate('/', { replace: true });
     } catch (err: unknown) { setError(errorMessage(err, 'Ошибка регистрации')); } finally { setLoading(false); }
   };
 

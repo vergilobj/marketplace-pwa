@@ -196,13 +196,13 @@ export default function ProductDetailPage() {
           {/* Количество */}
           <div className="flex items-center gap-4 mt-6">
             <span className="text-sm text-[var(--color-muted)]">Количество:</span>
-            <div className="inline-flex items-center gap-3 px-2 py-1.5 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]">
-              <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-9 h-9 rounded-lg hover:bg-[var(--bg-3)] flex items-center justify-center text-[var(--color-text)] transition-colors">
-                <Minus size={16} />
+            <div className="inline-flex items-center gap-2 px-1.5 py-1 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]">
+              <button onClick={() => setQuantity(Math.max(1, quantity - 1))} aria-label="Уменьшить количество" className="w-11 h-11 rounded-lg hover:bg-[var(--bg-3)] flex items-center justify-center text-[var(--color-text)] transition-colors">
+                <Minus size={17} />
               </button>
               <span className="w-8 text-center font-bold text-[var(--color-text)]">{quantity}</span>
-              <button onClick={() => setQuantity(quantity + 1)} className="w-9 h-9 rounded-lg hover:bg-[var(--bg-3)] flex items-center justify-center text-[var(--color-text)] transition-colors">
-                <Plus size={16} />
+              <button onClick={() => setQuantity(quantity + 1)} aria-label="Увеличить количество" className="w-11 h-11 rounded-lg hover:bg-[var(--bg-3)] flex items-center justify-center text-[var(--color-text)] transition-colors">
+                <Plus size={17} />
               </button>
             </div>
           </div>

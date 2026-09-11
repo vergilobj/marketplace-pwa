@@ -38,7 +38,7 @@ export default function CartPage() {
       }} />
 
       <div className="relative max-w-2xl mx-auto px-4 sm:px-6 pt-10 pb-32">
-        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
+        <button onClick={() => navigate(-1)} className="tap-link inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
           <ArrowLeft size={16} /> Назад
         </button>
 
@@ -64,10 +64,10 @@ export default function CartPage() {
                   <div className="text-sm font-bold text-[var(--color-text)] truncate">{item.title}</div>
                   <div className="text-sm font-extrabold text-[#22c55e]">{formatPrice(item.price * item.quantity)}</div>
                 </div>
-                <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => updateQuantity(item.productId, -1)} className="w-8 h-8 rounded-lg border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] flex items-center justify-center transition-all"><Minus size={13} /></button>
+                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => updateQuantity(item.productId, -1)} aria-label="Уменьшить количество" className="w-11 h-11 rounded-lg border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] flex items-center justify-center transition-all"><Minus size={16} /></button>
                   <span className="text-sm font-bold text-[var(--color-text)] min-w-[20px] text-center">{item.quantity}</span>
-                  <button onClick={() => updateQuantity(item.productId, 1)} className="w-8 h-8 rounded-lg border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] flex items-center justify-center transition-all"><Plus size={13} /></button>
+                  <button onClick={() => updateQuantity(item.productId, 1)} aria-label="Увеличить количество" className="w-11 h-11 rounded-lg border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] flex items-center justify-center transition-all"><Plus size={16} /></button>
                 </div>
               </motion.div>
             ))}
