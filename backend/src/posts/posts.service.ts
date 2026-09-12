@@ -318,7 +318,26 @@ export class PostsService implements OnModuleInit {
     return post.authorId === userId || post.adOwnerId === userId;
   }
 
-  async delete(id: string) {
+  /**
+   * PD-FIX-3: удаление поста с проверкой владения.
+   *
+   * Раньше метод не знал, кто удаляет, а роут был закрыт `@Roles('ADMIN')` —
+   * автор получал 403 на своём посте. Теперь право проверяется здесь (как в
+   * `update`): автор либо ADMIN. Чужой пост → 403, несуществующий → 404.
+   */
+  async delete(id: string, userId?: string, userRole?: string) {
+    const post = await this.prisma.post.findUnique({ where: { id } });
+    if (!post) throw new NotFoundException('Пост не найден');
+
+    if (
+      userId &&
+      post.authorId !== userId &&
+      post.adOwnerId !== userId &&
+      userRole !== 'ADMIN'
+    ) {
+      throw new ForbiddenException('Удалять можно только свои посты');
+    }
+
     await this.prisma.like.deleteMany({ where: { postId: id } });
     await this.prisma.comment.deleteMany({ where: { postId: id } });
     const deleted = await this.prisma.post.delete({ where: { id } });

@@ -10,6 +10,7 @@ import {
   Param,
   Header,
   Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -101,11 +102,30 @@ export class UsersController {
     return { user, accessToken };
   }
 
-  /** @deprecated B13: отдаёт phone по номеру — оставлено как есть (вне скоупа L1). */
+  /**
+   * @deprecated B13: отдаёт phone по номеру — оставлено как есть (вне скоупа L1).
+   *
+   * PD-FIX-2: читаем ОБА параметра — `phone` и `q`.
+   *
+   * Раньше контроллер брал только `phone`. Запрос фронта/мониторинга вида
+   * `GET /api/users/search?q=test` давал `phone === undefined`, и Prisma падала
+   * с PrismaClientValidationError → 500 (`where { phone: undefined }`).
+   * Теперь: нет ни `phone`, ни `q` → 400 (а не 500), иначе ищем по номеру.
+   *
+   * ⚠️ Публичный контракт не расширяем: по-прежнему принимаем номер телефона
+   * (этот эндпоинт и был «поиск по номеру»), `q` — алиас для совместимости.
+   */
   @UseGuards(JwtAuthGuard)
   @Get('search')
-  async searchByPhone(@Query('phone') phone: string) {
-    return this.usersService.findByPhone(phone);
+  async searchByPhone(
+    @Query('phone') phone?: string,
+    @Query('q') q?: string,
+  ) {
+    const value = phone ?? q;
+    if (!value || !String(value).trim()) {
+      throw new BadRequestException('Укажите phone или q');
+    }
+    return this.usersService.findByPhone(String(value).trim());
   }
 
   @UseGuards(JwtAuthGuard)

@@ -230,13 +230,39 @@ describe('PostsService', () => {
   });
 
   describe('delete', () => {
-    it('should delete post and cascade likes/comments', async () => {
+    it('PD-FIX-3: автор удаляет свой пост (каскад likes/comments)', async () => {
+      mockPrisma.post.findUnique.mockResolvedValue(mockPost);
       mockPrisma.like.deleteMany.mockResolvedValue({});
       mockPrisma.comment.deleteMany.mockResolvedValue({});
       mockPrisma.post.delete.mockResolvedValue(mockPost);
-      await service.delete('post-1');
+      await service.delete('post-1', 'author-1', 'SELLER');
       expect(mockPrisma.like.deleteMany).toHaveBeenCalled();
       expect(mockPrisma.comment.deleteMany).toHaveBeenCalled();
+      expect(mockPrisma.post.delete).toHaveBeenCalled();
+    });
+
+    it('PD-FIX-3: ADMIN удаляет чужой пост', async () => {
+      mockPrisma.post.findUnique.mockResolvedValue(mockPost);
+      mockPrisma.like.deleteMany.mockResolvedValue({});
+      mockPrisma.comment.deleteMany.mockResolvedValue({});
+      mockPrisma.post.delete.mockResolvedValue(mockPost);
+      await service.delete('post-1', 'admin-9', 'ADMIN');
+      expect(mockPrisma.post.delete).toHaveBeenCalled();
+    });
+
+    it('PD-FIX-3: чужой пост → 403, ничего не удалено', async () => {
+      mockPrisma.post.findUnique.mockResolvedValue(mockPost);
+      await expect(
+        service.delete('post-1', 'stranger-2', 'SELLER'),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockPrisma.post.delete).not.toHaveBeenCalled();
+    });
+
+    it('PD-FIX-3: несуществующий пост → 404', async () => {
+      mockPrisma.post.findUnique.mockResolvedValue(null);
+      await expect(
+        service.delete('nope', 'author-1', 'SELLER'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

@@ -13,6 +13,7 @@ import { mkdirSync, existsSync } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UploadService } from './upload.service';
+import { UploadsReplicationService } from './uploads-replication.service';
 
 const VIDEO_MIMES = new Set([
   'video/mp4',
@@ -66,7 +67,10 @@ const videoStorage = diskStorage({
 
 @Controller('upload')
 export class UploadController {
-  constructor(private uploadService: UploadService) {}
+  constructor(
+    private uploadService: UploadService,
+    private replication: UploadsReplicationService,
+  ) {}
 
   // Картинки (оставляем существующий эндпоинт).
   @UseGuards(JwtAuthGuard)
@@ -88,6 +92,9 @@ export class UploadController {
     }),
   )
   uploadFile(@UploadedFile() file: Express.Multer.File) {
+    // PD-FIX-1: файл лёг только на ЭТУ ноду — копируем на вторую (best-effort),
+    // иначе у половины пользователей картинка будет 404 (nginx гео-роутит).
+    this.replication.replicate(file.filename);
     return { url: this.uploadService.getFileUrl(file.filename) };
   }
 
@@ -116,6 +123,8 @@ export class UploadController {
     }),
   )
   uploadVideo(@UploadedFile() file: Express.Multer.File) {
+    // PD-FIX-1: видео реплицируем в подпапку videos/ (тот же механизм).
+    this.replication.replicate(`videos/${file.filename}`);
     return { url: this.uploadService.getVideoUrl(file.filename) };
   }
 }

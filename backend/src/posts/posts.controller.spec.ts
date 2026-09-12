@@ -92,10 +92,16 @@ describe('PostsController', () => {
   });
 
   describe('delete', () => {
-    it('should delete post', async () => {
+    it('PD-FIX-3: передаёт автора поста в сервис (проверка владения)', async () => {
       service.delete.mockResolvedValue({ id: 'post-1' });
-      await controller.delete('post-1');
-      expect(service.delete).toHaveBeenCalledWith('post-1');
+      await controller.delete('post-1', {
+        user: { userId: 'author-1', role: 'SELLER' },
+      } as any);
+      expect(service.delete).toHaveBeenCalledWith(
+        'post-1',
+        'author-1',
+        'SELLER',
+      );
     });
   });
 

@@ -89,11 +89,19 @@ export class PostsController {
     return this.postsService.findById(id, req.user?.userId, req.user?.role);
   }
 
+  /**
+   * PD-FIX-3: удаление поста.
+   *
+   * Раньше роут был `@Roles('ADMIN')` — автор получал 403 на своей же карточке
+   * (`FeedPage` зовёт `api.delete('/posts/' + id)`). Право владения проверяет
+   * сервис по `authorId` (ADMIN проходит всегда) — как в `update`.
+   * Роли оставлены все, чтобы BUYER тоже мог удалить свой пост.
+   */
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('BUYER', 'SELLER', 'ADMIN')
   @Delete(':id')
-  async delete(@Param('id') id: string) {
-    return this.postsService.delete(id);
+  async delete(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    return this.postsService.delete(id, req.user.userId, req.user.role);
   }
 
   // Админские эндпоинты
