@@ -310,14 +310,28 @@ export default function AdminPage() {
     </div>
   );
 
+  /**
+   * N1: поля настроек админки. Раньше здесь было 4 записи, а `deposit_tolerance_percent`,
+   * `order_payment_ttl_minutes`, `escrow_ship_deadline_days`, `escrow_autocomplete_days`
+   * и `withdrawal_min_amount` код читал, но поменять их было нельзя (ни UI, ни API).
+   * Значения подтягиваются из `settings[f.key]` (GET /settings), сохранение — общий
+   * `handleUpdateSetting` → PUT /settings.
+   */
+  const SETTINGS_FIELDS = [
+    { key: 'platform_fee_percent', label: 'Комиссия платформы (%)', placeholder: '10' },
+    { key: 'referral_percent', label: 'Реферальный процент (%)', placeholder: '5' },
+    { key: 'ad_price', label: 'Цена рекламы (USDT/день)', placeholder: '5000' },
+    { key: 'deposit_tolerance_percent', label: 'Допуск недоплаты (%)', placeholder: '1' },
+    { key: 'order_payment_ttl_minutes', label: 'Срок оплаты заказа (мин)', placeholder: '15' },
+    { key: 'escrow_ship_deadline_days', label: 'Срок отправки продавцом (дней)', placeholder: '5' },
+    { key: 'escrow_autocomplete_days', label: 'Авто-завершение заказа (дней)', placeholder: '7' },
+    { key: 'withdrawal_min_amount', label: 'Минимальная сумма вывода (USDT)', placeholder: '0' },
+    { key: 'stop_words', label: 'Стоп-слова (через запятую)', placeholder: 'спам, casino' },
+  ];
+
   const renderSettings = () => (
     <div className="space-y-4 max-w-md">
-      {[
-        { key: 'platform_fee_percent', label: 'Комиссия платформы (%)', placeholder: '10' },
-        { key: 'referral_percent', label: 'Реферальный процент (%)', placeholder: '5' },
-        { key: 'ad_price', label: 'Цена рекламы (USDT/день)', placeholder: '5000' },
-        { key: 'stop_words', label: 'Стоп-слова (через запятую)', placeholder: 'спам, casino' },
-      ].map(f => {
+      {SETTINGS_FIELDS.map(f => {
         const val = settings[f.key] || '';
         return (
           <div key={f.key}>
