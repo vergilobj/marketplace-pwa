@@ -65,7 +65,11 @@ export default function DictateButton({ onResult, size = 18, className = '' }: D
       animate={listening ? { scale: [1, 1.12, 1] } : { scale: 1 }}
       transition={listening ? { repeat: Infinity, duration: 1.1, ease: 'easeInOut' } : { duration: 0.15 }}
     >
-      {listening ? <Square size={size} /> : <Mic size={size} />}
+      {/* Иконки фиксированного бокса: Mic и Square разного размера давали
+          сдвиг кнопки при старте/стопе записи. */}
+      <span className="relative flex items-center justify-center" style={{ width: size + 2, height: size + 2 }}>
+        {listening ? <Square size={size - 2} className="absolute" /> : <Mic size={size} className="absolute" />}
+      </span>
     </motion.button>
   );
 }

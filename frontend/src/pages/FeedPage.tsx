@@ -312,8 +312,10 @@ export default function FeedPage() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)]" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Искать среди своих…" className="w-full pl-10 pr-20 py-3 rounded-xl bg-[var(--color-surface)] text-[var(--color-text)] text-sm outline-none border border-[var(--color-border)] focus:border-[#22c55e] transition-colors" />
             <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-              <DictateButton size={15} className="w-11 h-11" onResult={(text) => setSearch(text)} />
+              {/* Крестик первым в DOM: микрофон всегда прижат к правому краю
+                  и не сдвигается, когда появляется/исчезает очистка. */}
               {search && <button onClick={() => setSearch('')} aria-label="Очистить поиск" className="w-11 h-11 flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-text)]"><X size={16} /></button>}
+              <DictateButton size={15} className="w-11 h-11" onResult={(text) => setSearch(text)} />
             </div>
           </div>
         </div>
