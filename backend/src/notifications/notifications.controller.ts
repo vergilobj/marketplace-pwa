@@ -7,8 +7,14 @@ import {
   Body,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import {
+  PAGINATION_BULK_LIMIT,
+  parseLimit,
+  parsePage,
+} from '../common/dto/pagination.dto';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.interface';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -26,8 +32,15 @@ export class NotificationsController {
   // Внутренние уведомления
   @UseGuards(JwtAuthGuard)
   @Get()
-  async getNotifications(@Request() req: AuthenticatedRequest) {
-    return this.notificationsService.getNotifications(req.user.userId);
+  async getNotifications(
+    @Request() req: AuthenticatedRequest,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.notificationsService.getNotifications(req.user.userId, {
+      page: parsePage(page),
+      limit: parseLimit(limit, PAGINATION_BULK_LIMIT),
+    });
   }
 
   @UseGuards(JwtAuthGuard)

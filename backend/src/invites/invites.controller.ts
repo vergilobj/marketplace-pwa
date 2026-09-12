@@ -7,12 +7,18 @@ import {
   UseGuards,
   Request,
   Body,
+  Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.interface';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { InvitesService } from './invites.service';
+import {
+  PAGINATION_BULK_LIMIT,
+  parseLimit,
+  parsePage,
+} from '../common/dto/pagination.dto';
 
 @Controller('invites')
 export class InvitesController {
@@ -31,8 +37,15 @@ export class InvitesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'MODERATOR')
   @Get()
-  async findAll() {
-    return this.invitesService.findAll();
+  async findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    // L1: потолок limit. Ответ — массив (AdminPage).
+    return this.invitesService.findAll({
+      page: parsePage(page),
+      limit: parseLimit(limit, PAGINATION_BULK_LIMIT),
+    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

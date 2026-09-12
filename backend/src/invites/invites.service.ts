@@ -1,6 +1,11 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
+import {
+  PAGINATION_BULK_LIMIT,
+  clampLimit,
+  clampPage,
+} from '../common/dto/pagination.dto';
 
 // Генерация красивого короткого кода (8 символов, без похожих букв/цифр)
 function generateShortCode(length = 8): string {
@@ -59,13 +64,23 @@ export class InvitesService {
     return invite;
   }
 
-  async findAll() {
+  /**
+   * L1: список инвайтов. Раньше `findMany` без `take` — таблица инвайтов
+   * отдавалась целиком.
+   * ⚠️ Фронт (`AdminPage` / `getInvites`) читает ответ как МАССИВ
+   * (`api.get<ApiInvite[]>`) — форму не меняем. Дефолт 100.
+   */
+  async findAll(params: { page?: number; limit?: number } = {}) {
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     return this.prisma.invite.findMany({
       include: {
         owner: { select: { id: true, name: true } },
         usedBy: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 

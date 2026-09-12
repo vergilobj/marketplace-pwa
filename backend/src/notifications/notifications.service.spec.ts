@@ -77,12 +77,45 @@ describe('NotificationsService', () => {
   });
 
   describe('getNotifications', () => {
-    it('should return last 50 notifications', async () => {
+    it('should use bulk default limit (100) on first page', async () => {
       mockPrisma.notification.findMany.mockResolvedValue([]);
       await service.getNotifications('user-1');
       expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 50 }),
+        expect.objectContaining({ skip: 0, take: 100 }),
       );
+    });
+
+    it('should offset by page and honour explicit limit', async () => {
+      mockPrisma.notification.findMany.mockResolvedValue([]);
+      await service.getNotifications('user-1', { page: 3, limit: 25 });
+      expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 50, take: 25 }),
+      );
+    });
+
+    it('should clamp limit above max (100) and page below 1', async () => {
+      mockPrisma.notification.findMany.mockResolvedValue([]);
+      await service.getNotifications('user-1', { page: 0, limit: 100000 });
+      expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 0, take: 100 }),
+      );
+    });
+
+    it('should fall back to defaults on garbage params', async () => {
+      mockPrisma.notification.findMany.mockResolvedValue([]);
+      await service.getNotifications('user-1', {
+        page: 'abc' as unknown as number,
+        limit: NaN,
+      });
+      expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 0, take: 100 }),
+      );
+    });
+
+    it('should keep array response shape (no envelope)', async () => {
+      mockPrisma.notification.findMany.mockResolvedValue([{ id: 'n1' }]);
+      const result = await service.getNotifications('user-1');
+      expect(Array.isArray(result)).toBe(true);
     });
   });
 

@@ -20,6 +20,13 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
 import { EscrowService } from '../payments/escrow.service';
 import { computeFees, round2 } from '../payments/money.util';
+import {
+  DEAL_THREAD_DEFAULT_LIMIT,
+  DEAL_THREAD_MAX_LIMIT,
+  PAGINATION_BULK_LIMIT,
+  clampLimit,
+  clampPage,
+} from '../common/dto/pagination.dto';
 
 const MAX_RELAY_TEXT = 4000;
 
@@ -640,8 +647,20 @@ export class DealService {
     return { text, inStock: prod.isActive };
   }
 
-  /** Тред сделки: Deal + все сообщения по dealId. */
-  async thread(dealId: string, viewerId: string) {
+  /**
+   * Тред сделки: Deal + все сообщения по dealId.
+   *
+   * L1: раньше `findMany` без `take` — долгая переписка отдавалась целиком.
+   * Внутренний вызов из арбитража (`ArbitrageService`) идёт без параметров —
+   * дефолт 200 сообщений ему достаточно для вердикта (и он видит НАЧАЛО
+   * переписки, т.к. порядок asc + skip 0). Форма ответа `{ deal, thread }`
+   * сохранена — её читает и фронт, и арбитраж.
+   */
+  async thread(
+    dealId: string,
+    viewerId: string,
+    params: { page?: number; limit?: number } = {},
+  ) {
     const deal = await this.prisma.deal.findUnique({
       where: { id: dealId },
       include: {
@@ -656,20 +675,42 @@ export class DealService {
       throw new ForbiddenException('Вы не участник сделки');
     }
 
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(
+      params.limit,
+      DEAL_THREAD_DEFAULT_LIMIT,
+      DEAL_THREAD_MAX_LIMIT,
+    );
     const thread = await this.prisma.bazarMessage.findMany({
       where: { dealId },
       orderBy: { createdAt: 'asc' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
     return { deal, thread };
   }
 
-  /** Список сделок (лиды). */
-  async list(userId: string, as: 'buyer' | 'seller') {
+  /**
+   * Список сделок (лиды).
+   *
+   * L1: раньше `findMany` без `take` — у активного продавца сделок может быть
+   * много. Форма ответа — МАССИВ (фронт: `api.get<BazarDeal[]>`), не меняем.
+   * Дефолт 100.
+   */
+  async list(
+    userId: string,
+    as: 'buyer' | 'seller',
+    params: { page?: number; limit?: number } = {},
+  ) {
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     const where = as === 'buyer' ? { buyerId: userId } : { sellerId: userId };
     return this.prisma.deal.findMany({
       where,
       orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
       include: {
         buyer: { select: { id: true, name: true } },
         seller: { select: { id: true, name: true } },

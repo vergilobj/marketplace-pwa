@@ -20,6 +20,7 @@ import { ModerationService } from '../moderation/moderation.service';
 import { AdActivationHook } from '../payments/ad-activation.hook';
 import { addDays } from '../payments/money.util';
 import { publicAdVisibility } from './posts.visibility';
+import { clampLimit, clampPage } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class PostsService implements OnModuleInit {
@@ -107,6 +108,9 @@ export class PostsService implements OnModuleInit {
         title: dto.title,
         content: dto.content,
         link: dto.link,
+        // A1: медиа рекламы — тот же механизм, что у обычного поста.
+        media: dto.media,
+        videoUrl: dto.videoUrl,
         authorId: sellerId,
         isAd: true,
         adOwnerId: sellerId,
@@ -185,8 +189,8 @@ export class PostsService implements OnModuleInit {
     sort?: string;
     search?: string;
   }) {
-    const page = params.page || 1;
-    const limit = params.limit || 20;
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, 20);
     const skip = (page - 1) * limit;
     const now = new Date();
 
@@ -414,6 +418,73 @@ export class PostsService implements OnModuleInit {
     return { activated };
   }
 
+  /**
+   * B1: авто-снятие `isPinned` с ПРОСРОЧЕННОЙ рекламы.
+   *
+   * Реклама держится в топе ленты флагом `isPinned`, а срок размещения
+   * ограничен `adExpireDate` (его выставляет `activateAdForOrder`). Публичная
+   * выдача (`publicAdVisibility`) просроченную рекламу уже не показывает, но
+   * сам флаг `isPinned` остаётся выставленным — мёртвый флаг в БД: любой
+   * запрос в обход visibility (админка, будущий рефактор сортировки) снова
+   * поднимет истёкшую рекламу в топ. Метод приводит флаг в соответствие сроку.
+   *
+   * Только снимаем `isPinned`. Пост НЕ удаляется и НЕ скрывается (`isHidden`
+   * не трогаем): контент остаётся доступен, он просто перестаёт быть в топе.
+   *
+   * Условие `adExpireDate: { lt: now }` намеренно `lt`, а не `lte`: ровно в
+   * момент истечения реклама ещё считается действующей, а `adExpireDate = null`
+   * под него не подпадает (SQL-сравнение с NULL ложно), так что «вечно
+   * запиненные» посты без даты этот метод не трогает.
+   *
+   * Идемпотентно: `updateMany` фильтрует по «ещё просрочен И ещё запинен»,
+   * поэтому повторный прогон вернёт 0.
+   *
+   * @returns число постов, с которых снят `isPinned`.
+   */
+  async deactivateExpiredAds(): Promise<number> {
+    const now = new Date();
+    const { count } = await this.prisma.post.updateMany({
+      where: {
+        isAd: true,
+        isPinned: true,
+        adExpireDate: { lt: now },
+      },
+      data: { isPinned: false },
+    });
+    if (count > 0) {
+      this.logger.log(
+        `deactivateExpiredAds: снят isPinned с ${count} просроченных рекламных постов`,
+      );
+    }
+    return count;
+  }
+
+  /**
+   * B1: крон авто-снятия просроченной рекламы.
+   *
+   * Раз в час. Срок рекламы задаётся в ДНЯХ (`addDays`), поэтому суточный крон
+   * оставлял бы мёртвый флаг висеть до 24 часов; час ограничивает окно
+   * рассинхрона одним часом, а стоит это один `updateMany` по фильтру. Тот же
+   * приём, что у `reconcilePaidAds` (EVERY_5_MINUTES) — свой крон внутри
+   * PostsService, без нового пакета: `ScheduleModule.forRoot()` уже подключён
+   * в AppModule.
+   *
+   * Ошибку глотаем в лог: падение крона не должно ронять процесс, следующий
+   * тик доберёт (метод идемпотентен).
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async expireAdsCron(): Promise<{ deactivated: number }> {
+    try {
+      const deactivated = await this.deactivateExpiredAds();
+      return { deactivated };
+    } catch (e) {
+      this.logger.error(
+        `expireAdsCron failed: ${(e as Error).message}`,
+      );
+      return { deactivated: 0 };
+    }
+  }
+
   async getFeed(params: {
     userId?: string;
     page?: number;
@@ -421,8 +492,8 @@ export class PostsService implements OnModuleInit {
     sort?: string;
     search?: string;
   }) {
-    const page = params.page || 1;
-    const limit = params.limit || 20;
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, 20);
     const skip = (page - 1) * limit;
     const { userId, sort } = params;
 
@@ -496,8 +567,8 @@ export class PostsService implements OnModuleInit {
     search?: string;
     status?: string;
   }) {
-    const page = params.page || 1;
-    const limit = params.limit || 20;
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, 20);
     const skip = (page - 1) * limit;
     const where: Prisma.PostWhereInput = {};
     if (params.search) {
@@ -558,6 +629,28 @@ export class PostsService implements OnModuleInit {
     // Разрешить редактирование только автору или админу
     if (post.authorId !== userId && userRole !== 'ADMIN') {
       throw new ForbiddenException('Редактировать можно только свои посты');
+    }
+
+    // M1: модерация на РЕДАКТИРОВАНИИ (раньше стояла только на создании —
+    // обход: создать чистый пост → PATCH-ем вписать телефон/ссылку).
+    // Модерируем ИТОГОВЫЙ контент: merge(dto, post). Непришедшие поля берём
+    // из текущего поста — иначе правка одного заголовка проверяла бы только
+    // его, а старый (уже сохранённый) content/link остался бы вне проверки.
+    // Так проверяется ровно то, что окажется в посте после апдейта.
+    // entityType тот же, что на создании ('post'), — новых типов не заводим.
+    const moderation = await this.moderationService.moderate({
+      text: [
+        data.title ?? post.title,
+        data.content ?? post.content,
+        data.link ?? post.link,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      entityType: 'post',
+      userId,
+    });
+    if (moderation.verdict === 'block') {
+      throw new BadRequestException(moderation.reason);
     }
 
     const updated = await this.prisma.post.update({

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { usePaginatedList } from '../hooks/usePaginatedList';
 import { bazarDeals, DEAL_STATUS_RU } from '../api/bazar';
 import type { BazarDeal } from '../api/bazar';
 import { resolveMedia } from '../utils/media';
@@ -12,42 +13,34 @@ const fmt = (s?: string | null) => {
   return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 };
 
+/**
+ * L2: размер страницы лидов.
+ *
+ * `GET /bazar/deals` принимает page/limit (потолок 100), но отдаёт МАССИВ —
+ * «есть ещё» выводится из длины страницы. До этого лиды грузились одним
+ * запросом без параметров (дефолт 100), то есть у продавца с большим потоком
+ * заявок список обрезался молча. Здесь — реальная постраничная догрузка:
+ * infinite scroll (общий хук, `rootMargin: 200px` как в `ProductsPage`) плюс
+ * кнопка «Показать ещё».
+ */
+const LEADS_PAGE_SIZE = 100;
+
 export default function LeadsPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const [deals, setDeals] = useState<BazarDeal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let cancelled = false;
-    // setLoading/setError живут внутри цепочки промиса, а не синхронно в теле
-    // эффекта: синхронный setState здесь давал каскадный рендер на каждый вход.
-    Promise.resolve()
-      .then(() => {
-        if (cancelled) return undefined;
-        setLoading(true);
-        setError('');
-        return bazarDeals('seller');
-      })
-      .then((d) => {
-        if (cancelled || d === undefined) return;
-        setDeals(Array.isArray(d) ? d : []);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        console.error('leads load failed', e);
-        setError('Не удалось загрузить лиды');
-        setDeals([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated]);
+  const {
+    items: deals,
+    loading,
+    loadingMore,
+    hasMore,
+    loadMore,
+    loaderRef,
+  } = usePaginatedList<BazarDeal>(
+    ({ page, limit }) => bazarDeals('seller', { page, limit }),
+    LEADS_PAGE_SIZE,
+    isAuthenticated,
+  );
 
   if (loading) {
     return (
@@ -64,8 +57,6 @@ export default function LeadsPage() {
       <h1 className="text-2xl font-bold text-white mb-1">Лиды</h1>
       <p className="text-sm text-[var(--color-muted)] mb-6">Входящие заявки покупателей по вашим товарам</p>
 
-      {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
-
       {!loading && deals.length === 0 ? (
         <div
           className="rounded-3xl py-16 text-center"
@@ -74,7 +65,8 @@ export default function LeadsPage() {
           <div className="text-sm text-[var(--color-muted)]">Пока нет входящих лидов</div>
         </div>
       ) : (
-        <div className="space-y-3">
+        <>
+          <div className="space-y-3">
           {deals.map((d) => (
             <button
               key={d.id}
@@ -120,7 +112,24 @@ export default function LeadsPage() {
               </div>
             </button>
           ))}
-        </div>
+          </div>
+
+          {/* L2: маячок infinite scroll + ручная догрузка */}
+          <div ref={loaderRef} className="py-8 flex flex-col items-center gap-2">
+            {loadingMore && <Loader2 size={20} className="animate-spin text-[#22c55e]" />}
+            {!loadingMore && hasMore && (
+              <button
+                type="button"
+                onClick={loadMore}
+                className="px-5 min-h-[44px] rounded-full text-[var(--color-text)] text-sm font-semibold transition-colors hover:border-[#22c55e]/40"
+                style={{ background: '#0d1210', border: '1px solid rgba(34,197,94,0.12)' }}
+              >
+                Показать ещё
+              </button>
+            )}
+            {!loadingMore && !hasMore && <span className="text-[var(--color-faint)] text-xs">Всё показали</span>}
+          </div>
+        </>
       )}
     </div>
   );

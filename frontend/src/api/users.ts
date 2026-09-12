@@ -1,5 +1,5 @@
 import api from './axios';
-import type { ApiUser, ApiUserStats, AuthTokens, BecomeSellerResponse, ApiSellerRequest } from './types';
+import type { ApiUser, ApiUserStats, ApiWithdrawal, AuthTokens, BecomeSellerResponse, ApiSellerRequest } from './types';
 
 export const getProfile = () =>
   api.get<ApiUser>('/users/me').then(r => r.data);
@@ -36,6 +36,17 @@ export type BalanceResponse = {
 
 export const getBalance = () =>
   api.get<BalanceResponse>('/users/me/balance').then(r => r.data);
+
+/**
+ * L2: заявки на вывод — страницей.
+ * `GET /users/me/withdrawals?page=&limit=` (потолок 100), ответ — массив.
+ */
+export const getMyWithdrawals = (params?: { page?: number; limit?: number }) =>
+  api.get<ApiWithdrawal[]>('/users/me/withdrawals', { params }).then(r => r.data);
+
+/** L2: заявки на вывод для админки — страницей (ответ — массив). */
+export const getAdminWithdrawals = (params?: { page?: number; limit?: number }) =>
+  api.get<ApiWithdrawal[]>('/users/admin/withdrawals', { params }).then(r => r.data);
 
 export type LedgerEntryItem = {
   id: string;

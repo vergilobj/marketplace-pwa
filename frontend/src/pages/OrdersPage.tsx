@@ -29,11 +29,22 @@ type PayModalState = {
   status: string;
 };
 
+/**
+ * L2: размер страницы заказов.
+ *
+ * `/orders/my` отдаёт МАССИВ (без page/pages) и принимает только `status` —
+ * пагинацию L1 туда не добавлял, поэтому фронт режет историю сам: показываем
+ * по 20 записей с кнопкой «Показать ещё». Данные не теряются — они всё ещё в
+ * ответе, просто не рендерятся все сразу.
+ */
+const ORDERS_PAGE_SIZE = 20;
+
 export default function OrdersPage() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [visibleCount, setVisibleCount] = useState(ORDERS_PAGE_SIZE);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [pay, setPay] = useState<PayModalState | null>(null);
   const [creatingPay, setCreatingPay] = useState(false);
@@ -114,6 +125,11 @@ export default function OrdersPage() {
   };
 
   const filtered = filter ? orders.filter(o => o.status === filter) : orders;
+  const visible = filtered.slice(0, visibleCount);
+  const hasMoreOrders = filtered.length > visible.length;
+
+  // L2: смена фильтра — счётчик показа снова с первой страницы.
+  const handleFilter = (s: string) => { setFilter(s); setVisibleCount(ORDERS_PAGE_SIZE); };
 
   if (loading) return (
     <div className="flex justify-center py-32">
@@ -135,7 +151,7 @@ export default function OrdersPage() {
           {['', 'PENDING', 'PAID', 'SHIPPED', 'COMPLETED', 'DISPUTED', 'REFUNDED', 'CANCELLED'].map(s => (
             <button
               key={s}
-              onClick={() => setFilter(s)}
+              onClick={() => handleFilter(s)}
               className={`inline-flex items-center justify-center px-4 min-h-[44px] rounded-full text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
                 filter === s
                   ? 'bg-[#22c55e] text-[#0d1512] shadow-[0_4px_20px_rgba(34,197,94,0.4)]'
@@ -154,7 +170,7 @@ export default function OrdersPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map((order, i) => {
+            {visible.map((order, i) => {
               const cfg = statusConfig[order.status] || statusConfig.PENDING;
               return (
                 <motion.div key={order.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-5 hover:border-[#22c55e]/40 transition-colors">
@@ -222,6 +238,18 @@ export default function OrdersPage() {
                 </motion.div>
               );
             })}
+            {/* L2: «Показать ещё» — история заказов длиннее одной страницы */}
+            {hasMoreOrders && (
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount(c => c + ORDERS_PAGE_SIZE)}
+                  className="px-5 min-h-[44px] rounded-full bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm font-semibold hover:border-[#22c55e]/40 transition-all"
+                >
+                  Показать ещё ({filtered.length - visible.length})
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

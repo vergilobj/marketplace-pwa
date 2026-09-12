@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma/prisma.service';
+import {
+  PAGINATION_BULK_LIMIT,
+  clampLimit,
+  clampPage,
+} from '../common/dto/pagination.dto';
 
 /** Тело запроса к OneSignal REST API — набор полей известен лишь провайдеру. */
 type OneSignalBody = Record<string, unknown>;
@@ -44,11 +49,33 @@ export class NotificationsService {
     }
   }
 
-  async getNotifications(userId: string) {
+  /**
+   * N2: уведомления юзера с пагинацией.
+   *
+   * Раньше был жёсткий `take: 50` без параметров — у активного юзера 482
+   * уведомления, 432 терялись без возможности долистать.
+   *
+   * ⚠️ Совместимость: ответ читается фронтом как МАССИВ (`setList(r.data||[])`).
+   * Форму не меняем — по образцу `SocialService.getComments`.
+   * Дефолт `PAGINATION_BULK_LIMIT` (100), а не 20: список уведомлений на фронте
+   * раньше показывался сразу целиком (50 шт.), дефолт 20 обрезал бы первый экран
+   * вдвое. Верхняя граница — `PAGINATION_MAX_LIMIT` через `clampLimit`.
+   *
+   * `orderBy` с tie-breaker по `id`: при одинаковых `createdAt` (массовые
+   * broadcast-рассылки пишутся в одну миллисекунду) страницы skip/take без
+   * вторичной сортировки могут дублировать или пропускать записи.
+   */
+  async getNotifications(
+    userId: string,
+    params: { page?: number; limit?: number } = {},
+  ) {
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     return this.prisma.notification.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 

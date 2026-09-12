@@ -20,6 +20,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { EscrowService } from './escrow.service';
 import { AdActivationHook } from './ad-activation.hook';
 import { toRaw, round2, fromRaw } from './money.util';
+import { clampLimit, clampPage } from '../common/dto/pagination.dto';
 
 /** Финальные статусы оплаты, которые понимает фронт (CheckoutPage: isFinal). */
 const FINAL_PAYMENT_STATUSES = ['CONFIRMED', 'SWEPT'];
@@ -1031,8 +1032,9 @@ export class PaymentsService {
     page?: number;
     limit?: number;
   }) {
-    const page = filters?.page || 1;
-    const limit = filters?.limit || 20;
+    // L1: потолок limit — раньше `?limit=100000` отдавал всю таблицу транзакций.
+    const page = clampPage(filters?.page, 1);
+    const limit = clampLimit(filters?.limit, 20);
     const skip = (page - 1) * limit;
     const where: Prisma.TransactionWhereInput = {};
     if (filters?.type) {

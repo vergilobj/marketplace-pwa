@@ -14,11 +14,40 @@ const icons: Record<string, React.ReactNode> = {
   broadcast: <Bell size={13} className="text-[#34d399]" />,
 };
 
+/** N2: размер страницы. Держим равным серверному дефолту (PAGINATION_BULK_LIMIT). */
+const PAGE_SIZE = 100;
+
 export default function NotificationsPage() {
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  /** Пришло ровно PAGE_SIZE — значит, скорее всего, есть ещё. */
+  const [hasMore, setHasMore] = useState(false);
 
-  useEffect(() => { api.get('/notifications').then(r => setList(r.data||[])).finally(() => setLoading(false)); }, []);
+  useEffect(() => {
+    api.get('/notifications', { params: { page: 1, limit: PAGE_SIZE } })
+      .then(r => { const data = r.data || []; setList(data); setHasMore(data.length >= PAGE_SIZE); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const loadMore = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const next = page + 1;
+      const r = await api.get('/notifications', { params: { page: next, limit: PAGE_SIZE } });
+      const data: any[] = r.data || [];
+      setPage(next);
+      setHasMore(data.length >= PAGE_SIZE);
+      // дедуп по id — защита от сдвига страниц, если пришло новое уведомление
+      setList(p => {
+        const seen = new Set(p.map(n => n.id));
+        return [...p, ...data.filter(n => !seen.has(n.id))];
+      });
+    } catch { toast.error('Ошибка загрузки'); }
+    finally { setLoadingMore(false); }
+  };
 
   const readAll = async () => { try { await api.patch('/notifications/read-all'); setList(p => p.map(n=>({...n,isRead:true}))); toast.success('Всё прочитано'); } catch { toast.error('Ошибка'); } };
   const markRead = async (id:string) => { try { await api.patch(`/notifications/${id}/read`); setList(p => p.map(n=>n.id===id?{...n,isRead:true}:n)); } catch { /* ignore */ } };
@@ -67,6 +96,18 @@ export default function NotificationsPage() {
                 </div>
               </motion.div>
             ))}
+          </div>
+        )}
+
+        {list.length > 0 && hasMore && (
+          <div className="flex justify-center mt-6">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="px-6 py-2.5 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] text-sm font-bold text-[var(--color-text)] hover:border-[#22c55e]/60 transition-all disabled:opacity-50"
+            >
+              {loadingMore ? 'Загрузка…' : 'Показать ещё'}
+            </button>
           </div>
         )}
       </div>

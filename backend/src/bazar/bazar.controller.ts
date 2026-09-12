@@ -15,6 +15,13 @@ import { DealService } from './deal.service';
 import { AutopilotService } from './autopilot.service';
 import { ReputationService } from './reputation.service';
 import { SendBazarMessageDto } from './dto/send-bazar-message.dto';
+import {
+  DEAL_THREAD_DEFAULT_LIMIT,
+  DEAL_THREAD_MAX_LIMIT,
+  PAGINATION_BULK_LIMIT,
+  parseLimit,
+  parsePage,
+} from '../common/dto/pagination.dto';
 
 @Controller('bazar')
 @UseGuards(JwtAuthGuard)
@@ -50,24 +57,41 @@ export class BazarController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    // L1: parseLimit даёт 400 на мусор и кламп >100; дефолт 50 (как было).
     return this.bazarService.history(
       req.user.userId,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 50,
+      parsePage(page),
+      parseLimit(limit, 50),
     );
   }
 
   /** Список сделок (лиды) текущего юзера. */
   @Get('deals')
-  deals(@Req() req: AuthenticatedRequest, @Query('as') as?: string) {
+  deals(
+    @Req() req: AuthenticatedRequest,
+    @Query('as') as?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
     const role = as === 'seller' ? 'seller' : 'buyer';
-    return this.dealService.list(req.user.userId, role);
+    return this.dealService.list(req.user.userId, role, {
+      page: parsePage(page),
+      limit: parseLimit(limit, PAGINATION_BULK_LIMIT),
+    });
   }
 
   /** Тред сделки: Deal + сообщения. */
   @Get('deals/:id')
-  dealThread(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
-    return this.dealService.thread(id, req.user.userId);
+  dealThread(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.dealService.thread(id, req.user.userId, {
+      page: parsePage(page),
+      limit: parseLimit(limit, DEAL_THREAD_DEFAULT_LIMIT, DEAL_THREAD_MAX_LIMIT),
+    });
   }
 
   /** Ручная ретрансляция без LLM (fallback). */

@@ -5,6 +5,7 @@ import { BazarApiClient, BazarRef } from './bazar.api-client';
 import { CatalogSearchService } from './catalog-search.service';
 import { IntentDispatcher, type IntentAction } from './intent-dispatcher.service';
 import { AutopilotService } from './autopilot.service';
+import { clampLimit, clampPage } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class BazarService {
@@ -245,16 +246,19 @@ export class BazarService {
   }
 
   async history(userId: string, page = 1, limit = 50) {
+    // L1: потолок limit — раньше `?limit=100000` тянул всю переписку с базаром.
+    const p = clampPage(page, 1);
+    const l = clampLimit(limit, 50);
     const [items, total] = await Promise.all([
       this.prisma.bazarMessage.findMany({
         where: { userId },
         orderBy: { createdAt: 'asc' },
-        skip: (page - 1) * limit,
-        take: limit,
+        skip: (p - 1) * l,
+        take: l,
       }),
       this.prisma.bazarMessage.count({ where: { userId } }),
     ]);
-    return { items, total, page, pages: Math.ceil(total / limit) };
+    return { items, total, page: p, pages: Math.ceil(total / l) };
   }
 
   /** Фича 3: записать ViewEvent (открытие карточки товара). */

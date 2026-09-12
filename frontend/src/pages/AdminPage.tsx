@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import api from '../api/axios';
 import { getInvites, createInvite, deleteInvite } from '../api/invites';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Users, ShoppingBag, Newspaper, Wallet, TrendingUp, Download, Plus, Trash2, Copy, Check, Settings } from 'lucide-react';
+import { Users, ShoppingBag, Newspaper, Wallet, TrendingUp, Download, Plus, Trash2, Copy, Check, Settings, Loader2 } from 'lucide-react';
 import { formatPhone } from '../utils/phone';
 import { formatPrice } from "../utils/format";
 import { resolveMedia } from '../utils/media';
+import { mergeUniqueById } from '../utils/mergeUnique';
 import type {
   ApiAdminDashboard,
   ApiInvite,
@@ -36,6 +37,17 @@ const tabs = [
 /** Post в админке приходит с relation author — берём это из ApiPost. */
 type AdminPost = ApiPost & { author?: { id: string; name?: string | null } | null };
 
+/**
+ * L2: размер страницы админских списков.
+ *
+ * Бэкенд отдаёт `page/pages` (кроме выводов и инвайтов — те массивы), потолок
+ * 100. Было: админка дёргала список БЕЗ параметров, то есть получала дефолт 20
+ * записей, и остального админ не видел вообще — пагинации в UI не было.
+ * Стало: постраничная догрузка кнопкой «Показать ещё» (для таблицы это проще и
+ * надёжнее infinite scroll).
+ */
+const ADMIN_PAGE_SIZE = 100;
+
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboard, setDashboard] = useState<ApiAdminDashboard | null>(null);
@@ -47,26 +59,117 @@ export default function AdminPage() {
   const [withdrawals, setWithdrawals] = useState<ApiWithdrawal[]>([]);
   const [settings, setSettings] = useState<ApiSettings>({});
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [search, setSearch] = useState('');
   const [copied, setCopied] = useState('');
 
   useEffect(() => { api.get<ApiAdminDashboard>('/admin/dashboard').then(r => setDashboard(r.data)).catch(() => {}); }, []);
 
-  useEffect(() => {
-    const q = search ? `?search=${search}` : '';
-    switch (activeTab) {
-      case 'users': api.get<{ items: ApiUser[] }>(`/users${q}`).then(r => setUsers(r.data.items || [])).finally(() => setLoading(false)); break;
-      case 'products': api.get<{ items: ApiProduct[] }>(`/products/admin/list${q}`).then(r => setProducts(r.data.items || [])).finally(() => setLoading(false)); break;
-      case 'posts': api.get<{ items: AdminPost[] }>(`/posts/admin/list${q}`).then(r => setPosts(r.data.items || [])).finally(() => setLoading(false)); break;
-      case 'invites': getInvites().then(setInvites).finally(() => setLoading(false)); break;
-      case 'transactions': api.get<{ items: ApiTransaction[] }>(`/payments/transactions`).then(r => setTransactions(r.data.items || [])).finally(() => setLoading(false)); break;
-      case 'withdrawals': api.get<ApiWithdrawal[]>('/users/admin/withdrawals').then(r => setWithdrawals(r.data || [])).finally(() => setLoading(false)); break;
-      case 'settings': api.get<ApiSettings>('/settings').then(r => setSettings(r.data || {})).finally(() => setLoading(false)); break;
-      default: queueMicrotask(() => setLoading(false));
+  /**
+   * Загрузка страницы активной вкладки.
+   *
+   * `reset=true` — смена вкладки/поиска: список заменяется и нумеруется заново.
+   * `reset=false` — «Показать ещё»: страница добавляется к уже показанному.
+   * Ответы бывают двух форм: `{ items, total, page, pages }` (юзеры, товары,
+   * посты, транзакции) и просто массив (выводы, инвайты) — обрабатываем обе.
+   */
+  const loadTab = async (tab: string, pageNum: number, q: string, reset: boolean) => {
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
+
+    const qs = new URLSearchParams();
+    if (q) qs.set('search', q);
+    qs.set('page', String(pageNum));
+    qs.set('limit', String(ADMIN_PAGE_SIZE));
+    const suffix = `?${qs.toString()}`;
+
+    const apply = <T extends { id: string }>(rows: T[], pages: number | null, setter: Dispatch<SetStateAction<T[]>>) => {
+      if (reset) setter(rows);
+      else setter((prev) => mergeUniqueById(prev, rows));
+      setPage(pageNum + 1);
+      // pages известен только у «страничных» ответов; у массивов — эвристика
+      // по длине страницы (полная страница ⇒ возможно есть следующая).
+      setHasMore(pages !== null ? pageNum < pages : rows.length === ADMIN_PAGE_SIZE);
+    };
+
+    try {
+      switch (tab) {
+        case 'users': {
+          const r = await api.get<{ items: ApiUser[]; pages?: number }>(`/users${suffix}`);
+          apply(r.data.items || [], r.data.pages ?? null, (v) => setUsers(v));
+          break;
+        }
+        case 'products': {
+          const r = await api.get<{ items: ApiProduct[]; pages?: number }>(`/products/admin/list${suffix}`);
+          apply(r.data.items || [], r.data.pages ?? null, (v) => setProducts(v));
+          break;
+        }
+        case 'posts': {
+          const r = await api.get<{ items: AdminPost[]; pages?: number }>(`/posts/admin/list${suffix}`);
+          apply(r.data.items || [], r.data.pages ?? null, (v) => setPosts(v));
+          break;
+        }
+        case 'transactions': {
+          const r = await api.get<{ items: ApiTransaction[]; pages?: number }>(`/payments/transactions${suffix}`);
+          apply(r.data.items || [], r.data.pages ?? null, (v) => setTransactions(v));
+          break;
+        }
+        case 'withdrawals': {
+          const r = await api.get<ApiWithdrawal[]>(`/users/admin/withdrawals${suffix}`);
+          apply(Array.isArray(r.data) ? r.data : [], null, (v) => setWithdrawals(v));
+          break;
+        }
+        case 'invites': {
+          const r = await getInvites({ page: pageNum, limit: ADMIN_PAGE_SIZE });
+          const rows = Array.isArray(r) ? r : [];
+          // У инвайта нет поля id — ключ это `code`, и он же уникален.
+          if (reset) setInvites(rows);
+          else setInvites(prev => {
+            const seen = new Set(prev.map(i => i.code));
+            return [...prev, ...rows.filter(i => !seen.has(i.code))];
+          });
+          setPage(pageNum + 1);
+          setHasMore(rows.length === ADMIN_PAGE_SIZE);
+          break;
+        }
+        case 'settings': {
+          const r = await api.get<ApiSettings>('/settings');
+          setSettings(r.data || {});
+          setHasMore(false);
+          break;
+        }
+        default:
+          setHasMore(false);
+      }
+    } catch {
+      if (reset) toast.error('Не удалось загрузить список');
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'dashboard') return;
+    // Пагинация и загрузка — внутри async IIFE: синхронный setState в теле
+    // эффекта (setLoading внутри loadTab) давал каскадный рендер на каждый вход.
+    (async () => {
+      setPage(1);
+      await loadTab(activeTab, 1, search, true);
+    })();
+    // loadTab намеренно не в зависимостях: функция пересоздаётся каждый рендер,
+    // а эффект должен срабатывать только на смену вкладки/поиска.
   }, [activeTab, search]);
 
-  const handleCreateInvite = async () => { try { const r = await createInvite(); setInvites(prev => [...prev, r]); toast.success('Инвайт создан'); } catch { toast.error('Ошибка'); } };
+  const handleLoadMore = () => {
+    if (loading || loadingMore) return;
+    void loadTab(activeTab, page, search, false);
+  };
+
+  const handleCreateInvite = async () => { try { const r = await createInvite(); setInvites(prev => [r, ...prev]); toast.success('Инвайт создан'); } catch { toast.error('Ошибка'); } };
   const handleDeleteInvite = async (code: string) => { try { await deleteInvite(code); setInvites(prev => prev.filter(i => i.code !== code)); toast.success('Удалён'); } catch { toast.error('Ошибка'); } };
   const handleCopyInvite = (code: string) => { navigator.clipboard.writeText(code); setCopied(code); toast.success('Скопировано!'); setTimeout(() => setCopied(''), 2000); };
   const handleChangeRole = async (userId: string, role: UserRole) => { try { await api.patch(`/users/${userId}/role`, { role }); setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u)); toast.success('Роль изменена'); } catch { toast.error('Ошибка'); } };
@@ -243,6 +346,32 @@ export default function AdminPage() {
     }
   };
 
+  /**
+   * L2: «Показать ещё» под таблицей активной вкладки.
+   *
+   * `hasMore` бэкенд отдаёт явно (`page < pages`) для юзеров/товаров/постов/
+   * транзакций; для выводов и инвайтов (ответ — массив) — эвристика по длине
+   * страницы. Настройки и дашборд не пагинируются.
+   */
+  const renderLoadMore = () => {
+    if (activeTab === 'dashboard' || activeTab === 'settings') return null;
+    return (
+      <div className="mt-4 flex flex-col items-center gap-2">
+        {loadingMore && <Loader2 size={20} className="animate-spin text-[#22c55e]" />}
+        {!loadingMore && hasMore && (
+          <button
+            type="button"
+            onClick={handleLoadMore}
+            className="px-5 min-h-[44px] rounded-full bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm font-semibold hover:border-[#22c55e]/40 transition-all"
+          >
+            Показать ещё
+          </button>
+        )}
+        {!loadingMore && !hasMore && <span className="text-[var(--color-faint)] text-xs">Всё показали</span>}
+      </div>
+    );
+  };
+
   return (
     <div className="relative min-h-screen overflow-x-hidden">
       <div className="fixed inset-0 pointer-events-none" style={{
@@ -267,7 +396,10 @@ export default function AdminPage() {
         {loading ? (
           <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}</div>
         ) : (
-          renderContent()
+          <>
+            {renderContent()}
+            {renderLoadMore()}
+          </>
         )}
       </div>
     </div>

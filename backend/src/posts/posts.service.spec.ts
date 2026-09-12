@@ -35,6 +35,7 @@ describe('PostsService', () => {
       findMany: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       delete: jest.fn(),
       count: jest.fn(),
     },
@@ -285,6 +286,59 @@ describe('PostsService', () => {
         title: 'Edited',
       });
       expect(result.title).toBe('Edited');
+    });
+  });
+
+  /**
+   * B1: просроченная реклама — снятие `isPinned`.
+   *
+   * Мёртвый флаг: срок `adExpireDate` истёк, а `isPinned` остался. Проверяем
+   * и сам метод (какие посты он трогает и чем), и идемпотентность, и что крон
+   * не роняет процесс при ошибке БД.
+   */
+  describe('deactivateExpiredAds (B1)', () => {
+    it('снимает isPinned только с ПРОСРОЧЕННОЙ рекламы (фильтр isAd+isPinned+adExpireDate<now)', async () => {
+      mockPrisma.post.updateMany.mockResolvedValue({ count: 6 });
+
+      const count = await service.deactivateExpiredAds();
+
+      expect(count).toBe(6);
+      // Фильтр: не «все посты», а именно просроченная активная реклама.
+      expect(mockPrisma.post.updateMany).toHaveBeenCalledTimes(1);
+      const call = mockPrisma.post.updateMany.mock.calls[0][0];
+      expect(call.where.isAd).toBe(true);
+      expect(call.where.isPinned).toBe(true);
+      expect(call.where.adExpireDate.lt).toBeInstanceOf(Date);
+      // lt(now), а не lte: ровно в момент истечения реклама ещё активна.
+      expect(call.where.adExpireDate.lt.getTime()).toBeLessThanOrEqual(
+        Date.now(),
+      );
+      // Только снимаем флаг — пост не удаляем и не скрываем.
+      expect(call.data).toEqual({ isPinned: false });
+      expect(mockPrisma.post.delete).not.toHaveBeenCalled();
+    });
+
+    it('идемпотентен: повторный прогон возвращает 0 (просроченных+запиненных нет)', async () => {
+      mockPrisma.post.updateMany.mockResolvedValue({ count: 6 });
+      await service.deactivateExpiredAds();
+      mockPrisma.post.updateMany.mockResolvedValue({ count: 0 });
+
+      const second = await service.deactivateExpiredAds();
+
+      expect(second).toBe(0);
+      expect(mockPrisma.post.updateMany).toHaveBeenCalledTimes(2);
+    });
+
+    it('крон возвращает счётчик и не бросает при ошибке БД', async () => {
+      mockPrisma.post.updateMany.mockResolvedValue({ count: 3 });
+      await expect(service.expireAdsCron()).resolves.toEqual({
+        deactivated: 3,
+      });
+
+      mockPrisma.post.updateMany.mockRejectedValue(new Error('db down'));
+      await expect(service.expireAdsCron()).resolves.toEqual({
+        deactivated: 0,
+      });
     });
   });
 });

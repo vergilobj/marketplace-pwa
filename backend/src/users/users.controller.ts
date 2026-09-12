@@ -19,6 +19,7 @@ import { Roles } from '../auth/roles.decorator';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserRole } from '@prisma/client';
+import { parseLimit, parsePage, PAGINATION_BULK_LIMIT } from '../common/dto/pagination.dto';
 
 @Controller('users')
 export class UsersController {
@@ -49,8 +50,16 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Get('seller-requests')
-  async getSellerRequests(@Query('status') status?: string) {
-    return this.usersService.getSellerRequests(status);
+  async getSellerRequests(
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    // L1: потолок limit. Форма ответа — массив (админка читает список).
+    return this.usersService.getSellerRequests(status, {
+      page: parsePage(page),
+      limit: parseLimit(limit, PAGINATION_BULK_LIMIT),
+    });
   }
 
   /** A4: одобрить/отклонить заявку. approve=false → роль не меняется. */
@@ -131,8 +140,16 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me/referrals')
-  async getMyReferrals(@Request() req: AuthenticatedRequest) {
-    return this.usersService.getReferrals(req.user.userId);
+  async getMyReferrals(
+    @Request() req: AuthenticatedRequest,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    // L1: потолок limit. Ответ — массив (ReferralsPage: Array.isArray).
+    return this.usersService.getReferrals(req.user.userId, {
+      page: parsePage(page),
+      limit: parseLimit(limit, PAGINATION_BULK_LIMIT),
+    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -189,15 +206,30 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me/withdrawals')
-  async getMyWithdrawals(@Request() req: AuthenticatedRequest) {
-    return this.usersService.getMyWithdrawalRequests(req.user.userId);
+  async getMyWithdrawals(
+    @Request() req: AuthenticatedRequest,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    // L1: потолок limit. Ответ — массив (WithdrawalsPage).
+    return this.usersService.getMyWithdrawalRequests(req.user.userId, {
+      page: parsePage(page),
+      limit: parseLimit(limit, PAGINATION_BULK_LIMIT),
+    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Get('admin/withdrawals')
-  async getAllWithdrawals() {
-    return this.usersService.getAllWithdrawalRequests();
+  async getAllWithdrawals(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    // L1: потолок limit. Ответ — массив (AdminPage).
+    return this.usersService.getAllWithdrawalRequests({
+      page: parsePage(page),
+      limit: parseLimit(limit, PAGINATION_BULK_LIMIT),
+    });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -12,11 +12,31 @@ import { buildGallery } from '../utils/video';
 import toast from 'react-hot-toast';
 import { errorMessage } from '../utils/error';
 
+/**
+ * L2: размер страницы комментариев.
+ *
+ * Было: `getComments(postId)` без параметров — бэкенд отдавал ВСЕ комментарии
+ * поста (после L1 это дефолт 100 с потолком 100, но фронт об этом не знал и
+ * никак не показывал, что список обрезан). Стало: страница по 100 (потолок
+ * бэкенда) + «Показать ещё» и счётчик `post.commentCount` в заголовке, чтобы
+ * было видно реальное количество.
+ */
+const COMMENTS_PAGE_SIZE = 100;
+
 export default function PostDetailPage() {
   const { id } = useParams(); const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
   const [post, setPost] = useState<any>(null);
   const [comments, setComments] = useState<any[]>([]);
+  // L2: точный счётчик комментариев приходит в самом посте (`commentCount`),
+  // поэтому список можно грузить страницами, не теряя «сколько всего».
+  const [commentsTotal, setCommentsTotal] = useState<number | null>(null);
+  const [commentsLoadingMore, setCommentsLoadingMore] = useState(false);
+  const [hasMoreComments, setHasMoreComments] = useState(false);
+  // Сколько серверных комментариев уже загружено (без оптимистичных вставок) —
+  // это номер следующей страницы. Ref, а не state: значение нужно в обработчике
+  // клика, и его обновление не должно вызывать ререндер.
+  const loadedPagesRef = useRef(1);
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [liked, setLiked] = useState(false); const [likes, setLikes] = useState(0);
@@ -39,11 +59,49 @@ export default function PostDetailPage() {
   const sendingRef = useRef(false);
 
   useEffect(() => {
-    Promise.all([api.get(`/posts/${id}`).then(r => r.data), getComments(id!)])
-      .then(([p, c]) => { setPost(p); setComments(c); setLiked(p.likedByMe || false); setLikes(p.likeCount || 0); })
+    Promise.all([
+      api.get(`/posts/${id}`).then(r => r.data),
+      getComments(id!, { page: 1, limit: COMMENTS_PAGE_SIZE }),
+    ])
+      .then(([p, c]) => {
+        setPost(p);
+        const rows = Array.isArray(c) ? c : [];
+        setComments(rows);
+        setLiked(p.likedByMe || false);
+        setLikes(p.likeCount || 0);
+        // L2: точный счётчик — из поста; если бэкенд его не отдал, показываем
+        // длину загруженной страницы (и «показать ещё» выключим по эвристике).
+        setCommentsTotal(typeof p.commentCount === 'number' ? p.commentCount : rows.length);
+        setHasMoreComments(rows.length === COMMENTS_PAGE_SIZE);
+        loadedPagesRef.current = 1;
+      })
       .catch(() => setPost(null))
       .finally(() => setLoading(false));
   }, [id]);
+
+  /**
+   * L2: следующая страница комментариев.
+   *
+   * Оптимистичные (`_pending`) комментарии не считаются при нумерации страниц —
+   * они не пришли с сервера, но лежат в том же массиве. Поэтому счётчик страниц
+   * живёт в `loadedPagesRef`, а не выводится из `comments.length`.
+   */
+  const loadMoreComments = async () => {
+    if (!id || commentsLoadingMore || !hasMoreComments) return;
+    setCommentsLoadingMore(true);
+    const nextPage = loadedPagesRef.current + 1;
+    try {
+      const rows = await getComments(id, { page: nextPage, limit: COMMENTS_PAGE_SIZE });
+      const list = Array.isArray(rows) ? rows : [];
+      setComments(prev => [...prev, ...list.filter(c => !prev.some(x => x.id === c.id))]);
+      loadedPagesRef.current = nextPage;
+      setHasMoreComments(list.length === COMMENTS_PAGE_SIZE);
+    } catch (e) {
+      toast.error(errorMessage(e, 'Не удалось догрузить комментарии'));
+    } finally {
+      setCommentsLoadingMore(false);
+    }
+  };
 
   const handleLike = async () => { try { if (liked) { await unlikePost(id!); setLikes((c:number)=>c-1); } else { await likePost(id!); setLikes((c:number)=>c+1); } setLiked(!liked); } catch { /* ignore */ } };
 
@@ -84,6 +142,7 @@ export default function PostDetailPage() {
     try {
       const created = await addComment(id!, text);
       setComments(prev => prev.map(c => (c.id === tempId ? created : c)));
+      setCommentsTotal(t => (t ?? 0) + 1);
       toast.success('Комментарий отправлен');
     } catch (e) {
       setComments(prev => prev.filter(c => c.id !== tempId));
@@ -114,6 +173,7 @@ export default function PostDetailPage() {
     setComments(prev => prev.filter(c => c.id !== cid));
     try {
       await deleteComment(cid);
+      setCommentsTotal(t => (t === null ? t : Math.max(t - 1, 0)));
       toast.success('Комментарий удалён');
     } catch (e) {
       setComments(prev => {
@@ -260,13 +320,13 @@ export default function PostDetailPage() {
 
             <div className="flex items-center gap-2 mt-2.5">
               <button onClick={handleLike} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${liked?'text-[#22c55e] bg-[rgba(34,197,94,0.1)]':'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)]'}`}><Heart size={14} fill={liked?'currentColor':'none'}/>{likes>0&&likes}</button>
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] transition-colors"><MessageCircle size={14} />{comments.length}</div>
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] transition-colors"><MessageCircle size={14} />{commentsTotal ?? comments.length}</div>
             </div>
           </div>
         </motion.div>
 
         <div className="mt-8">
-          <h3 className="text-base font-extrabold text-[var(--color-text)] mb-4">Свои пишут ({comments.length})</h3>
+          <h3 className="text-base font-extrabold text-[var(--color-text)] mb-4">Свои пишут ({commentsTotal ?? comments.length})</h3>
           <div className="space-y-2 mb-6">
             {comments.map((c,i)=>(
               <motion.div key={c.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:i*0.02}} className={`rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 transition-opacity ${c._pending || deletingIds.includes(c.id) ? 'opacity-60' : ''}`}>
@@ -297,6 +357,20 @@ export default function PostDetailPage() {
             ))}
             {comments.length === 0 && (
               <p className="text-xs text-[var(--color-muted)] py-4">Пока тихо. Будь первым.</p>
+            )}
+            {/* L2: догрузка страницы комментариев (по 100) */}
+            {hasMoreComments && (
+              <div className="flex justify-center pt-1">
+                <button
+                  type="button"
+                  onClick={loadMoreComments}
+                  disabled={commentsLoadingMore}
+                  className="inline-flex items-center gap-2 px-4 min-h-[44px] rounded-full bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-xs font-semibold hover:border-[#22c55e]/40 disabled:opacity-50 transition-all"
+                >
+                  {commentsLoadingMore && <Loader2 size={13} className="animate-spin" />}
+                  Показать ещё
+                </button>
+              </div>
             )}
           </div>
           <div className="flex gap-2">

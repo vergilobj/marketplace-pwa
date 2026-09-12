@@ -8,10 +8,16 @@ import {
   Body,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.interface';
 import { SocialService } from './social.service';
+import {
+  PAGINATION_BULK_LIMIT,
+  parseLimit,
+  parsePage,
+} from '../common/dto/pagination.dto';
 
 @Controller('social')
 export class SocialController {
@@ -36,8 +42,15 @@ export class SocialController {
   }
 
   @Get(':postId/likes')
-  async getLikes(@Param('postId') postId: string) {
-    return this.socialService.getLikes(postId);
+  async getLikes(
+    @Param('postId') postId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.socialService.getLikes(postId, {
+      page: parsePage(page),
+      limit: parseLimit(limit, PAGINATION_BULK_LIMIT),
+    });
   }
 
   @UseGuards(JwtAuthGuard)
@@ -51,8 +64,15 @@ export class SocialController {
   }
 
   @Get(':postId/comments')
-  async getComments(@Param('postId') postId: string) {
-    return this.socialService.getComments(postId);
+  async getComments(
+    @Param('postId') postId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.socialService.getComments(postId, {
+      page: parsePage(page),
+      limit: parseLimit(limit, PAGINATION_BULK_LIMIT),
+    });
   }
 
   @UseGuards(JwtAuthGuard)

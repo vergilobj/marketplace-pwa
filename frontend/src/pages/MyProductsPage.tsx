@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import api from '../api/axios';
 import { useNavigate } from 'react-router-dom';
@@ -6,6 +6,7 @@ import { Package, Plus, EyeOff, Eye, Megaphone, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatPrice } from '../utils/format';
 import { resolveMedia } from '../utils/media';
+import { mergeUniqueById } from '../utils/mergeUnique';
 
 /**
  * A5: «Мои товары».
@@ -18,6 +19,18 @@ import { resolveMedia } from '../utils/media';
  *    видеть, а не гадать, почему её нет.
  *  - п.5: в интерфейсе создания больше нет поля видео-ссылки (это A2), здесь
  *    только карточки.
+ *
+ * L2: infinite scroll.
+ * Было — один `GET /products/my` без параметров (после L1 это дефолт 100), то
+ * есть у продавца с 300 позициями дальше 100 товаров не открывалось вообще.
+ * Стало — страницы через IntersectionObserver, паттерн скопирован с
+ * `ProductsPage` (`rootMargin: 200px`, PAGE_SIZE, mergeUniqueById), плюс
+ * «Показать ещё» — на случай, если наблюдатель не сработает.
+ *
+ * ⚠️ `/products/my` отдаёт МАССИВ (форма ответа сохранена L1), без total/pages.
+ * Поэтому «есть ещё» = пришла ПОЛНАЯ страница. PAGE_SIZE = 100 — совпадает с
+ * дефолтом/потолком бэкенда, так что первая страница отдаёт ровно то, что
+ * раньше приходило целиком, и ничего не теряется.
  */
 
 type MyProduct = {
@@ -30,26 +43,81 @@ type MyProduct = {
   videoUrl?: string | null;
 };
 
+const PAGE_SIZE = 100;
+
 export default function MyProductsPage() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<MyProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
   const [busyIds, setBusyIds] = useState<string[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const loaderRef = useRef<HTMLDivElement>(null);
 
+  const loadProducts = useCallback(async (pageNum: number) => {
+    setLoadingMore(true);
+    try {
+      const res = await api.get<MyProduct[]>('/products/my', {
+        params: { page: pageNum, limit: PAGE_SIZE },
+      });
+      const items = Array.isArray(res.data) ? res.data : [];
+      setProducts((prev) => (pageNum === 1 ? items : mergeUniqueById(prev, items)));
+      setHasMore(items.length === PAGE_SIZE);
+      setPage(pageNum + 1);
+    } catch {
+      if (pageNum === 1) setProducts([]);
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, []);
+
+  // Первая страница — запрос уходит из эффекта, setState живёт в .then/.finally.
   useEffect(() => {
+    let cancelled = false;
     api
-      .get<MyProduct[]>('/products/my')
-      .then((r) => setProducts(r.data || []))
-      .catch(() => setProducts([]))
-      .finally(() => setLoading(false));
+      .get<MyProduct[]>('/products/my', { params: { page: 1, limit: PAGE_SIZE } })
+      .then((r) => {
+        if (cancelled) return;
+        const items = Array.isArray(r.data) ? r.data : [];
+        setProducts(items);
+        setHasMore(items.length === PAGE_SIZE);
+        setPage(2);
+      })
+      .catch(() => {
+        if (!cancelled) setProducts([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     // Свой id — из профиля: клик по шапке ведёт на публичную страницу.
     api
       .get<{ id: string }>('/users/me')
       .then((r) => setUserId(r.data?.id ?? null))
       .catch(() => setUserId(null));
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    const el = loaderRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !loading && !loadingMore && hasMore) {
+          loadProducts(page);
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [loading, loadingMore, hasMore, page, loadProducts]);
 
   const toggle = async (id: string) => {
     if (busyIds.includes(id)) return;
@@ -187,6 +255,23 @@ export default function MyProductsPage() {
               </motion.div>
             );
           })}
+        </div>
+      )}
+
+      {/* L2: маячок infinite scroll + ручная кнопка (если наблюдатель не сработал) */}
+      {products.length > 0 && (
+        <div ref={loaderRef} className="py-10 flex flex-col items-center gap-3">
+          {loadingMore && <Loader2 size={22} className="animate-spin text-[#22c55e]" />}
+          {!loadingMore && hasMore && (
+            <button
+              type="button"
+              onClick={() => loadProducts(page)}
+              className="px-5 min-h-[44px] rounded-full bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm font-semibold hover:border-[#22c55e]/40 transition-all"
+            >
+              Показать ещё
+            </button>
+          )}
+          {!hasMore && <div className="text-[var(--color-faint)] text-xs">Всё показали</div>}
         </div>
       )}
     </div>

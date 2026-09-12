@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import api from '../api/axios';
-import { getBalance, getLedger, type BalanceResponse, type LedgerEntryItem } from '../api/users';
-import { Download, Clock, CheckCircle2, XCircle, Wallet, History } from 'lucide-react';
+import { getBalance, getLedger, getMyWithdrawals, type BalanceResponse, type LedgerEntryItem } from '../api/users';
+import { Download, Clock, CheckCircle2, XCircle, Wallet, History, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { formatPrice } from '../utils/format';
@@ -23,6 +23,21 @@ const accountLabel: Record<string, string> = {
   PLATFORM: 'Платформа',
 };
 
+/**
+ * L2: размер страницы в списках страницы выводов.
+ *
+ * `/users/me/withdrawals` принимает page/limit (потолок 100) и отдаёт МАССИВ.
+ * Было: один запрос без параметров (после L1 — дефолт 100) без возможности
+ * увидеть остальное. Стало: постраничная догрузка. Лимит вывода считается по
+ * pending-заявкам, поэтому важно, что первая страница — та же сотня, что и
+ * раньше; для точности суммы сервер всё равно проверяет баланс при создании
+ * заявки (это не единственная защита, §5.2).
+ *
+ * Журнал операций (`/users/me/ledger`) уже курсорный — догружаем по nextCursor.
+ */
+const WITHDRAWALS_PAGE_SIZE = 100;
+const LEDGER_PAGE_SIZE = 20;
+
 export default function WithdrawalsPage() {
   const [list, setList] = useState<ApiWithdrawal[]>([]);
   const [balances, setBalances] = useState<BalanceResponse | null>(null);
@@ -31,20 +46,67 @@ export default function WithdrawalsPage() {
   const [amount, setAmount] = useState('');
   const [wallet, setWallet] = useState('');
   const [req, setReq] = useState(false);
+  // L2: постраничная догрузка обоих списков.
+  const [listHasMore, setListHasMore] = useState(false);
+  const [listLoadingMore, setListLoadingMore] = useState(false);
+  const [ledgerCursor, setLedgerCursor] = useState<string | null>(null);
+  const [ledgerLoadingMore, setLedgerLoadingMore] = useState(false);
 
   const fetch = async () => {
     try {
       const [w, b, l] = await Promise.all([
-        api.get<ApiWithdrawal[]>('/users/me/withdrawals'),
+        getMyWithdrawals({ page: 1, limit: WITHDRAWALS_PAGE_SIZE }),
         getBalance(),
-        getLedger({ limit: 20 }).catch(() => ({ items: [], nextCursor: null })),
+        getLedger({ limit: LEDGER_PAGE_SIZE }).catch(() => ({ items: [], nextCursor: null })),
       ]);
-      setList(w.data || []);
+      const rows = Array.isArray(w) ? w : [];
+      setList(rows);
+      setListHasMore(rows.length === WITHDRAWALS_PAGE_SIZE);
       setBalances(b);
       setLedger(l.items || []);
+      setLedgerCursor(l.nextCursor ?? null);
     } finally { setLoading(false); }
   };
   useEffect(() => { fetch(); }, []);
+
+  /** L2: следующая страница заявок (форма ответа — массив). */
+  const loadMoreWithdrawals = async () => {
+    if (listLoadingMore || !listHasMore) return;
+    setListLoadingMore(true);
+    try {
+      const nextPage = Math.floor(list.length / WITHDRAWALS_PAGE_SIZE) + 1;
+      const rows = await getMyWithdrawals({ page: nextPage, limit: WITHDRAWALS_PAGE_SIZE });
+      const page = Array.isArray(rows) ? rows : [];
+      setList(prev => {
+        const seen = new Set(prev.map(w => w.id));
+        return [...prev, ...page.filter(w => !seen.has(w.id))];
+      });
+      setListHasMore(page.length === WITHDRAWALS_PAGE_SIZE);
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось догрузить заявки'));
+    } finally {
+      setListLoadingMore(false);
+    }
+  };
+
+  /** L2: следующая страница журнала операций (курсор из ответа). */
+  const loadMoreLedger = async () => {
+    if (ledgerLoadingMore || !ledgerCursor) return;
+    setLedgerLoadingMore(true);
+    try {
+      const res = await getLedger({ limit: LEDGER_PAGE_SIZE, cursor: ledgerCursor });
+      const items = res.items || [];
+      setLedger(prev => {
+        const seen = new Set(prev.map(e => e.id));
+        return [...prev, ...items.filter(e => !seen.has(e.id))];
+      });
+      setLedgerCursor(res.nextCursor ?? null);
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось догрузить операции'));
+    } finally {
+      setLedgerLoadingMore(false);
+    }
+  };
 
   // §5.2: вывод ограничен totalWithdrawable за вычетом уже поданных заявок.
   const pendingSum = list
@@ -133,6 +195,20 @@ export default function WithdrawalsPage() {
                 </motion.div>
               );
             })}
+            {/* L2: заявок больше одной страницы */}
+            {listHasMore && (
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={loadMoreWithdrawals}
+                  disabled={listLoadingMore}
+                  className="inline-flex items-center gap-2 px-5 min-h-[44px] rounded-full bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm font-semibold hover:border-[#22c55e]/40 disabled:opacity-50 transition-all"
+                >
+                  {listLoadingMore && <Loader2 size={14} className="animate-spin" />}
+                  Показать ещё
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -152,6 +228,20 @@ export default function WithdrawalsPage() {
                 </motion.div>
               ))}
             </div>
+            {/* L2: журнал операций догружается по курсору */}
+            {ledgerCursor && (
+              <div className="flex justify-center pt-3">
+                <button
+                  type="button"
+                  onClick={loadMoreLedger}
+                  disabled={ledgerLoadingMore}
+                  className="inline-flex items-center gap-2 px-5 min-h-[44px] rounded-full bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm font-semibold hover:border-[#22c55e]/40 disabled:opacity-50 transition-all"
+                >
+                  {ledgerLoadingMore && <Loader2 size={14} className="animate-spin" />}
+                  Показать ещё
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

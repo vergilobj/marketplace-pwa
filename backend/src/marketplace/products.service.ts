@@ -11,6 +11,11 @@ import { AuditService } from '../common/audit/audit.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ModerationService } from '../moderation/moderation.service';
+import {
+  PAGINATION_BULK_LIMIT,
+  clampLimit,
+  clampPage,
+} from '../common/dto/pagination.dto';
 
 @Injectable()
 export class ProductsService {
@@ -71,8 +76,10 @@ export class ProductsService {
     onlyActive?: boolean;
     search?: string;
   }) {
-    const page = params.page || 1;
-    const limit = params.limit || 20;
+    // L1: жёсткий потолок limit (сервисный кламп — вторая линия защиты после
+    // контроллера). Без него `?limit=100000` отдавал всю базу одним ответом.
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, 20);
     const skip = (page - 1) * limit;
     const onlyActive = params.onlyActive !== false;
 
@@ -149,6 +156,23 @@ export class ProductsService {
     if (product.sellerId !== sellerId) {
       throw new ForbiddenException('Редактировать можно только свои товары');
     }
+
+    // M1: модерация на РЕДАКТИРОВАНИИ. Обход был: создать чистый товар →
+    // PATCH-ем вписать телефон/ссылку в title/description.
+    // Модерируем ИТОГОВЫЙ текст (merge dto + текущий товар): правка только
+    // заголовка не должна оставлять старое описание вне проверки.
+    // entityType тот же, что на создании ('product').
+    const moderation = await this.moderationService.moderate({
+      text: [dto.title ?? product.title, dto.description ?? product.description]
+        .filter(Boolean)
+        .join('\n'),
+      entityType: 'product',
+      userId: sellerId,
+    });
+    if (moderation.verdict === 'block') {
+      throw new BadRequestException(moderation.reason);
+    }
+
     const updated = await this.prisma.product.update({ where: { id }, data: dto });
     await this.auditService.log({
       userId: sellerId,
@@ -184,8 +208,8 @@ export class ProductsService {
     search?: string;
     status?: string;
   }) {
-    const page = params.page || 1;
-    const limit = params.limit || 20;
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, 20);
     const skip = (page - 1) * limit;
     const where: Prisma.ProductWhereInput = {};
     if (params.search) {
@@ -254,10 +278,24 @@ export class ProductsService {
     });
   }
 
-  async findBySeller(sellerId: string) {
+  /**
+   * L1: «мои товары». Раньше `findMany` без `take` — активный продавец с
+   * сотнями позиций отдавал всё одним ответом.
+   *
+   * ⚠️ Совместимость: фронт (`MyProductsPage`) читает ответ КАК МАССИВ
+   * (`r.data || []`), infinite scroll тут нет. Поэтому форму ответа НЕ меняем —
+   * это по-прежнему массив, просто ограниченный по длине. Дефолт 100: у
+   * обычного продавца товаров меньше, а если больше — данные не теряются
+   * навсегда, их доберёт страница пагинации (`page`), которую можно передать.
+   */
+  async findBySeller(sellerId: string, params: { page?: number; limit?: number } = {}) {
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     return this.prisma.product.findMany({
       where: { sellerId },
       orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { clampLimit, clampPage } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class AdminService {
@@ -36,15 +37,19 @@ export class AdminService {
   }
 
   async getModerationLogs(page = 1, limit = 20) {
+    // L1: потолок limit (сервисный кламп). Раньше `?limit=100000` тянул весь
+    // журнал модерации.
+    const p = clampPage(page, 1);
+    const l = clampLimit(limit, 20);
     const [items, total] = await Promise.all([
       this.prisma.moderationLog.findMany({
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
+        skip: (p - 1) * l,
+        take: l,
       }),
       this.prisma.moderationLog.count(),
     ]);
-    return { items, total, page, pages: Math.ceil(total / limit) };
+    return { items, total, page: p, pages: Math.ceil(total / l) };
   }
 
   async getSellerStats() {

@@ -15,6 +15,11 @@ import { LedgerApplyResult } from '../payments/dto/ledger.dto';
 import { round2, toRaw } from '../payments/money.util';
 import { LedgerAccount, Prisma, UserRole } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  PAGINATION_BULK_LIMIT,
+  clampLimit,
+  clampPage,
+} from '../common/dto/pagination.dto';
 
 @Injectable()
 export class UsersService {
@@ -38,8 +43,8 @@ export class UsersService {
   }
 
   async findAll(params: { page?: number; limit?: number; search?: string }) {
-    const page = params.page || 1;
-    const limit = params.limit || 20;
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, 20);
     const skip = (page - 1) * limit;
     const where: Prisma.UserWhereInput = {};
     if (params.search) {
@@ -81,7 +86,17 @@ export class UsersService {
     return updated;
   }
 
-  async getReferrals(userId: string) {
+  /**
+   * L1: рефералы пользователя. Раньше `findMany` без `take`.
+   * ⚠️ Фронт (`ReferralsPage`) читает ответ как МАССИВ (`Array.isArray(r)`).
+   * Форму не меняем, только ограничиваем длину. Дефолт 100.
+   */
+  async getReferrals(
+    userId: string,
+    params: { page?: number; limit?: number } = {},
+  ) {
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     return this.prisma.order.findMany({
       where: { referralUserId: userId },
       include: {
@@ -89,6 +104,8 @@ export class UsersService {
         product: { select: { title: true } },
       },
       orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 
@@ -282,17 +299,42 @@ export class UsersService {
     });
   }
 
-  async getMyWithdrawalRequests(userId: string) {
+  /**
+   * L1: выводы пользователя. Раньше `findMany` без `take`.
+   * ⚠️ Фронт (`WithdrawalsPage`) читает ответ как МАССИВ и считает сумму
+   * pending по всему списку. Форму не меняем; дефолт 100 — заявок на вывод
+   * у одного юзера столько практически не бывает, а сумма pending считается
+   * по последним 100, что для лимита вывода безопасно.
+   */
+  async getMyWithdrawalRequests(
+    userId: string,
+    params: { page?: number; limit?: number } = {},
+  ) {
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     return this.prisma.withdrawalRequest.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 
-  async getAllWithdrawalRequests() {
+  /**
+   * L1: все выводы для админки. Раньше `findMany` без `take` — на большом
+   * количестве заявок админка тянула всю таблицу. Форму (массив) сохраняем.
+   * Дефолт 100.
+   */
+  async getAllWithdrawalRequests(
+    params: { page?: number; limit?: number } = {},
+  ) {
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     return this.prisma.withdrawalRequest.findMany({
       include: { user: { select: { id: true, name: true, phone: true } } },
       orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 
@@ -700,8 +742,17 @@ export class UsersService {
     return request;
   }
 
-  /** A4: список заявок для админки (опционально фильтр по статусу). */
-  async getSellerRequests(status?: string) {
+  /**
+   * A4: список заявок для админки (опционально фильтр по статусу).
+   * L1: раньше `findMany` без `take` — все заявки разом. Форму (массив)
+   * сохраняем: админка (`AdminPage`) читает ответ как список. Дефолт 100.
+   */
+  async getSellerRequests(
+    status?: string,
+    params: { page?: number; limit?: number } = {},
+  ) {
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     return this.prisma.sellerRequest.findMany({
       where: status ? { status } : undefined,
       include: {
@@ -710,6 +761,8 @@ export class UsersService {
         },
       },
       orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 

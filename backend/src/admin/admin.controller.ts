@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AdminService } from './admin.service';
+import { parseLimit, parsePage } from '../common/dto/pagination.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -21,8 +22,8 @@ export class AdminController {
     @Query('limit') limit?: string,
   ) {
     return this.adminService.getModerationLogs(
-      Number(page) || 1,
-      Number(limit) || 20,
+      parsePage(page),
+      parseLimit(limit),
     );
   }
 

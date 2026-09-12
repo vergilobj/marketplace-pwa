@@ -42,5 +42,11 @@ export type AdPostResponse = {
   order?: AdOrder | null;
 };
 
-export const createAd = (data: { title: string; content: string; link?: string; days: number }) =>
-  api.post<AdPostResponse>('/posts/ad', data).then(r => r.data);
+export const createAd = (data: {
+  title: string;
+  content: string;
+  link?: string;
+  days: number;
+  media?: string[];
+  videoUrl?: string;
+}) => api.post<AdPostResponse>('/posts/ad', data).then(r => r.data);

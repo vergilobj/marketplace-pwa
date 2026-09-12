@@ -9,6 +9,11 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ModerationService } from '../moderation/moderation.service';
+import {
+  PAGINATION_BULK_LIMIT,
+  clampLimit,
+  clampPage,
+} from '../common/dto/pagination.dto';
 
 @Injectable()
 export class SocialService {
@@ -49,10 +54,22 @@ export class SocialService {
     return { liked: false };
   }
 
-  async getLikes(postId: string) {
+  /**
+   * L1: лайки поста. Раньше `findMany` без `take` — пост-вирус отдавал все
+   * лайки разом.
+   *
+   * ⚠️ Совместимость: ответ читается фронтом как МАССИВ. Форму не меняем.
+   * Дефолт 100 — у обычного поста лайков меньше, UI ничего не теряет.
+   */
+  async getLikes(postId: string, params: { page?: number; limit?: number } = {}) {
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     return this.prisma.like.findMany({
       where: { postId },
       include: { user: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 
@@ -91,11 +108,24 @@ export class SocialService {
     return comment;
   }
 
-  async getComments(postId: string) {
+  /**
+   * L1: комментарии поста. Раньше `findMany` без `take` — пост-вирус отдавал
+   * все комментарии.
+   *
+   * ⚠️ Совместимость: фронт (`PostDetailPage`) читает ответ как МАССИВ и
+   * показывает `comments.length`, infinite scroll нет. Форму не меняем.
+   * Дефолт 100 (не 20!): 20 обрезало бы обсуждение в UI. Порядок — старые
+   * сверху, как было.
+   */
+  async getComments(postId: string, params: { page?: number; limit?: number } = {}) {
+    const page = clampPage(params.page, 1);
+    const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     return this.prisma.comment.findMany({
       where: { postId },
       orderBy: { createdAt: 'asc' },
       include: { user: { select: { id: true, name: true } } },
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 
@@ -112,6 +142,19 @@ export class SocialService {
     if (comment.userId !== userId && userRole !== 'ADMIN') {
       throw new ForbiddenException('Редактировать можно только свои комментарии');
     }
+
+    // M1: модерация на РЕДАКТИРОВАНИИ комментария. Обход был: написать
+    // чистый комментарий → PATCH-ем заменить текст на телефон/ссылку.
+    // entityType тот же, что в addComment ('comment').
+    const moderation = await this.moderationService.moderate({
+      text,
+      entityType: 'comment',
+      userId,
+    });
+    if (moderation.verdict === 'block') {
+      throw new BadRequestException(moderation.reason);
+    }
+
     const updated = await this.prisma.comment.update({
       where: { id: commentId },
       data: { text },

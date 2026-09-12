@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsInt, Min, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsInt, Min, IsOptional, IsArray } from 'class-validator';
 
 export class CreateAdDto {
   @IsString()
@@ -12,6 +12,14 @@ export class CreateAdDto {
   @IsOptional()
   @IsString()
   link?: string;
+
+  @IsOptional()
+  @IsArray()
+  media?: string[];
+
+  @IsOptional()
+  @IsString()
+  videoUrl?: string;
 
   @IsInt()
   @Min(1)

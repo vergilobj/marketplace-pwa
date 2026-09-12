@@ -4,10 +4,49 @@ import { Heart, ShoppingCart, Trash2, Plus, Minus } from 'lucide-react';
 import EmptyState from '../components/ui/EmptyState';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
-import { getProducts } from '../api/products';
+import { getProductById } from '../api/products';
 import { formatPrice } from "../utils/format";
 import { resolveMedia } from '../utils/media';
 import type { ApiProduct } from '../api/types';
+
+/**
+ * L2: избранное больше НЕ тянет каталог.
+ *
+ * Было: `getProducts({ limit: 2000 })` — две тысячи товаров одним запросом + фильтр
+ * на клиенте. Это ровно «тысячи айтемов одним запросом», плюс после L1 такой
+ * limit всё равно клампится до 100, и фильтр вернул бы только те избранные,
+ * которые случайно попали в первые 100 каталога (тихая потеря данных).
+ *
+ * Стало (вариант «б» из ТЗ): id избранного известны локально
+ * (`localStorage.favorites`), поэтому тянем РОВНО их через `GET /products/:id`,
+ * с ограничением параллелизма. `GET /products?ids=...` на бэке нет (L1 его не
+ * делал) — проверено по `products.controller.ts`, поэтому вариант «а» отпадает.
+ * Вариант «в» (infinite scroll по каталогу) оставлял бы клиентский фильтр и
+ * тянул бы лишние товары — отклонён.
+ *
+ * Объём запросов = размер избранного (обычно <50), а не размер базы.
+ * Если товар снят/удалён — `getProductById` бросает, элемент молча пропускается
+ * (и удаляется из списка), остальные избранные при этом не теряются.
+ */
+const FAVORITES_FETCH_CONCURRENCY = 6;
+
+/** Пул воркеров: не больше N запросов в полёте, порядок id сохраняется. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor++;
+      results[index] = await worker(items[index]);
+    }
+  });
+  await Promise.all(runners);
+  return results;
+}
 
 export default function FavoritesPage() {
   const navigate = useNavigate();
@@ -15,9 +54,42 @@ export default function FavoritesPage() {
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Ключ набора — сами id: список товаров должен перезагружаться и при
+  // добавлении, и при удалении из избранного. Ref-effect на `favorites`
+  // (массив из контекста пересоздаётся на каждый рендер) дал бы цикл запросов,
+  // поэтому зависимость — стабильная строка.
+  const favoritesKey = favorites.join(',');
+
   useEffect(() => {
-    getProducts({ limit: 2000 }).then(res => setProducts((res.items || []).filter(p => favorites.includes(p.id)))).finally(() => setLoading(false));
-  }, [favorites]);
+    const ids = favoritesKey ? favoritesKey.split(',') : [];
+    let cancelled = false;
+
+    // Всё внутри async IIFE: синхронный setState в теле эффекта даёт каскадный
+    // рендер (react-hooks/set-state-in-effect), а ожидание промиса делает
+    // апдейты асинхронными.
+    (async () => {
+      if (cancelled) return;
+      if (ids.length === 0) {
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const rows = await mapWithConcurrency(ids, FAVORITES_FETCH_CONCURRENCY, (id) =>
+          getProductById(id).catch(() => null),
+        );
+        if (!cancelled) setProducts(rows.filter((p): p is ApiProduct => p !== null));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [favoritesKey]);
 
   if (loading) return (
     <div className="flex justify-center py-32">

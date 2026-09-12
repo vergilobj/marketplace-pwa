@@ -71,8 +71,19 @@ export const DEAL_STATUS_RU: Record<string, string> = {
   LOST: 'Отменена',
 };
 
-export const bazarDeals = (role: 'buyer' | 'seller' = 'buyer') =>
-  api.get<BazarDeal[]>('/bazar/deals', { params: { as: role } }).then((res) => res.data);
+/**
+ * L2: список сделок (лидов) — страницей.
+ *
+ * Бэкенд (`GET /bazar/deals`) принимает page/limit (потолок 100) и отдаёт
+ * МАССИВ, поэтому «есть ещё» выводится из длины страницы.
+ */
+export const bazarDeals = (
+  role: 'buyer' | 'seller' = 'buyer',
+  params?: { page?: number; limit?: number },
+) =>
+  api
+    .get<BazarDeal[]>('/bazar/deals', { params: { as: role, ...params } })
+    .then((res) => res.data);
 
 export const bazarDealThread = (dealId: string) =>
   api.get<BazarDealThread>(`/bazar/deals/${dealId}`).then((res) => res.data);

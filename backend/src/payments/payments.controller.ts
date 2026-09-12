@@ -18,6 +18,7 @@ import type { AuthenticatedRequest } from '../common/types/authenticated-request
 import { PaymentsService } from './payments.service';
 import { NowPaymentsProvider } from './nowpayments.provider';
 import { CartPayDto } from './dto/cart-pay.dto';
+import { parseLimit, parsePage } from '../common/dto/pagination.dto';
 
 @Controller('payments')
 export class PaymentsController {
@@ -95,8 +96,8 @@ export class PaymentsController {
     return this.paymentsService.getAllTransactions({
       type,
       orderSearch,
-      page: Number(page) || 1,
-      limit: Number(limit) || 20,
+      page: parsePage(page),
+      limit: parseLimit(limit),
     });
   }
 

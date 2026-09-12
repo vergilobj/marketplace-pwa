@@ -17,6 +17,11 @@ import { Roles } from '../auth/roles.decorator';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import {
+  PAGINATION_BULK_LIMIT,
+  parseLimit,
+  parsePage,
+} from '../common/dto/pagination.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -33,8 +38,8 @@ export class ProductsController {
     @Query('status') status?: string,
   ) {
     return this.productsService.findAllAdmin({
-      page: Number(page) || 1,
-      limit: Number(limit) || 20,
+      page: parsePage(page),
+      limit: parseLimit(limit),
       search,
       status,
     });
@@ -57,8 +62,17 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('BUYER', 'SELLER', 'ADMIN')
   @Get('my')
-  async findMyProducts(@Request() req: AuthenticatedRequest) {
-    return this.productsService.findBySeller(req.user.userId);
+  async findMyProducts(
+    @Request() req: AuthenticatedRequest,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    // L1: лимит с потолком. Дефолт — 100 (фронт читает ответ как массив,
+    // infinite scroll нет; 20 обрезало бы список в UI).
+    return this.productsService.findBySeller(req.user.userId, {
+      page: parsePage(page),
+      limit: parseLimit(limit, PAGINATION_BULK_LIMIT),
+    });
   }
 
   @Get()
@@ -70,8 +84,8 @@ export class ProductsController {
     @Query('q') q?: string,
   ) {
     return this.productsService.findAll({
-      page: Number(page) || 1,
-      limit: Number(limit) || 20,
+      page: parsePage(page),
+      limit: parseLimit(limit),
       sort: sort || 'newest',
       search: search || q || undefined,
     });

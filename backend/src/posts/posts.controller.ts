@@ -18,6 +18,7 @@ import { Roles } from '../auth/roles.decorator';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateAdDto } from './dto/create-ad.dto';
+import { parseLimit, parsePage } from '../common/dto/pagination.dto';
 
 @Controller('posts')
 export class PostsController {
@@ -35,8 +36,8 @@ export class PostsController {
   ) {
     return this.postsService.getFeed({
       userId: req.user?.userId,
-      page: Number(page) || 1,
-      limit: Number(limit) || 20,
+      page: parsePage(page),
+      limit: parseLimit(limit),
       sort: sort || 'newest',
       search: search || q || undefined,
     });
@@ -71,8 +72,8 @@ export class PostsController {
     @Query('q') q?: string,
   ) {
     return this.postsService.findAll({
-      page: Number(page) || 1,
-      limit: Number(limit) || 20,
+      page: parsePage(page),
+      limit: parseLimit(limit),
       sort: sort || 'newest',
       search: search || q || undefined,
     });
@@ -102,8 +103,8 @@ export class PostsController {
     @Query('status') status?: string,
   ) {
     return this.postsService.findAllAdmin({
-      page: Number(page) || 1,
-      limit: Number(limit) || 20,
+      page: parsePage(page),
+      limit: parseLimit(limit),
       search,
       status,
     });
