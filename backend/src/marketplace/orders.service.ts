@@ -43,6 +43,14 @@ type Actor = 'BUYER' | 'SELLER' | 'ADMIN' | 'SYSTEM';
 export const ORDER_DECISION_MARKER = 'USER_DECISION:';
 
 /**
+ * L1-ФИКС (ДЕФЕКТ 2): верхняя граница возраста PENDING-заказа, который крон
+ * отмены ещё имеет право трогать. Всё старше — это импорт/бэкап/компенсация,
+ * а не «ожидание оплаты»; такие заказы разбирает reconciler
+ * (`reconcileUnheldEscrow`), а не `cancelExpiredOrders`.
+ */
+export const CANCEL_MAX_AGE_MINUTES = 24 * 60; // 24 часа
+
+/**
  * ФИКС 1: отчёт прогона `reconcileUnheldEscrow`.
  *
  * `held` / `reverted` заполняются только в режиме `apply=true`: в dry-run
@@ -881,11 +889,60 @@ export class OrdersService {
       'order_payment_ttl_minutes',
       15,
     );
-    const cutoff = addMinutes(new Date(), -ttlMinutes);
+    const now = new Date();
+    const cutoff = addMinutes(now, -ttlMinutes);
+    const oldestAllowed = addMinutes(now, -CANCEL_MAX_AGE_MINUTES);
+
+    // L1-ФИКС (ДЕФЕКТ 2): отменяем только заказы, которые РЕАЛЬНО ждут оплату.
+    //
+    // Было: `status: PENDING, createdAt < cutoff` — любой старый PENDING
+    // выкашивался за 30 секунд. На боевой БД это 654 легаси-заказа
+    // (01.08.2026, статус восстанавливался из бэкапа/миграции): ветка
+    // reconciler'а (б), возвращающая заказ в PENDING, сносила их за один тик.
+    //
+    // Стало (вариант «в» из ТЗ):
+    //   (а) нижняя граница окна — `createdAt > now - CANCEL_MAX_AGE_MINUTES`.
+    //       Всё, что старше суток, не может быть «ожиданием оплаты»: это
+    //       импорт/бэкап/компенсация. Такие заказы не трогаем, но считаем и
+    //       логируем — их должен разбирать reconciler, а не крон.
+    //   (б) заказы со следами оплаты (`paidAt != null`) не «неоплаченные», а
+    //       «сломанные»: отмена вернула бы деньги в никуда. Их тоже не трогаем.
+    //   (в) штатный сценарий не меняется: создан → не оплачен → через TTL
+    //       отменён (cutoff = now - 15 мин, окно 24 ч его покрывает).
+    const baseWhere = {
+      status: 'PENDING' as const,
+      createdAt: { lt: cutoff },
+    };
+
+    // Диагностика: сколько старых PENDING мы НЕ трогаем (и почему).
+    const [tooOld, paidMarked] = await Promise.all([
+      this.prisma.order.count({
+        where: { status: 'PENDING', createdAt: { lt: oldestAllowed } },
+      }),
+      this.prisma.order.count({
+        where: { ...baseWhere, paidAt: { not: null } },
+      }),
+    ]);
+
+    if (tooOld > 0) {
+      this.logger.warn(
+        `cancelExpiredOrders: пропущено ${tooOld} PENDING старше ` +
+          `${CANCEL_MAX_AGE_MINUTES} мин — не трогаем историю/импорт ` +
+          `(разбор за reconciler'ом, см. reconcileUnheldEscrow)`,
+      );
+    }
+    if (paidMarked > 0) {
+      this.logger.warn(
+        `cancelExpiredOrders: пропущено ${paidMarked} PENDING со следом ` +
+          `оплаты (paidAt != null) — это «сломанные» заказы, их разбирает reconciler`,
+      );
+    }
+
     const { count } = await this.prisma.order.updateMany({
       where: {
-        status: 'PENDING',
-        createdAt: { lt: cutoff },
+        ...baseWhere,
+        createdAt: { lt: cutoff, gt: oldestAllowed },
+        paidAt: null,
       },
       data: { status: 'CANCELLED', cancelledAt: new Date() },
     });
@@ -894,7 +951,7 @@ export class OrdersService {
       this.logger.log(`Отменено просроченных заказов: ${count}`);
     }
 
-    return { count };
+    return { count, skippedOld: tooOld, skippedPaid: paidMarked };
   }
 
   // ─── ФИКС 1: reconciler «PAID/SHIPPED + escrowStatus=NONE» ─────────────

@@ -12,5 +12,10 @@
   },
   "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/../src/$1"
-  }
+  },
+  "globalSetup": "<rootDir>/jest-global-setup.ts",
+  "globalTeardown": "<rootDir>/jest-global-teardown.ts",
+  "setupFiles": [
+    "<rootDir>/jest-setup-env.ts"
+  ]
 }
