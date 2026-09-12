@@ -100,10 +100,7 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Patch(':id/force-status')
-  async forceStatus(
-    @Param('id') id: string,
-    @Body() dto: ForceOrderStatusDto,
-  ) {
+  async forceStatus(@Param('id') id: string, @Body() dto: ForceOrderStatusDto) {
     return this.ordersService.adminForceStatus(id, dto, dto.reason);
   }
 }

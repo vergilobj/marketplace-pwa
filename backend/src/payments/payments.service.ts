@@ -140,10 +140,14 @@ export class PaymentsService {
     }
 
     // Фолбэк — NowPayments (легаси).
-    const result = await this.nowPayments.createPayment(order.amount, order.id, {
-      currency: 'usd',
-      description: `Order ${order.id}`,
-    });
+    const result = await this.nowPayments.createPayment(
+      order.amount,
+      order.id,
+      {
+        currency: 'usd',
+        description: `Order ${order.id}`,
+      },
+    );
 
     await this.prisma.transaction.create({
       data: {
@@ -279,7 +283,9 @@ export class PaymentsService {
       where: { clientRef: cartKey },
     });
     if (existing?.depositAddress) {
-      this.logger.log(`cart payment reused: ${cartKey} addr=${existing.depositAddress}`);
+      this.logger.log(
+        `cart payment reused: ${cartKey} addr=${existing.depositAddress}`,
+      );
       return {
         depositAddress: existing.depositAddress,
         clientRef: existing.clientRef,
@@ -341,7 +347,7 @@ export class PaymentsService {
           type: 'payment',
           amount: total,
           status: 'PENDING',
-          payload: payload as Prisma.InputJsonValue,
+          payload: payload,
           provider: 'PAYMOD',
           clientRef: cartKey,
           depositAddress,
@@ -608,7 +614,10 @@ export class PaymentsService {
       select: { id: true, amount: true, status: true, buyerId: true },
     });
 
-    const perOrder = orders.map((o) => ({ id: o.id, amount: round2(o.amount) }));
+    const perOrder = orders.map((o) => ({
+      id: o.id,
+      amount: round2(o.amount),
+    }));
     const expectedRaw = perOrder.reduce(
       (acc, o) => acc + this.toRawBigInt(o.amount, decimals),
       0n,
@@ -669,11 +678,7 @@ export class PaymentsService {
           select: { status: true, buyerId: true, amount: true },
         });
         if (fresh && fresh.status !== 'PAID' && fresh.status !== 'PENDING') {
-          await this.creditOrphanShare(
-            order.id,
-            fresh.buyerId,
-            fresh.amount,
-          );
+          await this.creditOrphanShare(order.id, fresh.buyerId, fresh.amount);
           orphaned++;
         }
         continue;
@@ -728,10 +733,7 @@ export class PaymentsService {
           account: LedgerAccount.AVAILABLE,
           amount: overHuman,
           type: 'deposit_overpay',
-          refKey: `deposit_overpay:cart:${uniqueIds
-            .slice()
-            .sort()
-            .join(',')}`,
+          refKey: `deposit_overpay:cart:${uniqueIds.slice().sort().join(',')}`,
           orderId: uniqueIds[0],
         });
         await this.notifySafely(
@@ -784,7 +786,9 @@ export class PaymentsService {
   }
 
   private async tolerancePercent(): Promise<number> {
-    const raw = await this.settingsService.getFloat('deposit_tolerance_percent');
+    const raw = await this.settingsService.getFloat(
+      'deposit_tolerance_percent',
+    );
     return Number.isFinite(raw) && raw > 0 ? raw : 1;
   }
 
@@ -1005,7 +1009,11 @@ export class PaymentsService {
    * проход не задваивает возврат.
    */
   @Cron(CronExpression.EVERY_10_MINUTES)
-  async reconcilePayouts(): Promise<{ checked: number; confirmed: number; failed: number }> {
+  async reconcilePayouts(): Promise<{
+    checked: number;
+    confirmed: number;
+    failed: number;
+  }> {
     const submitted = await this.prisma.withdrawalRequest.findMany({
       where: { payoutStatus: 'SUBMITTED', payoutTxHash: { not: null } },
       take: 50,
@@ -1020,7 +1028,11 @@ export class PaymentsService {
         const tx = await this.paymodService.getTxStatus(txHash);
         const status = (tx.status || '').toLowerCase();
 
-        if (status === 'confirmed' || status === 'success' || status === 'swept') {
+        if (
+          status === 'confirmed' ||
+          status === 'success' ||
+          status === 'swept'
+        ) {
           await this.prisma.withdrawalRequest.update({
             where: { id: request.id },
             data: { status: 'paid', payoutStatus: 'CONFIRMED' },
@@ -1261,9 +1273,7 @@ export class PaymentsService {
    * Устойчиво к повторам: если остаток 0, вызывающий код ничего не пишет;
    * даже при гонке уникальный refKey реверса не даст задвоить проводку.
    */
-  private async debitPartsForRequest(
-    requestId: string,
-  ): Promise<{
+  private async debitPartsForRequest(requestId: string): Promise<{
     fromAvailable: number;
     fromReferral: number;
     attempt: number | null;
@@ -1297,7 +1307,8 @@ export class PaymentsService {
       const sep = tail.indexOf(':');
       if (sep <= 0) continue;
       const n = parseInt(tail.slice(0, sep), 10);
-      if (Number.isFinite(n) && n > 0) reversed.add(`${n}:${tail.slice(sep + 1)}`);
+      if (Number.isFinite(n) && n > 0)
+        reversed.add(`${n}:${tail.slice(sep + 1)}`);
     }
 
     let fromAvailable = 0;

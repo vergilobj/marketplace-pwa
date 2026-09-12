@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PaymentMetadata, PaymentProvider, PaymentResult } from './payment.provider';
+import {
+  PaymentMetadata,
+  PaymentProvider,
+  PaymentResult,
+} from './payment.provider';
 import { PaymodService } from './paymod.service';
 
 /**
@@ -26,7 +30,11 @@ export class PaymodProvider extends PaymentProvider {
     const token = metadata?.token || 'USDT';
     const clientRef = metadata?.clientRef || `mp-txn-${orderId}`;
 
-    const address = await this.paymodService.getAddress(clientRef, chain, token);
+    const address = await this.paymodService.getAddress(
+      clientRef,
+      chain,
+      token,
+    );
     this.logger.log(`paymod address derived: ${clientRef} -> ${address}`);
 
     return {
@@ -42,15 +50,18 @@ export class PaymodProvider extends PaymentProvider {
     };
   }
 
-  async verifyPayment(transactionId: string): Promise<PaymentResult> {
+  // Контракт PaymentProvider требует Promise<PaymentResult> (поллинг статуса),
+  // но реализация синхронная: статус ведётся webhook'ом, а не поллингом.
+  // Возвращаем уже разрешённый Promise без async (лишний async без await).
+  verifyPayment(transactionId: string): Promise<PaymentResult> {
     // Статус депозита ведётся через webhook deposit (client_ref + tx_hash),
     // а не поллингом. Здесь возвращаем заглушку pending; фактическая отметка
     // CONFIRMED происходит в webhook-контроллере.
-    return {
+    return Promise.resolve({
       success: false,
       transactionId,
       status: 'pending',
       raw: { note: 'resolved via deposit webhook' },
-    };
+    });
   }
 }

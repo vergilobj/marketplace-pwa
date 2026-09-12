@@ -319,7 +319,10 @@ export class UsersService {
       const pendingRequests = await tx.withdrawalRequest.findMany({
         where: { userId, status: 'pending' },
       });
-      const totalPending = pendingRequests.reduce((sum, r) => sum + r.amount, 0);
+      const totalPending = pendingRequests.reduce(
+        (sum, r) => sum + r.amount,
+        0,
+      );
       const available = round2(balances.totalWithdrawable - totalPending);
       if (available < amount)
         throw new BadRequestException(
@@ -675,14 +678,13 @@ export class UsersService {
    * НЕИЗВЕСТНОГО ключа реально инициирует перевод, поэтому «спрашивать»
    * им состояние нельзя — создашь вторую выплату с нулевой суммой.
    */
-  private async recoverPayout(
-    idempotencyKey: string,
-  ): Promise<PayoutRecovery> {
+  private async recoverPayout(idempotencyKey: string): Promise<PayoutRecovery> {
     try {
       const existing = await this.paymodService.getPayout(idempotencyKey);
       if (!existing) return { outcome: 'absent' }; // ключа нет — выплаты не было
       const status = (existing.status || '').toLowerCase();
-      if (status === 'failed' || status === 'error') return { outcome: 'absent' };
+      if (status === 'failed' || status === 'error')
+        return { outcome: 'absent' };
       // submitted/confirmed/swept/pending — выплата инициирована.
       return {
         outcome: 'recovered',

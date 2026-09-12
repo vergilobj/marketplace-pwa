@@ -6,7 +6,6 @@ import { SettingsService } from '../settings/settings.service';
 describe('ChatService', () => {
   let service: ChatService;
   let _prisma: any;
-  let settings: any;
 
   const mockPrisma = {
     user: { update: jest.fn() },
@@ -26,7 +25,6 @@ describe('ChatService', () => {
     }).compile();
     service = module.get<ChatService>(ChatService);
     _prisma = mockPrisma;
-    settings = mockSettings;
     jest.clearAllMocks();
   });
 
@@ -36,7 +34,10 @@ describe('ChatService', () => {
 
   describe('setPublicKey', () => {
     it('should update user public key', async () => {
-      mockPrisma.user.update.mockResolvedValue({ id: 'u1', chatPublicKey: 'KEY' });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1',
+        chatPublicKey: 'KEY',
+      });
       const result = await service.setPublicKey('u1', 'KEY');
       expect(result.chatPublicKey).toBe('KEY');
       expect(mockPrisma.user.update).toHaveBeenCalledWith({

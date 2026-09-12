@@ -43,9 +43,7 @@ export class AuthController {
       if (parts.length !== 3 || !parts[1]) {
         throw new Error('malformed');
       }
-      const parsed = JSON.parse(
-        Buffer.from(parts[1], 'base64').toString(),
-      );
+      const parsed = JSON.parse(Buffer.from(parts[1], 'base64').toString());
       if (!parsed || typeof parsed !== 'object' || !parsed.sub) {
         throw new Error('malformed');
       }

@@ -77,7 +77,9 @@ describe('ProductsController', () => {
   describe('remove', () => {
     it('should soft-delete product', async () => {
       service.remove.mockResolvedValue({ id: 'p1', isActive: false });
-      const result = await controller.remove('p1', { user: { userId: 's1', role: 'SELLER' } });
+      const result = await controller.remove('p1', {
+        user: { userId: 's1', role: 'SELLER' },
+      });
       expect(result.isActive).toBe(false);
     });
   });

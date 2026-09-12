@@ -102,7 +102,9 @@ export class ProductsService {
 
     // R10: серверный поиск по названию и описанию — не ограничен страницей пагинации
     const search = params.search?.trim();
-    const where: Prisma.ProductWhereInput = onlyActive ? { isActive: true } : {};
+    const where: Prisma.ProductWhereInput = onlyActive
+      ? { isActive: true }
+      : {};
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -144,7 +146,10 @@ export class ProductsService {
       where: {
         id: { not: id },
         isActive: true,
-        OR: [{ sellerId: product.sellerId }, { title: { contains: firstWord } }],
+        OR: [
+          { sellerId: product.sellerId },
+          { title: { contains: firstWord } },
+        ],
       },
       include: { seller: { select: { id: true, name: true } } },
       take: 4,
@@ -173,7 +178,10 @@ export class ProductsService {
       throw new BadRequestException(moderation.reason);
     }
 
-    const updated = await this.prisma.product.update({ where: { id }, data: dto });
+    const updated = await this.prisma.product.update({
+      where: { id },
+      data: dto,
+    });
     await this.auditService.log({
       userId: sellerId,
       action: 'product_updated',
@@ -288,7 +296,10 @@ export class ProductsService {
    * обычного продавца товаров меньше, а если больше — данные не теряются
    * навсегда, их доберёт страница пагинации (`page`), которую можно передать.
    */
-  async findBySeller(sellerId: string, params: { page?: number; limit?: number } = {}) {
+  async findBySeller(
+    sellerId: string,
+    params: { page?: number; limit?: number } = {},
+  ) {
     const page = clampPage(params.page, 1);
     const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     return this.prisma.product.findMany({

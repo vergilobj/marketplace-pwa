@@ -25,7 +25,12 @@
  *
  * Namespace — phone-префикс `g1b-`; уборка через общий cleanupTestData.
  */
-import { EscrowStatus, LedgerAccount, OrderStatus, TransactionStatus } from '@prisma/client';
+import {
+  EscrowStatus,
+  LedgerAccount,
+  OrderStatus,
+  TransactionStatus,
+} from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { cleanupTestData } from '../common/prisma/test-db-cleanup';
 import { AuditService } from '../common/audit/audit.service';
@@ -34,7 +39,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { LedgerService } from '../payments/ledger.service';
 import { EscrowService } from '../payments/escrow.service';
 import { PaymentsService } from '../payments/payments.service';
-import { OrdersService, ESCROW_RECONCILE_APPLY_SETTING } from './orders.service';
+import {
+  OrdersService,
+  ESCROW_RECONCILE_APPLY_SETTING,
+} from './orders.service';
 
 describe('G1b (integration): reconcileUnheldEscrow — PAID/SHIPPED без холда', () => {
   const prisma = new PrismaService();
@@ -58,7 +66,7 @@ describe('G1b (integration): reconcileUnheldEscrow — PAID/SHIPPED без хо�
     ledger,
     notify,
     escrow,
-    undefined as any,
+    undefined,
   );
 
   const orders = new OrdersService(

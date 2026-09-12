@@ -99,9 +99,10 @@ export class NotificationsController {
     // Получаем всех пользователей (или по роли).
     // role приходит строкой из body — сужаем до enum, невалидное значение
     // отдаст пустой список (Prisma отфильтрует), это осознанное поведение.
-    const roleFilter = role && (Object.values(UserRole) as string[]).includes(role)
-      ? (role as UserRole)
-      : undefined;
+    const roleFilter =
+      role && (Object.values(UserRole) as string[]).includes(role)
+        ? (role as UserRole)
+        : undefined;
     const users = await this.prisma.user.findMany({
       where: roleFilter ? { role: roleFilter } : {},
       select: { id: true },

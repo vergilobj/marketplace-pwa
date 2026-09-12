@@ -71,16 +71,11 @@ describe('G3 (integration): телефон в заказе, доступ к ре
 
   let buyerId = '';
   let sellerId = '';
-  let adminId = '';
   let buyerToken = '';
   let sellerToken = '';
   let adminToken = '';
 
-  const mkUser = async (
-    tag: string,
-    role: UserRole,
-    availableBalance = 0,
-  ) => {
+  const mkUser = async (tag: string, role: UserRole, availableBalance = 0) => {
     const user = await prisma.user.create({
       data: {
         phone: `${SUFFIX}-${tag}`,
@@ -124,7 +119,6 @@ describe('G3 (integration): телефон в заказе, доступ к ре
     const admin = await mkUser('admin', UserRole.ADMIN);
     buyerId = buyer.id;
     sellerId = seller.id;
-    adminId = admin.id;
 
     buyerToken = tokenFor(buyer.id, buyer.phone, UserRole.BUYER);
     sellerToken = tokenFor(seller.id, seller.phone, UserRole.SELLER);
@@ -214,9 +208,7 @@ describe('G3 (integration): телефон в заказе, доступ к ре
     });
 
     it('аноним получает 401', async () => {
-      await request(app.getHttpServer())
-        .get(`/orders/${orderId}`)
-        .expect(401);
+      await request(app.getHttpServer()).get(`/orders/${orderId}`).expect(401);
     });
   });
 

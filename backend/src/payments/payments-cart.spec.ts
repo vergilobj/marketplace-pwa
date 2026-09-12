@@ -10,7 +10,12 @@
  *  - не-якорный заказ видит статус общей транзакции.
  */
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
@@ -26,12 +31,29 @@ const WEI = 10n ** 18n;
 
 describe('PaymentsService — cart-aware (A3/B1)', () => {
   let service: PaymentsService;
-  let prisma: any;
 
   const orders = [
-    { id: 'ord-a', amount: 100, status: 'PENDING', buyerId: 'buyer-1', post: null },
-    { id: 'ord-b', amount: 200, status: 'PENDING', buyerId: 'buyer-1', post: null },
-    { id: 'ord-c', amount: 300, status: 'PENDING', buyerId: 'buyer-1', post: null },
+    {
+      id: 'ord-a',
+      amount: 100,
+      status: 'PENDING',
+      buyerId: 'buyer-1',
+      post: null,
+    },
+    {
+      id: 'ord-b',
+      amount: 200,
+      status: 'PENDING',
+      buyerId: 'buyer-1',
+      post: null,
+    },
+    {
+      id: 'ord-c',
+      amount: 300,
+      status: 'PENDING',
+      buyerId: 'buyer-1',
+      post: null,
+    },
   ];
 
   const mockPrisma = {
@@ -78,7 +100,6 @@ describe('PaymentsService — cart-aware (A3/B1)', () => {
       ],
     }).compile();
     service = module.get<PaymentsService>(PaymentsService);
-    prisma = mockPrisma;
 
     jest.clearAllMocks();
     mockSettings.get.mockResolvedValue('paymod');
@@ -129,10 +150,13 @@ describe('PaymentsService — cart-aware (A3/B1)', () => {
 
     it('clientRef детерминирован: порядок orderIds не важен', async () => {
       mockPrisma.order.findMany.mockResolvedValue(orders);
-      await service.createPaymentForCart(['ord-c', 'ord-a', 'ord-b'], 'buyer-1');
-      expect(mockPrisma.transaction.create.mock.calls[0][0].data.clientRef).toBe(
-        cartClientRef(['ord-a', 'ord-b', 'ord-c']),
+      await service.createPaymentForCart(
+        ['ord-c', 'ord-a', 'ord-b'],
+        'buyer-1',
       );
+      expect(
+        mockPrisma.transaction.create.mock.calls[0][0].data.clientRef,
+      ).toBe(cartClientRef(['ord-a', 'ord-b', 'ord-c']));
     });
 
     it('идемпотентен: существующая корзина → тот же адрес, без новой строки', async () => {
@@ -251,8 +275,10 @@ describe('PaymentsService — cart-aware (A3/B1)', () => {
           return row;
         });
 
-        mockPrisma.transaction.findUnique.mockImplementation(async (args: any) => {
-          return stored.find((t) => t.clientRef === args.where.clientRef) ?? null;
+        mockPrisma.transaction.findUnique.mockImplementation((args: any) => {
+          return (
+            stored.find((t) => t.clientRef === args.where.clientRef) ?? null
+          );
         });
 
         // Барьер: оба вызова гарантированно проходят pre-check ДО любого insert.
@@ -583,7 +609,11 @@ describe('PaymentsService — cart-aware (A3/B1)', () => {
       mockEscrow.holdForOrder.mockRejectedValue(new Error('db down'));
 
       await expect(
-        service.processSuccessfulCartPayment(['ord-a', 'ord-b'], 300n * WEI, 18),
+        service.processSuccessfulCartPayment(
+          ['ord-a', 'ord-b'],
+          300n * WEI,
+          18,
+        ),
       ).rejects.toThrow('db down');
 
       // Компенсация: статус возвращён в PENDING, деньги не зачислены.

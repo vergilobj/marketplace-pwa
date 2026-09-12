@@ -23,11 +23,7 @@
  *   он до записи не доходит по гарду `updateMany({ escrowStatus: HELD })`,
  *   поэтому проверяем и это: повторный releaseEscrow не кидает.
  */
-import {
-  EscrowStatus,
-  LedgerAccount,
-  OrderStatus,
-} from '@prisma/client';
+import { EscrowStatus, LedgerAccount, OrderStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { cleanupTestData } from '../common/prisma/test-db-cleanup';
 import { LedgerService } from './ledger.service';
@@ -223,7 +219,9 @@ describe('G1b (integration): append-only журнал и guard проводок 
 
       expect((await entry(`${suffix}:idem:1`)).balanceAfter).toBe(40);
       expect(
-        await prisma.ledgerEntry.count({ where: { refKey: `${suffix}:idem:1` } }),
+        await prisma.ledgerEntry.count({
+          where: { refKey: `${suffix}:idem:1` },
+        }),
       ).toBe(1);
       const after = await prisma.user.findUniqueOrThrow({
         where: { id: user.id },
@@ -290,9 +288,9 @@ describe('G1b (integration): append-only журнал и guard проводок 
         },
       });
 
-      await expect(escrow.releaseEscrow(order.id, 'buyer_confirmed')).rejects.toThrow(
-        LedgerInvariantError,
-      );
+      await expect(
+        escrow.releaseEscrow(order.id, 'buyer_confirmed'),
+      ).rejects.toThrow(LedgerInvariantError);
 
       // Транзакция откатилась: заказ НЕ закрыт.
       const after = await prisma.order.findUniqueOrThrow({

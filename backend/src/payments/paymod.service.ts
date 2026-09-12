@@ -26,7 +26,11 @@ export class PaymodService {
     return createHmac('sha256', this.secret).update(message).digest('base64');
   }
 
-  private verify(timestamp: string, rawBody: string, signature: string): boolean {
+  private verify(
+    timestamp: string,
+    rawBody: string,
+    signature: string,
+  ): boolean {
     if (!timestamp || !signature) return false;
     // Проверка окна 60 с (анти-replay)
     const now = Math.floor(Date.now() / 1000);
@@ -61,19 +65,29 @@ export class PaymodService {
 
     if (!res.ok) {
       const err = await res.text();
-      this.logger.error(`paymod ${method} ${path} failed: ${res.status} ${err}`);
+      this.logger.error(
+        `paymod ${method} ${path} failed: ${res.status} ${err}`,
+      );
       throw new Error(`paymod error: ${res.status} ${err}`);
     }
     return (await res.json()) as T;
   }
 
   /** Получить/дерive детерминированный депозит-адрес (идемпотентно). */
-  async getAddress(clientRef: string, chain: string, token: string): Promise<string> {
-    const data = await this.request<{ address: string }>('POST', '/v1/address', {
-      client_ref: clientRef,
-      chain,
-      token,
-    });
+  async getAddress(
+    clientRef: string,
+    chain: string,
+    token: string,
+  ): Promise<string> {
+    const data = await this.request<{ address: string }>(
+      'POST',
+      '/v1/address',
+      {
+        client_ref: clientRef,
+        chain,
+        token,
+      },
+    );
     return data.address;
   }
 
@@ -85,12 +99,19 @@ export class PaymodService {
     amount: string;
     token: string;
     chain: string;
-  }): Promise<{ tx_hash: string | null; status: string; error?: string; replayed?: boolean }> {
-    return this.request('POST', '/v1/payout', payload as unknown as Record<string, unknown>);
+  }): Promise<{
+    tx_hash: string | null;
+    status: string;
+    error?: string;
+    replayed?: boolean;
+  }> {
+    return this.request('POST', '/v1/payout', payload);
   }
 
   /** Статус свипа/выплаты по хэшу. */
-  async getTxStatus(txHash: string): Promise<{ tx_hash: string; status: string; confirmations: number }> {
+  async getTxStatus(
+    txHash: string,
+  ): Promise<{ tx_hash: string; status: string; confirmations: number }> {
     return this.request('GET', `/v1/tx/${txHash}`);
   }
 
@@ -102,9 +123,11 @@ export class PaymodService {
    * создаёт и не отправляет (в отличие от payout(), который для нового
    * ключа реально инициирует перевод).
    */
-  async getPayout(
-    idempotencyKey: string,
-  ): Promise<{ tx_hash: string | null; status: string; error?: string | null } | null> {
+  async getPayout(idempotencyKey: string): Promise<{
+    tx_hash: string | null;
+    status: string;
+    error?: string | null;
+  } | null> {
     try {
       return await this.request<{
         tx_hash: string | null;
@@ -120,7 +143,11 @@ export class PaymodService {
   }
 
   /** Валидация HMAC входящего webhook. timestamp+rawBody против подписи. */
-  verifyWebhookSignature(timestamp: string, rawBody: string, signature: string): boolean {
+  verifyWebhookSignature(
+    timestamp: string,
+    rawBody: string,
+    signature: string,
+  ): boolean {
     return this.verify(timestamp, rawBody, signature);
   }
 }

@@ -58,11 +58,11 @@ describe('NH6: арбитраж не запирает эскроу', () => {
 
   it('сначала двигает деньги, потом фиксирует вердикт (порядок вызовов)', async () => {
     const calls: string[] = [];
-    const settle = jest.fn().mockImplementation(async () => {
+    const settle = jest.fn().mockImplementation(() => {
       calls.push('settle');
     });
     const { prisma, call } = mkService(settle);
-    prisma.deal.update.mockImplementation(async () => {
+    prisma.deal.update.mockImplementation(() => {
       calls.push('markResolved');
     });
 

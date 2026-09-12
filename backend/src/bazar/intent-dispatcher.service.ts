@@ -4,7 +4,10 @@ import { AutopilotService } from './autopilot.service';
 import { BazarMessage } from '@prisma/client';
 
 export type IntentAction =
-  | { intent: 'create_deal'; payload: { productId?: string; sellerId?: string } }
+  | {
+      intent: 'create_deal';
+      payload: { productId?: string; sellerId?: string };
+    }
   | { intent: 'relay_message'; payload: { dealId: string; text: string } }
   | { intent: 'ask_question'; payload: { dealId: string; question: string } }
   | { intent: 'view_order_status'; payload: { orderId?: string } }
@@ -13,7 +16,10 @@ export type IntentAction =
   | { intent: 'reject_deal'; payload: { dealId: string; reason?: string } }
   | { intent: 'ask_availability'; payload: { productId: string } }
   | { intent: 'autopilot_request'; payload: { goal: string; budget?: number } }
-  | { intent: 'autopilot_confirm'; payload: { accept: boolean; productId?: string } }
+  | {
+      intent: 'autopilot_confirm';
+      payload: { accept: boolean; productId?: string };
+    }
   | { intent: 'autopilot_refine'; payload: { feedback: string } }
   | { intent: 'counter_offer'; payload: { dealId: string; amount: number } }
   | { intent: 'accept_offer'; payload: { dealId: string; offerId: string } }
@@ -56,7 +62,11 @@ export class IntentDispatcher {
 
       case 'cancel_deal':
       case 'reject_deal':
-        return this.deals.lose(userId, action.payload.dealId, action.payload.reason);
+        return this.deals.lose(
+          userId,
+          action.payload.dealId,
+          action.payload.reason,
+        );
 
       case 'view_order_status':
         return this.deals.orderStatus(userId, action.payload.orderId);
@@ -65,13 +75,23 @@ export class IntentDispatcher {
         return this.deals.relayAvailability(userId, action.payload.productId);
 
       case 'autopilot_request':
-        return this.autopilot.start(userId, action.payload.goal, action.payload.budget);
+        return this.autopilot.start(
+          userId,
+          action.payload.goal,
+          action.payload.budget,
+        );
 
       case 'autopilot_confirm':
-        return this.autopilot.resume(userId, { type: 'confirm', ...action.payload });
+        return this.autopilot.resume(userId, {
+          type: 'confirm',
+          ...action.payload,
+        });
 
       case 'autopilot_refine':
-        return this.autopilot.resume(userId, { type: 'refine', feedback: action.payload.feedback });
+        return this.autopilot.resume(userId, {
+          type: 'refine',
+          feedback: action.payload.feedback,
+        });
 
       case 'counter_offer':
         return this.deals.counterOffer(userId, {

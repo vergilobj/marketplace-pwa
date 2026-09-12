@@ -54,10 +54,20 @@ describe('NH8 (integration): спор по заказу без Deal доходи
 
   it('спор по заказу без Deal доходит до арбитража и эскроу реально возвращается', async () => {
     const buyer = await prisma.user.create({
-      data: { phone: `hv-b-${suffix}`, name: 'HV buyer', role: 'BUYER', referralCode: `hv-b-${suffix}` },
+      data: {
+        phone: `hv-b-${suffix}`,
+        name: 'HV buyer',
+        role: 'BUYER',
+        referralCode: `hv-b-${suffix}`,
+      },
     });
     const seller = await prisma.user.create({
-      data: { phone: `hv-s-${suffix}`, name: 'HV seller', role: 'SELLER', referralCode: `hv-s-${suffix}` },
+      data: {
+        phone: `hv-s-${suffix}`,
+        name: 'HV seller',
+        role: 'SELLER',
+        referralCode: `hv-s-${suffix}`,
+      },
     });
     userIds.push(buyer.id, seller.id);
 
@@ -93,7 +103,11 @@ describe('NH8 (integration): спор по заказу без Deal доходи
 
     const apiClient = {
       complete: jest.fn().mockResolvedValue({
-        text: JSON.stringify({ verdict: 'BUYER_RIGHT', confidence: 0.95, note: 'не прислали' }),
+        text: JSON.stringify({
+          verdict: 'BUYER_RIGHT',
+          confidence: 0.95,
+          note: 'не прислали',
+        }),
       }),
     };
     const service = new ArbitrageService(
@@ -110,7 +124,9 @@ describe('NH8 (integration): спор по заказу без Deal доходи
     expect(apiClient.complete).toHaveBeenCalledTimes(1);
 
     // 2. Деньги реально вернулись покупателю.
-    const fresh = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    const fresh = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
     expect(fresh.escrowStatus).toBe(EscrowStatus.REFUNDED);
     expect(fresh.status).toBe(OrderStatus.REFUNDED);
 
@@ -121,15 +137,25 @@ describe('NH8 (integration): спор по заказу без Deal доходи
     expect(escrowSum._sum.amount ?? 0).toBe(0); // холд закрыт возвратом
 
     const buyerAvailable = await prisma.ledgerEntry.aggregate({
-      where: { orderId: order.id, userId: buyer.id, account: LedgerAccount.AVAILABLE },
+      where: {
+        orderId: order.id,
+        userId: buyer.id,
+        account: LedgerAccount.AVAILABLE,
+      },
       _sum: { amount: true },
     });
     expect(buyerAvailable._sum.amount ?? 0).toBe(1000);
 
     // 3. Вердикт зафиксирован машиночитаемо (контракт payments).
     expect(String(fresh.cancelReason).startsWith(VERDICT_MARKER)).toBe(true);
-    const parsed = JSON.parse(String(fresh.cancelReason).slice(VERDICT_MARKER.length));
-    expect(parsed).toMatchObject({ verdict: 'BUYER_RIGHT', refundAmount: 1000, source: 'order_no_deal' });
+    const parsed = JSON.parse(
+      String(fresh.cancelReason).slice(VERDICT_MARKER.length),
+    );
+    expect(parsed).toMatchObject({
+      verdict: 'BUYER_RIGHT',
+      refundAmount: 1000,
+      source: 'order_no_deal',
+    });
 
     // 4. Повторный проход cron — no-op: заказ уже не DISPUTED+HELD.
     await service.resolveDisputes();

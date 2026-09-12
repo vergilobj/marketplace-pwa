@@ -162,7 +162,7 @@ describe('NH9 (integration): реклама не живёт после авто-
 
   const mockPaymodPayment = () =>
     fakePaymodProvider.createPayment.mockImplementation(
-      async (_amount: number, _orderId: string, metadata: any) => ({
+      (_amount: number, _orderId: string, metadata: any) => ({
         success: true,
         transactionId: metadata.clientRef,
         status: 'pending',

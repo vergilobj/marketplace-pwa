@@ -50,9 +50,9 @@ describe('AlertsService', () => {
 
     it('send() не бросает даже на пустом сообщении', async () => {
       const service = new AlertsService(makeConfig({}));
-      await expect(
-        service.send({ code: 'x', message: '' }),
-      ).resolves.toBe(false);
+      await expect(service.send({ code: 'x', message: '' })).resolves.toBe(
+        false,
+      );
     });
   });
 
@@ -220,7 +220,8 @@ describe('AlertsService', () => {
     it('токен в query не попадает в лог', () => {
       const service = new AlertsService(
         makeConfig({
-          ALERT_WEBHOOK_URL: 'https://hooks.example.com/services/T00/B00/XXX?token=SECRET',
+          ALERT_WEBHOOK_URL:
+            'https://hooks.example.com/services/T00/B00/XXX?token=SECRET',
         }),
       );
       // Проверяем через приватный статический хелпер напрямую.

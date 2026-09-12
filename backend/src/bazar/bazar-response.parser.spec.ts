@@ -72,7 +72,10 @@ describe('parseBazarContent', () => {
       '```action\n{"intent":"open_deal","payload":{"dealId":"d1"}}\n```\nГотово';
     const r = parseBazarContent(raw);
     expect(r.refs).toEqual([{ type: 'PRODUCT', id: 'a' }]);
-    expect(r.action).toEqual({ intent: 'open_deal', payload: { dealId: 'd1' } });
+    expect(r.action).toEqual({
+      intent: 'open_deal',
+      payload: { dealId: 'd1' },
+    });
     expect(r.text).not.toContain('```');
     expect(r.text).toContain('Нашёл');
     expect(r.text).toContain('Готово');

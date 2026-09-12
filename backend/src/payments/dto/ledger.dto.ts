@@ -3,6 +3,9 @@ import { LedgerAccount } from '@prisma/client';
 /**
  * Типы проводок журнала (§1.2 ТЗ).
  * Строкой, а не enum: новые типы не должны требовать миграции БД.
+ * NB: НЕ union с `string` — это убивает автокомплит и типобезопасность
+ * (правило no-redundant-type-constituents). Для «свободных» типов из БД
+ * есть отдельный алиас LedgerEntryTypeLoose.
  */
 export type LedgerEntryType =
   | 'escrow_hold'
@@ -15,11 +18,14 @@ export type LedgerEntryType =
   | 'platform_fee'
   | 'referral_bonus';
 
+/** Свободная форма: тип из БД/внешнего источника, не покрытый union'ом выше. */
+export type LedgerEntryTypeLoose = LedgerEntryType | (string & {});
+
 /** Одна проводка. amount ЗНАКОВЫЙ: плюс — зачисление, минус — списание. */
 export interface LedgerOp {
   account: LedgerAccount;
   amount: number;
-  type: LedgerEntryType | string;
+  type: LedgerEntryTypeLoose;
   /** Идемпотентность: повторный apply с тем же refKey — no-op. */
   refKey: string;
   /** null/undefined — платформенный аккаунт (PLATFORM, ESCROW-агрегат). */

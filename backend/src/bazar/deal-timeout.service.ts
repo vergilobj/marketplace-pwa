@@ -69,7 +69,9 @@ export class DealTimeoutService {
   }
 
   private async closeNewDeals(): Promise<number> {
-    const cutoff = new Date(Date.now() - this.newTimeoutDays * 24 * 60 * 60 * 1000);
+    const cutoff = new Date(
+      Date.now() - this.newTimeoutDays * 24 * 60 * 60 * 1000,
+    );
     const deals = await this.prisma.deal.findMany({
       where: { status: DealStatus.NEW, createdAt: { lt: cutoff } },
       select: { id: true, buyerId: true, sellerId: true },
@@ -80,14 +82,21 @@ export class DealTimeoutService {
         where: { id: deal.id },
         data: { status: DealStatus.LOST },
       });
-      await this.pushDealEvent(deal.buyerId, deal.sellerId, deal.id, 'Сделка закрыта автоматически: нет ответа продавца');
+      await this.pushDealEvent(
+        deal.buyerId,
+        deal.sellerId,
+        deal.id,
+        'Сделка закрыта автоматически: нет ответа продавца',
+      );
     }
 
     return deals.length;
   }
 
   private async closeContactedDeals(): Promise<number> {
-    const cutoff = new Date(Date.now() - this.contactedTimeoutDays * 24 * 60 * 60 * 1000);
+    const cutoff = new Date(
+      Date.now() - this.contactedTimeoutDays * 24 * 60 * 60 * 1000,
+    );
     const deals = await this.prisma.deal.findMany({
       where: { status: DealStatus.CONTACTED, updatedAt: { lt: cutoff } },
       select: { id: true, buyerId: true, sellerId: true },
@@ -98,7 +107,12 @@ export class DealTimeoutService {
         where: { id: deal.id },
         data: { status: DealStatus.LOST },
       });
-      await this.pushDealEvent(deal.buyerId, deal.sellerId, deal.id, 'Сделка закрыта автоматически: нет активности');
+      await this.pushDealEvent(
+        deal.buyerId,
+        deal.sellerId,
+        deal.id,
+        'Сделка закрыта автоматически: нет активности',
+      );
     }
 
     return deals.length;
@@ -122,7 +136,12 @@ export class DealTimeoutService {
         where: { dealId: deal.id, status: 'PENDING' },
         data: { status: 'REJECTED' },
       });
-      await this.pushDealEvent(deal.buyerId, deal.sellerId, deal.id, 'Сделка закрыта автоматически: торг затянулся');
+      await this.pushDealEvent(
+        deal.buyerId,
+        deal.sellerId,
+        deal.id,
+        'Сделка закрыта автоматически: торг затянулся',
+      );
     }
 
     return deals.length;
@@ -200,7 +219,9 @@ export class DealTimeoutService {
   ) {
     const heading = 'Сделка закрыта';
     for (const userId of [buyerId, sellerId]) {
-      await this.notify.createNotification(userId, 'deal_lost_timeout', content, dealId).catch(() => null);
+      await this.notify
+        .createNotification(userId, 'deal_lost_timeout', content, dealId)
+        .catch(() => null);
       try {
         await this.notify.sendToUser(
           userId,

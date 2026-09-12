@@ -19,7 +19,11 @@ import { Roles } from '../auth/roles.decorator';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserRole } from '@prisma/client';
-import { parseLimit, parsePage, PAGINATION_BULK_LIMIT } from '../common/dto/pagination.dto';
+import {
+  parseLimit,
+  parsePage,
+  PAGINATION_BULK_LIMIT,
+} from '../common/dto/pagination.dto';
 
 @Controller('users')
 export class UsersController {

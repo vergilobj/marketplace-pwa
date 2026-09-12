@@ -122,7 +122,10 @@ describe('B1: авто-снятие isPinned с просроченной рек�
     expect(count).toBeGreaterThanOrEqual(1);
 
     const reload = async (id: string) =>
-      (await prisma.post.findUnique({ where: { id }, select: { isPinned: true, isHidden: true } }))!;
+      (await prisma.post.findUnique({
+        where: { id },
+        select: { isPinned: true, isHidden: true },
+      }))!;
 
     expect((await reload(expired.id)).isPinned).toBe(false);
     expect((await reload(active.id)).isPinned).toBe(true);
@@ -146,7 +149,9 @@ describe('B1: авто-снятие isPinned с просроченной рек�
       pinnedTitle: 'expired-idem',
     });
 
-    await expect(posts.deactivateExpiredAds()).resolves.toBeGreaterThanOrEqual(1);
+    await expect(posts.deactivateExpiredAds()).resolves.toBeGreaterThanOrEqual(
+      1,
+    );
     const second = await posts.deactivateExpiredAds();
     expect(second).toBe(0);
 

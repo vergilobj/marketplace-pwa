@@ -1,12 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import {
-  EscrowStatus,
-  LedgerAccount,
-  OrderStatus,
-  Prisma,
-  UserRole,
-} from '@prisma/client';
+import { EscrowStatus, LedgerAccount, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AlertsService } from '../common/alerts/alerts.service';
@@ -361,14 +355,13 @@ export class LedgerService {
    * Если кэш и журнал разошлись — берём журнал (источник истины, §4.1).
    */
   async getBalances(userId: string): Promise<LedgerBalances> {
-    const [user, grouped, escrowAgg, orderAgg] = await Promise.all([
-      this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { availableBalance: true, bonusBalance: true },
-      }),
+    const [grouped, escrowAgg, orderAgg] = await Promise.all([
       this.prisma.ledgerEntry.groupBy({
         by: ['account'],
-        where: { userId, account: { in: [LedgerAccount.AVAILABLE, LedgerAccount.REFERRAL] } },
+        where: {
+          userId,
+          account: { in: [LedgerAccount.AVAILABLE, LedgerAccount.REFERRAL] },
+        },
         _sum: { amount: true },
       }),
       this.prisma.ledgerEntry.aggregate({
@@ -381,7 +374,9 @@ export class LedgerService {
       }),
     ]);
 
-    const byAccount = new Map(grouped.map((g) => [g.account, g._sum.amount ?? 0]));
+    const byAccount = new Map(
+      grouped.map((g) => [g.account, g._sum.amount ?? 0]),
+    );
     const available = round2(byAccount.get(LedgerAccount.AVAILABLE) ?? 0);
     const referral = round2(byAccount.get(LedgerAccount.REFERRAL) ?? 0);
     const escrowBalance = round2(escrowAgg._sum.amount ?? 0);
@@ -514,7 +509,8 @@ export class LedgerService {
     params: { page?: number; limit?: number; account?: LedgerAccount } = {},
   ) {
     const page = params.page && params.page > 0 ? params.page : 1;
-    const limit = params.limit && params.limit > 0 ? Math.min(params.limit, 100) : 20;
+    const limit =
+      params.limit && params.limit > 0 ? Math.min(params.limit, 100) : 20;
 
     const where: Prisma.LedgerEntryWhereInput = { userId };
     if (params.account) where.account = params.account;
@@ -619,9 +615,7 @@ export class LedgerService {
 
       return { ok: report.ok, problems: report.problems.length };
     } catch (err) {
-      this.logger.error(
-        `invariant check failed: ${(err as Error).message}`,
-      );
+      this.logger.error(`invariant check failed: ${(err as Error).message}`);
       await this.notifyAdminsSafely(
         'money_alert_failure',
         `Проверка денежных инвариантов упала: ${(err as Error).message}`,
@@ -640,7 +634,11 @@ export class LedgerService {
    */
   private async alertAdmins(
     problems: string[],
-    mismatches: Array<{ orderId: string; escrowStatus: EscrowStatus; ledgerEscrow: number }>,
+    mismatches: Array<{
+      orderId: string;
+      escrowStatus: EscrowStatus;
+      ledgerEscrow: number;
+    }>,
   ): Promise<void> {
     if (!problems.length && !mismatches.length) return;
 
@@ -665,7 +663,9 @@ export class LedgerService {
   }
 
   /** Warning-уровень (легаси-сид) — отдельный тип, чтобы не тонул в алертах. */
-  private async alertAdminsInvariantWarnings(warnings: string[]): Promise<void> {
+  private async alertAdminsInvariantWarnings(
+    warnings: string[],
+  ): Promise<void> {
     if (!warnings.length) return;
     const lines = [
       `Предупреждения журнала (${warnings.length}):`,
@@ -712,7 +712,10 @@ export class LedgerService {
    * проверка и вставка идут под pg_advisory_xact_lock — второй инстанс
    * ждёт коммита первого и видит уже созданную запись.
    */
-  private async notifyAdminsSafely(type: string, message: string): Promise<void> {
+  private async notifyAdminsSafely(
+    type: string,
+    message: string,
+  ): Promise<void> {
     try {
       const admins = await this.prisma.user.findMany({
         where: { role: UserRole.ADMIN },
@@ -785,7 +788,9 @@ export class LedgerService {
    * контроля: возвращает список заказов, где статус и наличие проводок
    * расходятся (кандидаты на разбор).
    */
-  async findEscrowMismatches(limit = 100): Promise<
+  async findEscrowMismatches(
+    limit = 100,
+  ): Promise<
     Array<{ orderId: string; escrowStatus: EscrowStatus; ledgerEscrow: number }>
   > {
     const orders = await this.prisma.order.findMany({
@@ -838,7 +843,10 @@ export class LedgerService {
       if (op.account !== LedgerAccount.PLATFORM && !op.userId) {
         // ESCROW без userId допустим (агрегатный аккаунт заказа),
         // AVAILABLE/REFERRAL — обязаны быть привязаны к пользователю.
-        if (op.account === LedgerAccount.AVAILABLE || op.account === LedgerAccount.REFERRAL) {
+        if (
+          op.account === LedgerAccount.AVAILABLE ||
+          op.account === LedgerAccount.REFERRAL
+        ) {
           throw new LedgerInvariantError(
             `apply: ${op.account} entry requires userId (refKey=${op.refKey})`,
           );
@@ -863,7 +871,12 @@ export class LedgerService {
     idempotent: boolean,
   ): Promise<LedgerApplyResult> {
     const existing = idempotent
-      ? new Set(await this.findExistingRefKeys(tx, ops.map((op) => op.refKey)))
+      ? new Set(
+          await this.findExistingRefKeys(
+            tx,
+            ops.map((op) => op.refKey),
+          ),
+        )
       : new Set<string>();
 
     const appliedOps = ops.filter((op) => !existing.has(op.refKey));
@@ -876,18 +889,20 @@ export class LedgerService {
       // Считается по состоянию журнала ДО вставки + накопление внутри батча.
       const projected = await this.projectBalances(tx, appliedOps);
 
-      const data: Prisma.LedgerEntryCreateManyInput[] = appliedOps.map((op) => ({
-        account: op.account,
-        amount: round2(op.amount),
-        type: op.type,
-        refKey: op.refKey,
-        userId: op.userId ?? null,
-        orderId: op.orderId ?? null,
-        dealId: op.dealId ?? null,
-        currency: op.currency ?? 'USDT',
-        balanceAfter: projected.get(op.refKey) ?? null,
-        meta: (op.meta ?? undefined) as Prisma.InputJsonValue | undefined,
-      }));
+      const data: Prisma.LedgerEntryCreateManyInput[] = appliedOps.map(
+        (op) => ({
+          account: op.account,
+          amount: round2(op.amount),
+          type: op.type,
+          refKey: op.refKey,
+          userId: op.userId ?? null,
+          orderId: op.orderId ?? null,
+          dealId: op.dealId ?? null,
+          currency: op.currency ?? 'USDT',
+          balanceAfter: projected.get(op.refKey) ?? null,
+          meta: (op.meta ?? undefined) as Prisma.InputJsonValue | undefined,
+        }),
+      );
 
       const result = await tx.ledgerEntry.createMany({
         data,
@@ -984,8 +999,8 @@ export class LedgerService {
       const key = `${op.userId}:${op.account}`;
       const base =
         op.account === LedgerAccount.AVAILABLE
-          ? availableBefore.get(op.userId) ?? 0
-          : bonusBefore.get(op.userId) ?? 0;
+          ? (availableBefore.get(op.userId) ?? 0)
+          : (bonusBefore.get(op.userId) ?? 0);
       const next = round2((running.get(key) ?? base) + round2(op.amount));
       running.set(key, next);
       out.set(op.refKey, next);

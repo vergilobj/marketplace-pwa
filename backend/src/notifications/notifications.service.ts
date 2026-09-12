@@ -18,7 +18,11 @@ type OneSignalBody = Record<string, unknown>;
  * настроен, и падал на каждом пуше уже внутри OneSignal API. Пуш при этом был
  * мёртв, а в логе — ничего на старте.
  */
-const ONESIGNAL_PLACEHOLDER_APP_IDS = new Set(['test', 'change_me', 'changeme']);
+const ONESIGNAL_PLACEHOLDER_APP_IDS = new Set([
+  'test',
+  'change_me',
+  'changeme',
+]);
 
 /**
  * Валиден ли OneSignal App ID.
@@ -212,7 +216,10 @@ export class NotificationsService {
         body: JSON.stringify(body),
       });
 
-      const result = (await response.json()) as { id?: string } & Record<string, unknown>;
+      const result = (await response.json()) as { id?: string } & Record<
+        string,
+        unknown
+      >;
       if (!response.ok) {
         this.logger.error(`OneSignal error: ${JSON.stringify(result)}`);
       } else {

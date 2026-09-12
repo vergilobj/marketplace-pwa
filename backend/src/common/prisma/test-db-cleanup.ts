@@ -147,7 +147,9 @@ export async function cleanupTestData(
             { buyerId: inUsers },
             { sellerId: inUsers },
             { referralUserId: inUsers },
-            ...((ids.orderIds ?? []).length ? [{ id: { in: ids.orderIds } }] : []),
+            ...((ids.orderIds ?? []).length
+              ? [{ id: { in: ids.orderIds } }]
+              : []),
           ],
         },
         select: { id: true, productId: true },
@@ -231,7 +233,9 @@ export async function cleanupTestData(
     },
     select: { id: true },
   });
-  const allPostIds = Array.from(new Set([...postIds, ...posts.map((p) => p.id)]));
+  const allPostIds = Array.from(
+    new Set([...postIds, ...posts.map((p) => p.id)]),
+  );
 
   await prisma.like.deleteMany({ where: { userId: inUsers } });
   await prisma.comment.deleteMany({ where: { userId: inUsers } });

@@ -33,10 +33,25 @@ export class PaymodWebhookHandler {
     private paymentsService: PaymentsService,
   ) {}
 
+  /**
+   * Явное приведение скаляра из нетипизированного payload (webhook) к строке.
+   * `String(unknown)` на объекте даёт '[object Object]' — правило
+   * no-base-to-string справедливо ловит это. Здесь мы осознанно допускаем
+   * только скалярные типы, всё остальное (объект/массив/null) → ''.
+   */
+  private toScalarString(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'bigint') {
+      return String(value);
+    }
+    if (typeof value === 'boolean') return String(value);
+    return '';
+  }
+
   async handleDeposit(body: Record<string, unknown>): Promise<void> {
     const clientRef = (body.client_ref as string) || '';
     const txHash = (body.tx_hash as string) || '';
-    const amountRaw = String(body.amount_raw ?? '');
+    const amountRaw = this.toScalarString(body.amount_raw);
     const chain = (body.chain as string) || '';
     const token = (body.token as string) || '';
     const to = (body.to as string) || '';
@@ -144,7 +159,6 @@ export class PaymodWebhookHandler {
     // ---- НЕДОПЛАТА СВЕРХ ДОПУСКА: не подтверждаем ----
     if (totalReceived + tolerance < expected) {
       const shortfall = expected - totalReceived;
-      const shortfallHuman = fromRaw(shortfall, decimals);
       this.logger.warn(
         `UNDERPAID deposit for ${transaction.id}: expected=${expected}, ` +
           `received=${totalReceived}, shortfall=${shortfall} — order NOT processed`,
@@ -359,7 +373,11 @@ export class PaymodWebhookHandler {
 
   /** §6.1: ожидаемая сумма в атомарных единицах (BigInt). */
   private expectedRaw(
-    transaction: { expectedAmountRaw: string | null; amountRaw: string | null; amount: number },
+    transaction: {
+      expectedAmountRaw: string | null;
+      amountRaw: string | null;
+      amount: number;
+    },
     decimals: number,
   ): bigint {
     const source = transaction.expectedAmountRaw ?? transaction.amountRaw;
@@ -391,12 +409,15 @@ export class PaymodWebhookHandler {
       where: { id: transactionId },
       data: { status: TransactionStatus.FAILED, mismatchReason: reason },
     });
-    this.logger.error(`ALERT ${reason}: transaction ${transactionId} ${JSON.stringify(extra)}`);
+    this.logger.error(
+      `ALERT ${reason}: transaction ${transactionId} ${JSON.stringify(extra)}`,
+    );
   }
 
   private readConfirmations(body: Record<string, unknown>): number | null {
     const raw = body.confirmations;
-    const n = typeof raw === 'number' ? raw : parseInt(String(raw ?? ''), 10);
+    const n =
+      typeof raw === 'number' ? raw : parseInt(this.toScalarString(raw), 10);
     return Number.isFinite(n) ? n : null;
   }
 
@@ -406,7 +427,10 @@ export class PaymodWebhookHandler {
   ): Prisma.InputJsonValue {
     const obj = this.asObject(payload) ?? {};
     const deposit = this.asObject(obj.deposit) ?? {};
-    return { ...obj, deposit: { ...deposit, ...patch } } as Prisma.InputJsonValue;
+    return {
+      ...obj,
+      deposit: { ...deposit, ...patch },
+    } as Prisma.InputJsonValue;
   }
 
   /** Строгий парс атомарной суммы: только десятичные цифры. null — формат неясен. */
@@ -473,7 +497,9 @@ export class PaymodWebhookHandler {
         relatedId,
       );
     } catch (err) {
-      this.logger.warn(`notification to ${userId} failed: ${(err as Error).message}`);
+      this.logger.warn(
+        `notification to ${userId} failed: ${(err as Error).message}`,
+      );
     }
   }
 }

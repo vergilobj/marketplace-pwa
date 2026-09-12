@@ -41,7 +41,9 @@ export class InvitesService {
       // Автоматическая генерация красивого кода (до 10 попыток)
       for (let attempt = 0; attempt < 10; attempt++) {
         const code = generateShortCode();
-        const existing = await this.prisma.invite.findUnique({ where: { code } });
+        const existing = await this.prisma.invite.findUnique({
+          where: { code },
+        });
         if (!existing) {
           invite = await this.prisma.invite.create({
             data: { code, ownerId },
@@ -50,7 +52,9 @@ export class InvitesService {
         }
       }
       if (!invite) {
-        throw new BadRequestException('Не удалось сгенерировать уникальный код');
+        throw new BadRequestException(
+          'Не удалось сгенерировать уникальный код',
+        );
       }
     }
 

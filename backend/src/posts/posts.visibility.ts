@@ -34,7 +34,9 @@ export const PAID_AD_ORDER: Prisma.PostWhereInput = {
  * модуля, и после рестарта процесса «сейчас» замерзло бы — просроченная реклама
  * висела бы в ленте вечно.
  */
-export function publicAdVisibility(now: Date = new Date()): Prisma.PostWhereInput {
+export function publicAdVisibility(
+  now: Date = new Date(),
+): Prisma.PostWhereInput {
   return {
     isHidden: false,
     OR: [

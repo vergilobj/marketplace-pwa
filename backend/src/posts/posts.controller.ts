@@ -81,7 +81,10 @@ export class PostsController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  async findById(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+  async findById(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
     // G3: role нужен, чтобы неоплаченную рекламу видели автор и ADMIN (404 — остальным).
     return this.postsService.findById(id, req.user?.userId, req.user?.role);
   }

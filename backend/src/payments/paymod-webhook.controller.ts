@@ -40,8 +40,12 @@ export class PaymodWebhookController {
     const rawBody = req.rawBody
       ? req.rawBody.toString('utf-8')
       : JSON.stringify(body);
-    if (!this.paymodService.verifyWebhookSignature(timestamp, rawBody, signature)) {
-      this.logger.warn('paymod webhook rejected: invalid signature or stale timestamp');
+    if (
+      !this.paymodService.verifyWebhookSignature(timestamp, rawBody, signature)
+    ) {
+      this.logger.warn(
+        'paymod webhook rejected: invalid signature or stale timestamp',
+      );
       return { status: 'rejected', reason: 'invalid_signature' };
     }
 

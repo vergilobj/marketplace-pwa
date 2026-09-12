@@ -35,7 +35,9 @@ describe('PostsController', () => {
   describe('feed', () => {
     it('should return feed with userId', async () => {
       service.getFeed.mockResolvedValue([]);
-      await controller.feed({ user: { userId: 'user-1', role: 'ADMIN' } } as any);
+      await controller.feed({
+        user: { userId: 'user-1', role: 'ADMIN' },
+      } as any);
       expect(service.getFeed).toHaveBeenCalledWith(
         expect.objectContaining({ userId: 'user-1' }),
       );

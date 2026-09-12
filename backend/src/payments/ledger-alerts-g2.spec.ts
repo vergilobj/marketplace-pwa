@@ -30,19 +30,21 @@ describe('LedgerService → AlertsService (G2)', () => {
 
   it('нарушение инвариантов → alerts.send вызван с кодом money_invariants_violated', async () => {
     const sent: any[] = [];
-    const alerts = { send: jest.fn(async (a: any) => (sent.push(a), true)) };
+    const alerts = {
+      send: jest.fn((a: any) => (sent.push(a), true)),
+    };
 
     const { ledger } = makeLedger(alerts as any);
 
     // Подменяем детекторы: инварианты нарушены, расхождений эскроу нет.
-    jest
-      .spyOn(ledger, 'verifyInvariants')
-      .mockResolvedValue({ ok: false, problems: ['p1', 'p2'], warnings: [] } as any);
+    jest.spyOn(ledger, 'verifyInvariants').mockResolvedValue({
+      ok: false,
+      problems: ['p1', 'p2'],
+      warnings: [],
+    } as any);
     jest.spyOn(ledger, 'findEscrowMismatches').mockResolvedValue([]);
     // Приватный метод доставки админам — не предмет этого теста.
-    jest
-      .spyOn(ledger as any, 'alertAdmins')
-      .mockResolvedValue(undefined);
+    jest.spyOn(ledger as any, 'alertAdmins').mockResolvedValue(undefined);
     jest
       .spyOn(ledger as any, 'alertAdminsInvariantWarnings')
       .mockResolvedValue(undefined);
@@ -58,16 +60,20 @@ describe('LedgerService → AlertsService (G2)', () => {
 
   it('расхождение реестра эскроу → alerts.send с кодом escrow_registry_mismatch', async () => {
     const sent: any[] = [];
-    const alerts = { send: jest.fn(async (a: any) => (sent.push(a), true)) };
+    const alerts = {
+      send: jest.fn((a: any) => (sent.push(a), true)),
+    };
 
     const { ledger } = makeLedger(alerts as any);
 
     jest
       .spyOn(ledger, 'verifyInvariants')
       .mockResolvedValue({ ok: true, problems: [], warnings: [] } as any);
-    jest.spyOn(ledger, 'findEscrowMismatches').mockResolvedValue([
-      { orderId: 'o-1', escrowStatus: 'HELD', ledgerEscrow: 0 },
-    ] as any);
+    jest
+      .spyOn(ledger, 'findEscrowMismatches')
+      .mockResolvedValue([
+        { orderId: 'o-1', escrowStatus: 'HELD', ledgerEscrow: 0 },
+      ] as any);
     jest.spyOn(ledger as any, 'alertAdmins').mockResolvedValue(undefined);
     jest
       .spyOn(ledger as any, 'alertAdminsInvariantWarnings')

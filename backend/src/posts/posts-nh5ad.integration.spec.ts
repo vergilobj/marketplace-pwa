@@ -135,7 +135,7 @@ describe('NH5-ad: реклама не подтверждается без деп
     await mkUser('admin', 'ADMIN'); // platformUser для заказа
 
     fakePaymodProvider.createPayment.mockImplementation(
-      async (_amount: number, _orderId: string, metadata: any) => ({
+      (_amount: number, _orderId: string, metadata: any) => ({
         success: true,
         transactionId: metadata.clientRef,
         status: 'pending',
@@ -159,7 +159,9 @@ describe('NH5-ad: реклама не подтверждается без деп
     createdPostIds.push(post.id);
 
     // 1. Заказ создан, но НЕ оплачен.
-    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    const order = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+    });
     expect(order.status).toBe(OrderStatus.PENDING);
     expect(order.escrowStatus).toBe(EscrowStatus.NONE);
     expect(order.escrowAmount).toBe(0);
@@ -188,10 +190,10 @@ describe('NH5-ad: реклама не подтверждается без деп
 
   it('webhook депозита → PAID + HELD, реклама активирована, ESCROW = сумма', async () => {
     const seller = await mkUser('seller2', 'SELLER');
-    const admin = await mkUser('admin2', 'ADMIN');
+    await mkUser('admin2', 'ADMIN');
 
     fakePaymodProvider.createPayment.mockImplementation(
-      async (_amount: number, _orderId: string, metadata: any) => ({
+      (_amount: number, _orderId: string, metadata: any) => ({
         success: true,
         transactionId: metadata.clientRef,
         status: 'pending',
@@ -224,7 +226,9 @@ describe('NH5-ad: реклама не подтверждается без деп
       to: `0xdeposit2-${suffix}`,
     });
 
-    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    const order = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+    });
     expect(order.status).toBe(OrderStatus.PAID);
     expect(order.escrowStatus).toBe(EscrowStatus.HELD);
     expect(order.escrowAmount).toBe(AMOUNT);
@@ -275,7 +279,7 @@ describe('NH5-ad: реклама не подтверждается без деп
     await mkUser('admin3', 'ADMIN');
 
     fakePaymodProvider.createPayment.mockImplementation(
-      async (_amount: number, _orderId: string, metadata: any) => ({
+      (_amount: number, _orderId: string, metadata: any) => ({
         success: true,
         transactionId: metadata.clientRef,
         status: 'pending',

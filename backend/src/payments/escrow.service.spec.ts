@@ -345,7 +345,11 @@ describe('EscrowService (integration)', () => {
       });
 
       await escrow.holdForOrder(order.id);
-      const result = await escrow.refundEscrow(order.id, 'arbitration_split', 60);
+      const result = await escrow.refundEscrow(
+        order.id,
+        'arbitration_split',
+        60,
+      );
 
       expect(result.refunded).toBe(true);
       expect(result.toBuyer).toBe(600);
@@ -412,7 +416,9 @@ describe('EscrowService (integration)', () => {
         escrow.releaseEscrow(order.id, 'arbitration'),
       ]);
 
-      expect([refund.refunded, release.released].filter(Boolean)).toHaveLength(1);
+      expect([refund.refunded, release.released].filter(Boolean)).toHaveLength(
+        1,
+      );
 
       const updated = await prisma.order.findUniqueOrThrow({
         where: { id: order.id },

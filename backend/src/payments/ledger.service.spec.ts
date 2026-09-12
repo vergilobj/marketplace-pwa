@@ -18,8 +18,15 @@ describe('LedgerService (integration)', () => {
     // Пишем в реальную таблицу Notification — тест проверяет, что запись
     // реально видна в /notifications, а не только «метод вызван».
     createNotification: jest.fn(
-      async (userId: string, type: string, message: string, relatedId?: string) =>
-        prisma.notification.create({ data: { userId, type, message, relatedId } }),
+      async (
+        userId: string,
+        type: string,
+        message: string,
+        relatedId?: string,
+      ) =>
+        prisma.notification.create({
+          data: { userId, type, message, relatedId },
+        }),
     ),
     sendToUser: jest.fn().mockResolvedValue(null),
   } as any;
@@ -566,7 +573,10 @@ describe('LedgerService (integration)', () => {
       // по списку проблем, а не по обрезанному тексту уведомления — так тест не
       // зависит ни от порядка проблем, ни от truncate'а до 5 строк.
       await prisma.notification.deleteMany({
-        where: { userId: admin.id, type: { in: ['money_alert', 'money_warning'] } },
+        where: {
+          userId: admin.id,
+          type: { in: ['money_alert', 'money_warning'] },
+        },
       });
 
       const report = await ledger.verifyInvariants();

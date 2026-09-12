@@ -43,7 +43,12 @@ export class ProactiveService {
     });
 
     for (const deal of deals) {
-      await this.nudge(deal.buyerId, 'cold_lead', deal.id, `Напомнить продавцу о сделке по товару «${deal.product?.title ?? 'без названия'}»? Продавец молчит уже 48 часов.`);
+      await this.nudge(
+        deal.buyerId,
+        'cold_lead',
+        deal.id,
+        `Напомнить продавцу о сделке по товару «${deal.product?.title ?? 'без названия'}»? Продавец молчит уже 48 часов.`,
+      );
     }
   }
 
@@ -61,7 +66,12 @@ export class ProactiveService {
 
     for (const deal of deals) {
       for (const userId of [deal.buyerId, deal.sellerId]) {
-        await this.nudge(userId, 'stuck_negotiation', deal.id, `Сделка ждёт ответа уже 24 часа — продолжить переговоры?`);
+        await this.nudge(
+          userId,
+          'stuck_negotiation',
+          deal.id,
+          `Сделка ждёт ответа уже 24 часа — продолжить переговоры?`,
+        );
       }
     }
   }
@@ -95,7 +105,12 @@ export class ProactiveService {
   }
 
   /** Единая точка проактивного сообщения с rate limit и @@unique дедупом. */
-  private async nudge(userId: string, kind: string, refId: string, prompt: string) {
+  private async nudge(
+    userId: string,
+    kind: string,
+    refId: string,
+    prompt: string,
+  ) {
     try {
       // 1) @@unique — один раз на сущность.
       const existing = await this.prisma.proactiveEvent.findUnique({
@@ -139,7 +154,9 @@ export class ProactiveService {
         { screen: 'bazar' },
       );
     } catch (e) {
-      this.logger.warn(`Proactive nudge failed for ${userId}/${kind}: ${(e as Error).message}`);
+      this.logger.warn(
+        `Proactive nudge failed for ${userId}/${kind}: ${(e as Error).message}`,
+      );
     }
   }
 }

@@ -32,7 +32,8 @@ export class AuthService {
     const existingUser = await this.prisma.user.findUnique({
       where: { phone: dto.phone },
     });
-    if (existingUser) throw new ConflictException('Телефон уже зарегистрирован');
+    if (existingUser)
+      throw new ConflictException('Телефон уже зарегистрирован');
 
     const invite = await this.prisma.invite.findUnique({
       where: { code: dto.inviteCode },

@@ -4,7 +4,7 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
-import { AutopilotRun, BazarRole, Prisma } from '@prisma/client';
+import { AutopilotRun, BazarRole } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { BazarApiClient } from './bazar.api-client';
 import { CatalogSearchService } from './catalog-search.service';
@@ -33,7 +33,11 @@ export class AutopilotService {
 
   async start(userId: string, goal: string, budget?: number) {
     const active = await this.prisma.autopilotRun.findFirst({
-      where: { userId, kind: 'AUTOPILOT', status: { in: ['RUNNING', 'AWAITING_USER'] } },
+      where: {
+        userId,
+        kind: 'AUTOPILOT',
+        status: { in: ['RUNNING', 'AWAITING_USER'] },
+      },
     });
     if (active) throw new BadRequestException('У вас уже идёт автоподбор');
 
@@ -51,7 +55,10 @@ export class AutopilotService {
 
     try {
       const catalog = await this.search.search(goal, userId);
-      const candidates = this.normalizeCandidates(catalog.products ?? []).slice(0, 3);
+      const candidates = this.normalizeCandidates(catalog.products ?? []).slice(
+        0,
+        3,
+      );
 
       const text = await this.apiClient.complete(
         [
@@ -66,12 +73,19 @@ export class AutopilotService {
       await this.writeAssistant(userId, run.id, 1, text.text);
       await this.prisma.autopilotRun.update({
         where: { id: run.id },
-        data: { status: 'AWAITING_USER', lastStepAt: new Date(), context: { candidates } as Prisma.InputJsonValue },
+        data: {
+          status: 'AWAITING_USER',
+          lastStepAt: new Date(),
+          context: { candidates },
+        },
       });
 
       return { runId: run.id, text: text.text, candidates };
     } catch (e) {
-      await this.failRun(run.id, 'Помощник временно недоступен, вот что нашёл — уточните запрос.');
+      await this.failRun(
+        run.id,
+        'Помощник временно недоступен, вот что нашёл — уточните запрос.',
+      );
       throw e;
     }
   }
@@ -99,10 +113,19 @@ export class AutopilotService {
       }
 
       // refine / отказ → следующий шаг поиска с учётом feedback И бюджета.
-      const feedback = event.type === 'refine' ? event.feedback ?? '' : 'нет, другой вариант';
+      const feedback =
+        event.type === 'refine'
+          ? (event.feedback ?? '')
+          : 'нет, другой вариант';
       const budgetHint = run.budget != null ? ` до ${run.budget} рублей` : '';
-      const catalog = await this.search.search(`${run.goal} ${feedback}${budgetHint}`, userId);
-      const candidates = this.normalizeCandidates(catalog.products ?? []).slice(0, 3);
+      const catalog = await this.search.search(
+        `${run.goal} ${feedback}${budgetHint}`,
+        userId,
+      );
+      const candidates = this.normalizeCandidates(catalog.products ?? []).slice(
+        0,
+        3,
+      );
 
       const next = await this.apiClient.complete(
         [
@@ -117,13 +140,21 @@ export class AutopilotService {
       const newStep = run.step + 1;
       await this.prisma.autopilotRun.update({
         where: { id: run.id },
-        data: { step: newStep, lastStepAt: new Date(), status: 'AWAITING_USER', context: { candidates } as Prisma.InputJsonValue },
+        data: {
+          step: newStep,
+          lastStepAt: new Date(),
+          status: 'AWAITING_USER',
+          context: { candidates },
+        },
       });
       await this.writeAssistant(userId, run.id, newStep, next.text);
 
       return { step: newStep, text: next.text };
     } catch (e) {
-      await this.failRun(run.id, 'Помощник временно недоступен — попробуйте ещё раз.');
+      await this.failRun(
+        run.id,
+        'Помощник временно недоступен — попробуйте ещё раз.',
+      );
       throw e;
     }
   }
@@ -137,7 +168,8 @@ export class AutopilotService {
     run: AutopilotRun,
     event: { accept?: boolean; productId?: string; text?: string },
   ) {
-    let candidates: Candidate[] = (run.context as { candidates?: Candidate[] } | null)?.candidates ?? [];
+    let candidates: Candidate[] =
+      (run.context as { candidates?: Candidate[] } | null)?.candidates ?? [];
 
     // Edge: кандидаты не сохранились — fallback на поиск по goal, не по тексту confirm.
     if (!candidates.length) {
@@ -146,7 +178,7 @@ export class AutopilotService {
       if (candidates.length) {
         await this.prisma.autopilotRun.update({
           where: { id: run.id },
-          data: { context: { candidates } as Prisma.InputJsonValue },
+          data: { context: { candidates } },
         });
       }
     }
@@ -155,7 +187,10 @@ export class AutopilotService {
 
     // Детерминированно по реплике юзера (приоритетнее, чем productId от LLM,
     // который на confirm мог переискать и прицепить не тот товар).
-    let productId: string | undefined = this.matchCandidate(candidates, replyText);
+    let productId: string | undefined = this.matchCandidate(
+      candidates,
+      replyText,
+    );
 
     // productId из события валиден только если он есть в сохранённых кандидатах.
     if (!productId && event.productId) {
@@ -174,7 +209,12 @@ export class AutopilotService {
         select: { isActive: true, title: true, price: true },
       });
       if (!product || !product.isActive) {
-        await this.writeAssistant(userId, run.id, run.step, 'Товар недоступен — уточните, что ищете.');
+        await this.writeAssistant(
+          userId,
+          run.id,
+          run.step,
+          'Товар недоступен — уточните, что ищете.',
+        );
         await this.prisma.autopilotRun.update({
           where: { id: run.id },
           data: { status: 'AWAITING_USER' },
@@ -182,7 +222,11 @@ export class AutopilotService {
         return { done: false, text: 'Товар недоступен' };
       }
 
-      const deal = await this.deals.createFromChat(userId, { productId }, undefined);
+      const deal = await this.deals.createFromChat(
+        userId,
+        { productId },
+        undefined,
+      );
       const text = `Готово! Оформляю сделку по «${product.title}» — ${product.price} ₽. Продавцу ушёл лид, ждите ответа.`;
       await this.writeAssistant(userId, run.id, run.step, text);
       await this.prisma.autopilotRun.update({
@@ -206,7 +250,10 @@ export class AutopilotService {
   }
 
   /** Сопоставляет реплику юзера с сохранёнными кандидатами: цена → название → порядковый номер. */
-  private matchCandidate(candidates: Candidate[], text: string): string | undefined {
+  private matchCandidate(
+    candidates: Candidate[],
+    text: string,
+  ): string | undefined {
     const t = (text || '').trim();
     if (!t || !candidates.length) return undefined;
 
@@ -236,7 +283,9 @@ export class AutopilotService {
   }
 
   private extractPrice(text: string): number | null {
-    const m = text.toLowerCase().match(/(?:за|по|цена|стоит)?\s*(\d{3,}(?:[.,]\d+)?)\s*(?:₽|руб|р\.?)?/);
+    const m = text
+      .toLowerCase()
+      .match(/(?:за|по|цена|стоит)?\s*(\d{3,}(?:[.,]\d+)?)\s*(?:₽|руб|р\.?)?/);
     if (!m) return null;
     const raw = parseFloat(m[1].replace(',', '.'));
     return isNaN(raw) ? null : raw;
@@ -245,7 +294,12 @@ export class AutopilotService {
   private extractOrdinal(text: string): number | null {
     const t = text.toLowerCase();
     const map: Record<string, number> = {
-      'перв': 1, 'втор': 2, 'трет': 3, 'четвёрт': 4, 'четверт': 4, 'пят': 5,
+      перв: 1,
+      втор: 2,
+      трет: 3,
+      четвёрт: 4,
+      четверт: 4,
+      пят: 5,
     };
     for (const [key, n] of Object.entries(map)) {
       if (t.includes(key)) return n;
@@ -257,11 +311,19 @@ export class AutopilotService {
 
   /** Товары из CatalogSearchService: нужны только id/title/price, форму не гарантируем. */
   private normalizeCandidates(
-    products: { id?: string; title?: string | null; price?: number | string | null }[],
+    products: {
+      id?: string;
+      title?: string | null;
+      price?: number | string | null;
+    }[],
   ): Candidate[] {
     return products
       .filter((p) => p && p.id)
-      .map((p) => ({ id: p.id as string, title: p.title ?? '', price: Number(p.price) || 0 }));
+      .map((p) => ({
+        id: p.id as string,
+        title: p.title ?? '',
+        price: Number(p.price) || 0,
+      }));
   }
 
   private async lastUserText(userId: string): Promise<string> {
@@ -287,7 +349,12 @@ export class AutopilotService {
     });
   }
 
-  private async writeAssistant(userId: string, runId: string, step: number, text: string) {
+  private async writeAssistant(
+    userId: string,
+    runId: string,
+    step: number,
+    text: string,
+  ) {
     await this.prisma.bazarMessage.create({
       data: {
         userId,

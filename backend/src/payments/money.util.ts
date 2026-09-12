@@ -91,7 +91,9 @@ export function computeFees(
 ): FeeSplit {
   const total = round2(amount);
   const platformFee = round2((total * platformPercent) / 100);
-  const referralBonus = hasReferrer ? round2((total * referralPercent) / 100) : 0;
+  const referralBonus = hasReferrer
+    ? round2((total * referralPercent) / 100)
+    : 0;
   const sellerNet = round2(total - platformFee - referralBonus);
   return { platformFee, referralBonus, sellerNet };
 }

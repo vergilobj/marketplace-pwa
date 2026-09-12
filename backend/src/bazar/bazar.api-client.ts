@@ -37,7 +37,8 @@ export class BazarApiClient {
   private readonly model: string;
 
   constructor(private config: ConfigService) {
-    this.baseUrl = this.config.get<string>('BAZAR_API_URL') || 'http://127.0.0.1:8642/v1';
+    this.baseUrl =
+      this.config.get<string>('BAZAR_API_URL') || 'http://127.0.0.1:8642/v1';
     this.apiKey = this.config.get<string>('BAZAR_API_KEY') || '';
     this.model = this.config.get<string>('BAZAR_MODEL') || 'bazar';
   }
@@ -59,7 +60,9 @@ export class BazarApiClient {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.apiKey}`,
-          ...(opts?.sessionKey ? { 'X-Hermes-Session-Key': opts.sessionKey } : {}),
+          ...(opts?.sessionKey
+            ? { 'X-Hermes-Session-Key': opts.sessionKey }
+            : {}),
         },
         body: JSON.stringify({
           model: this.model,
@@ -79,7 +82,9 @@ export class BazarApiClient {
       throw new Error('bazar_error');
     }
 
-    const data = (await res.json().catch(() => null)) as ChatCompletionResponse | null;
+    const data = (await res
+      .json()
+      .catch(() => null)) as ChatCompletionResponse | null;
     const content = data?.choices?.[0]?.message?.content ?? '';
     return this.parseContent(content);
   }

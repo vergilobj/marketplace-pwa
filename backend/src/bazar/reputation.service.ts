@@ -52,7 +52,9 @@ export class ReputationService {
           await this.recompute(sellerId);
           updated++;
         } catch (e) {
-          this.logger.warn(`recompute failed for ${sellerId}: ${(e as Error).message}`);
+          this.logger.warn(
+            `recompute failed for ${sellerId}: ${(e as Error).message}`,
+          );
         }
       }
     }
@@ -62,21 +64,26 @@ export class ReputationService {
 
   /** Полный пересчёт одного продавца. Возвращает вычисленный скор. */
   async recompute(sellerId: string): Promise<number> {
-    const [replySpeed, successRate, completionRate, cancelRate, disputePenalty] =
-      await Promise.all([
-        this.computeReplySpeed(sellerId),
-        this.computeSuccessRate(sellerId),
-        this.computeCompletionRate(sellerId),
-        this.computeCancelRate(sellerId),
-        this.computeDisputePenalty(sellerId),
-      ]);
+    const [
+      replySpeed,
+      successRate,
+      completionRate,
+      cancelRate,
+      disputePenalty,
+    ] = await Promise.all([
+      this.computeReplySpeed(sellerId),
+      this.computeSuccessRate(sellerId),
+      this.computeCompletionRate(sellerId),
+      this.computeCancelRate(sellerId),
+      this.computeDisputePenalty(sellerId),
+    ]);
 
     const raw =
-      0.40 * replySpeed +
-      0.30 * successRate +
-      0.20 * completionRate -
-      0.10 * cancelRate -
-      0.10 * disputePenalty;
+      0.4 * replySpeed +
+      0.3 * successRate +
+      0.2 * completionRate -
+      0.1 * cancelRate -
+      0.1 * disputePenalty;
 
     const trustScore = Math.round(clamp(0.05, 0.95, raw) * 1000) / 1000;
 
@@ -120,9 +127,7 @@ export class ReputationService {
     const isPublicSeller = user.products.length > 0;
 
     if (!isSelf && !isStaff && !isPublicSeller) {
-      throw new ForbiddenException(
-        'Репутация доступна только для продавцов',
-      );
+      throw new ForbiddenException('Репутация доступна только для продавцов');
     }
 
     return {
@@ -193,10 +198,18 @@ export class ReputationService {
     const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
     const [closed, lost] = await Promise.all([
       this.prisma.deal.count({
-        where: { sellerId, status: DealStatus.CLOSED, createdAt: { gte: cutoff } },
+        where: {
+          sellerId,
+          status: DealStatus.CLOSED,
+          createdAt: { gte: cutoff },
+        },
       }),
       this.prisma.deal.count({
-        where: { sellerId, status: DealStatus.LOST, createdAt: { gte: cutoff } },
+        where: {
+          sellerId,
+          status: DealStatus.LOST,
+          createdAt: { gte: cutoff },
+        },
       }),
     ]);
     const total = closed + lost;
@@ -207,7 +220,9 @@ export class ReputationService {
   /** Order COMPLETED / total seller orders, min 1 иначе 0.5. */
   private async computeCompletionRate(sellerId: string): Promise<number> {
     const [completed, total] = await Promise.all([
-      this.prisma.order.count({ where: { sellerId, status: OrderStatus.COMPLETED } }),
+      this.prisma.order.count({
+        where: { sellerId, status: OrderStatus.COMPLETED },
+      }),
       this.prisma.order.count({ where: { sellerId } }),
     ]);
     if (total === 0) return 0.5;

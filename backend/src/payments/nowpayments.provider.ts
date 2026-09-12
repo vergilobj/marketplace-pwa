@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
-import { PaymentMetadata, PaymentProvider, PaymentResult } from './payment.provider';
+import {
+  PaymentMetadata,
+  PaymentProvider,
+  PaymentResult,
+} from './payment.provider';
 
 @Injectable()
 export class NowPaymentsProvider extends PaymentProvider {
@@ -40,7 +44,9 @@ export class NowPaymentsProvider extends PaymentProvider {
       cancel_url: metadata?.cancelUrl,
     };
 
-    this.logger.log(`Creating invoice for order ${orderId}: ${amount} ${body.price_currency}`);
+    this.logger.log(
+      `Creating invoice for order ${orderId}: ${amount} ${body.price_currency}`,
+    );
 
     const res = await fetch(`${this.baseUrl}/invoice`, {
       method: 'POST',
@@ -53,7 +59,9 @@ export class NowPaymentsProvider extends PaymentProvider {
 
     if (!res.ok) {
       const err = await res.text();
-      this.logger.error(`NowPayments invoice creation failed: ${res.status} ${err}`);
+      this.logger.error(
+        `NowPayments invoice creation failed: ${res.status} ${err}`,
+      );
       throw new Error(`NowPayments error: ${res.status}`);
     }
 
@@ -81,7 +89,12 @@ export class NowPaymentsProvider extends PaymentProvider {
     if (!res.ok) {
       const err = await res.text();
       this.logger.warn(`NowPayments verify failed: ${res.status} ${err}`);
-      return { success: false, transactionId, status: 'failed', raw: { error: err } };
+      return {
+        success: false,
+        transactionId,
+        status: 'failed',
+        raw: { error: err },
+      };
     }
 
     const data = await res.json();
@@ -99,7 +112,9 @@ export class NowPaymentsProvider extends PaymentProvider {
     };
 
     return {
-      success: payment.payment_status === 'finished' || payment.payment_status === 'confirmed',
+      success:
+        payment.payment_status === 'finished' ||
+        payment.payment_status === 'confirmed',
       transactionId,
       status: statusMap[payment.payment_status] || 'pending',
       raw: payment,
@@ -110,7 +125,10 @@ export class NowPaymentsProvider extends PaymentProvider {
    * Verify HMAC-SHA512 signature from IPN webhook.
    * NowPayments signs the request body (sorted keys, JSON.stringify) with ipn_secret.
    */
-  verifyIpnSignature(body: Record<string, unknown>, signature: string): boolean {
+  verifyIpnSignature(
+    body: Record<string, unknown>,
+    signature: string,
+  ): boolean {
     const sortedBody = JSON.stringify(body, Object.keys(body).sort());
     const hmac = createHmac('sha512', this.ipnSecret)
       .update(sortedBody)

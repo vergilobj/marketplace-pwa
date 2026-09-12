@@ -158,7 +158,9 @@ export class ArbitrageService {
         }
       } catch (e) {
         // LLM недоступен — оставляем OPEN, cron ретраит через 10 мин.
-        this.logger.warn(`Arbitrage failed for deal ${deal.id}: ${(e as Error).message}`);
+        this.logger.warn(
+          `Arbitrage failed for deal ${deal.id}: ${(e as Error).message}`,
+        );
       }
     }
 
@@ -242,7 +244,7 @@ export class ArbitrageService {
     if (order.escrowStatus !== EscrowStatus.HELD) return;
     if (order.deals.length > 0) return;
 
-    const context = await this.buildOrderDisputeContext(order);
+    const context = this.buildOrderDisputeContext(order);
     const text = await this.apiClient.complete(
       [
         {
@@ -269,7 +271,7 @@ export class ArbitrageService {
   }
 
   /** NH8: материалы спора по заказу для LLM (без чата сделки — его нет). */
-  private async buildOrderDisputeContext(order: {
+  private buildOrderDisputeContext(order: {
     id: string;
     amount: number;
     status: OrderStatus;
@@ -281,7 +283,7 @@ export class ArbitrageService {
     sellerId: string;
     cancelReason?: string | null;
     product?: { title: string; description: string | null } | null;
-  }): Promise<string> {
+  }): string {
     const parts = [
       `Заказ ${order.id} (маркетплейс, без сделки в базаре).`,
       `Статус: ${order.status}, эскроу: ${order.escrowStatus} ${order.escrowAmount} USDT.`,
@@ -495,7 +497,11 @@ export class ArbitrageService {
       if (verdict === 'SELLER_RIGHT') {
         await this.escrow.releaseEscrow(order.id, 'arbitration');
       } else if (verdict === 'BUYER_RIGHT') {
-        await this.escrow.refundEscrow(order.id, 'arbitration_buyer_right', 100);
+        await this.escrow.refundEscrow(
+          order.id,
+          'arbitration_buyer_right',
+          100,
+        );
       } else if (verdict === 'SPLIT') {
         await this.escrow.refundEscrow(
           order.id,

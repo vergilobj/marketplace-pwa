@@ -58,7 +58,7 @@ export class ChatService {
 
   private detectContact(text: string): boolean {
     // Телефоны: +7..., 8..., просто 10+ цифр подряд
-    const phoneRegex = /(\+?\d[\d\s()\-]{9,}\d)/;
+    const phoneRegex = /(\+?\d[\d\s()-]{9,}\d)/;
     // Email
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
     // URL

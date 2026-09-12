@@ -50,7 +50,10 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: JwtService, useValue: mockJwtService as any },
         { provide: ConfigService, useValue: mockConfig },
-        { provide: AuditService, useValue: { log: jest.fn().mockResolvedValue({}) } },
+        {
+          provide: AuditService,
+          useValue: { log: jest.fn().mockResolvedValue({}) },
+        },
       ],
     }).compile();
 

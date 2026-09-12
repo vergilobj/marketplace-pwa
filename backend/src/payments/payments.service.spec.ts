@@ -11,7 +11,6 @@ import { EscrowService } from './escrow.service';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
-  let prisma: any;
 
   const mockOrder = {
     id: 'order-1',
@@ -113,7 +112,6 @@ describe('PaymentsService', () => {
       ],
     }).compile();
     service = module.get<PaymentsService>(PaymentsService);
-    prisma = mockPrisma;
     jest.clearAllMocks();
     mockSettings.get.mockResolvedValue('paymod');
     mockPaymod.createPayment.mockResolvedValue({

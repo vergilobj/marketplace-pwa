@@ -5,7 +5,10 @@ import type { AuthenticatedUser } from '../common/types/authenticated-request.in
 @Injectable()
 export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
   /** Не роняем запрос при отсутствии/невалидности токена — просто user = null. */
-  handleRequest<TUser = AuthenticatedUser>(err: unknown, user: TUser): TUser | null {
+  handleRequest<TUser = AuthenticatedUser>(
+    err: unknown,
+    user: TUser,
+  ): TUser | null {
     return user || null;
   }
 }

@@ -269,7 +269,10 @@ export class PostsService implements OnModuleInit {
     // `GET /posts/:id` под OptionalJwtAuthGuard отдавал её анонимному
     // пользователю: он видел «реклама выложилась, хотя я не платил».
     // Отвечаем 404 (а не 403) — не подтверждаем существование поста.
-    if (this.isUnpaidOrExpiredAd(post) && !this.canSeeUnpaidAd(post, userId, role)) {
+    if (
+      this.isUnpaidOrExpiredAd(post) &&
+      !this.canSeeUnpaidAd(post, userId, role)
+    ) {
       throw new NotFoundException('Пост не найден');
     }
 
@@ -522,9 +525,7 @@ export class PostsService implements OnModuleInit {
       const deactivated = await this.deactivateExpiredAds();
       return { deactivated };
     } catch (e) {
-      this.logger.error(
-        `expireAdsCron failed: ${(e as Error).message}`,
-      );
+      this.logger.error(`expireAdsCron failed: ${(e as Error).message}`);
       return { deactivated: 0 };
     }
   }

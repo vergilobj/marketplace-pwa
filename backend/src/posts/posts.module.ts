@@ -9,7 +9,13 @@ import { AuditService } from '../common/audit/audit.service';
 import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
-  imports: [SettingsModule, PaymentsModule, AuthModule, NotificationsModule, ModerationModule],
+  imports: [
+    SettingsModule,
+    PaymentsModule,
+    AuthModule,
+    NotificationsModule,
+    ModerationModule,
+  ],
   controllers: [PostsController],
   providers: [PostsService, AuditService],
 })

@@ -93,10 +93,7 @@ export class PaymentsController {
   // Владение заказами проверяет сервис (403 на чужой заказ).
   @UseGuards(JwtAuthGuard)
   @Post('cart/pay')
-  async payCart(
-    @Body() dto: CartPayDto,
-    @Request() req: AuthenticatedRequest,
-  ) {
+  async payCart(@Body() dto: CartPayDto, @Request() req: AuthenticatedRequest) {
     return this.paymentsService.createPaymentForCart(
       dto.orderIds,
       req.user.userId,
@@ -135,14 +132,9 @@ export class PaymentsController {
     const orderId = this.nowPayments.extractOrderId(body);
     const paymentStatus = body.payment_status as string;
 
-    this.logger.log(
-      `IPN verified: order=${orderId} status=${paymentStatus}`,
-    );
+    this.logger.log(`IPN verified: order=${orderId} status=${paymentStatus}`);
 
-    if (
-      paymentStatus === 'finished' ||
-      paymentStatus === 'confirmed'
-    ) {
+    if (paymentStatus === 'finished' || paymentStatus === 'confirmed') {
       if (!orderId) {
         // Деньги пришли без привязки к заказу — молча терять нельзя.
         this.logger.error(

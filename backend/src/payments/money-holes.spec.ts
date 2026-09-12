@@ -221,9 +221,7 @@ describe('D6: updateStatus(DISPUTED) поднимает Deal.dispute', () => {
       updateMany: jest.fn(),
     },
     deal: {
-      findFirst: jest
-        .fn()
-        .mockResolvedValue({ id: 'deal-1', dispute: null }),
+      findFirst: jest.fn().mockResolvedValue({ id: 'deal-1', dispute: null }),
       update: jest.fn().mockResolvedValue({}),
     },
   };
@@ -248,7 +246,10 @@ describe('D6: updateStatus(DISPUTED) поднимает Deal.dispute', () => {
         OrdersService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditService, useValue: { log: jest.fn() } },
-        { provide: PaymentsDep, useValue: { createPaymentForOrder: jest.fn() } },
+        {
+          provide: PaymentsDep,
+          useValue: { createPaymentForOrder: jest.fn() },
+        },
         { provide: EscrowService, useValue: mockEscrow },
         { provide: SettingsService, useValue: mockSettings },
         { provide: NotificationsService, useValue: mockNotifications },
@@ -285,7 +286,7 @@ describe('D6: updateStatus(DISPUTED) поднимает Deal.dispute', () => {
     mockEscrow.releaseEscrow.mockResolvedValue({ released: false });
     await service.adminForceStatus(
       'order-1',
-      { status: OrderStatus.COMPLETED } as any,
+      { status: OrderStatus.COMPLETED },
       'ручное завершение',
     );
     expect(prisma.order.update).toHaveBeenCalledWith(
@@ -301,7 +302,6 @@ describe('D6: updateStatus(DISPUTED) поднимает Deal.dispute', () => {
 // ============================================================
 describe('D4: сбой холда откатывает заказ в PENDING', () => {
   let service: PaymentsService;
-  let prisma: any;
 
   const mockPrisma = {
     order: {
@@ -320,17 +320,22 @@ describe('D4: сбой холда откатывает заказ в PENDING', (
       providers: [
         PaymentsService,
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: SettingsService, useValue: { get: jest.fn(), getFloat: jest.fn() } },
+        {
+          provide: SettingsService,
+          useValue: { get: jest.fn(), getFloat: jest.fn() },
+        },
         { provide: NowPaymentsProvider, useValue: {} },
         { provide: PaymodProvider, useValue: {} },
         { provide: PaymodService, useValue: { getTxStatus: jest.fn() } },
         { provide: LedgerService, useValue: { credit: jest.fn() } },
-        { provide: NotificationsService, useValue: { createNotification: jest.fn() } },
+        {
+          provide: NotificationsService,
+          useValue: { createNotification: jest.fn() },
+        },
         { provide: EscrowService, useValue: mockEscrow },
       ],
     }).compile();
     service = module.get(PaymentsService);
-    prisma = mockPrisma;
   });
 
   it('при падении holdForOrder заказ возвращается в PENDING и ошибка наверх', async () => {

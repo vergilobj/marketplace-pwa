@@ -66,7 +66,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const http = host.switchToHttp();
     const response = http.getResponse();
-    const request = http.getRequest();
 
     this.logException(exception, host);
 
@@ -173,7 +172,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
         : ((exception as { statusCode?: number })?.statusCode ?? 500);
 
     const name = exception instanceof Error ? exception.name : typeof exception;
-    const message = exception instanceof Error ? exception.message : String(exception);
+    const message =
+      exception instanceof Error ? exception.message : String(exception);
     const stack = exception instanceof Error ? exception.stack : undefined;
 
     const context = `${method} ${url} user=${userId} status=${status}`;

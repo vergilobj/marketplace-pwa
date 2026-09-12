@@ -37,10 +37,7 @@ export class InvitesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'MODERATOR')
   @Get()
-  async findAll(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
+  async findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
     // L1: потолок limit. Ответ — массив (AdminPage).
     return this.invitesService.findAll({
       page: parsePage(page),

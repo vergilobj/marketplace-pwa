@@ -130,7 +130,7 @@ describe('Срок рекламы = оплаченный dto.days (integration)'
     await mkUser('admin', 'ADMIN');
 
     fakePaymodProvider.createPayment.mockImplementation(
-      async (_amount: number, _orderId: string, metadata: any) => ({
+      (_amount: number, _orderId: string, metadata: any) => ({
         success: true,
         transactionId: metadata.clientRef,
         status: 'pending',
@@ -170,11 +170,15 @@ describe('Срок рекламы = оплаченный dto.days (integration)'
       to: `0xadterm-${suffix}`,
     });
 
-    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    const order = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+    });
     expect(order.status).toBe(OrderStatus.PAID);
     expect(order.escrowStatus).toBe(EscrowStatus.HELD);
 
-    const fresh = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    const fresh = await prisma.post.findUniqueOrThrow({
+      where: { id: post.id },
+    });
     expect(fresh.isPinned).toBe(true);
     expect(fresh.adExpireDate).not.toBeNull();
 
@@ -184,8 +188,7 @@ describe('Срок рекламы = оплаченный dto.days (integration)'
     expect(days).toBeLessThanOrEqual(30.01);
 
     // Окно эскроу при этом осталось коротким (5д) — сроки независимы.
-    const escrowDays =
-      (order.autoCompleteAt!.getTime() - Date.now()) / DAY_MS;
+    const escrowDays = (order.autoCompleteAt!.getTime() - Date.now()) / DAY_MS;
     expect(escrowDays).toBeGreaterThan(4.9);
     expect(escrowDays).toBeLessThanOrEqual(5.01);
     expect(escrowDays).toBeLessThan(days);
@@ -196,7 +199,7 @@ describe('Срок рекламы = оплаченный dto.days (integration)'
     await mkUser('admin2', 'ADMIN');
 
     fakePaymodProvider.createPayment.mockImplementation(
-      async (_amount: number, _orderId: string, metadata: any) => ({
+      (_amount: number, _orderId: string, metadata: any) => ({
         success: true,
         transactionId: metadata.clientRef,
         status: 'pending',
@@ -229,7 +232,9 @@ describe('Срок рекламы = оплаченный dto.days (integration)'
       to: `0xadterm2-${suffix}`,
     });
 
-    const fresh = await prisma.post.findUniqueOrThrow({ where: { id: post.id } });
+    const fresh = await prisma.post.findUniqueOrThrow({
+      where: { id: post.id },
+    });
     const actual = (fresh.adExpireDate!.getTime() - Date.now()) / DAY_MS;
     expect(actual).toBeGreaterThan(2.9);
     expect(actual).toBeLessThanOrEqual(3.01);

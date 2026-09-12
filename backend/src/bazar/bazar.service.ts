@@ -3,7 +3,10 @@ import { BazarMessage, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { BazarApiClient, BazarRef } from './bazar.api-client';
 import { CatalogSearchService } from './catalog-search.service';
-import { IntentDispatcher, type IntentAction } from './intent-dispatcher.service';
+import {
+  IntentDispatcher,
+  type IntentAction,
+} from './intent-dispatcher.service';
 import { AutopilotService } from './autopilot.service';
 import { clampLimit, clampPage } from '../common/dto/pagination.dto';
 
@@ -20,7 +23,9 @@ export class BazarService {
   ) {}
 
   /** Идемпотентное приветствие нового юзера. Личность — из SOUL профиля bazar. */
-  async ensureWelcome(userId: string): Promise<{ created: boolean; message?: BazarMessage }> {
+  async ensureWelcome(
+    userId: string,
+  ): Promise<{ created: boolean; message?: BazarMessage }> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.bazarWelcomed) return { created: false };
 
@@ -39,7 +44,9 @@ export class BazarService {
       refs = welcome.refs ?? [];
     } catch (e) {
       // API лёг — отдаём статичное приветствие, не блочим вход юзеру.
-      this.logger.warn(`Welcome fallback for ${userId}: ${(e as Error).message}`);
+      this.logger.warn(
+        `Welcome fallback for ${userId}: ${(e as Error).message}`,
+      );
       text = `Привет, ${user.name ?? 'друг'}! Я Базар — помогу найти товары, услуги и людей на площадке. Спроси, что ищешь.`;
     }
 
@@ -68,7 +75,11 @@ export class BazarService {
     // Если у юзера активен автоподбор — маршрутизируем в автопилот,
     // минуя обычный LLM-поток (иначе агент переищет и потеряет кандидатов).
     const activeRun = await this.prisma.autopilotRun.findFirst({
-      where: { userId, kind: 'AUTOPILOT', status: { in: ['RUNNING', 'AWAITING_USER'] } },
+      where: {
+        userId,
+        kind: 'AUTOPILOT',
+        status: { in: ['RUNNING', 'AWAITING_USER'] },
+      },
       orderBy: { createdAt: 'desc' },
     });
     if (activeRun) {
@@ -81,7 +92,9 @@ export class BazarService {
           feedback: isConfirm ? undefined : text,
         });
       } catch (e) {
-        this.logger.warn(`Autopilot resume failed for ${userId}: ${(e as Error).message}`);
+        this.logger.warn(
+          `Autopilot resume failed for ${userId}: ${(e as Error).message}`,
+        );
         // Упал автопилот — не роняем чат, отдаём обычный ответ ниже.
       }
     }
@@ -90,7 +103,13 @@ export class BazarService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, role: true, bonusBalance: true, bazarSessionKey: true },
+      select: {
+        id: true,
+        name: true,
+        role: true,
+        bonusBalance: true,
+        bazarSessionKey: true,
+      },
     });
 
     const history = await this.prisma.bazarMessage.findMany({
@@ -123,7 +142,7 @@ export class BazarService {
     ]);
 
     const compactDeal = (
-      d: typeof dealsAsBuyer[number] | typeof dealsAsSeller[number],
+      d: (typeof dealsAsBuyer)[number] | (typeof dealsAsSeller)[number],
       counterparty: { id: string; name: string | null } | undefined,
     ) => ({
       id: d.id,
@@ -167,14 +186,19 @@ export class BazarService {
         { sessionKey: user?.bazarSessionKey || userId },
       );
     } catch (e) {
-      this.logger.warn(`send bazar failed for ${userId}: ${(e as Error).message}`);
+      this.logger.warn(
+        `send bazar failed for ${userId}: ${(e as Error).message}`,
+      );
       throw e;
     }
 
     // Запрос на автоподбор: НЕ пишем свой текст и НЕ диспатчим отдельно —
     // автопилот сам делает search + LLM + сохраняет ОДНО assistant-сообщение.
     // Иначе получится двойная генерация списков (наша + из AutopilotService.start).
-    if (answer.action?.intent === 'autopilot_request' && answer.action.payload?.goal) {
+    if (
+      answer.action?.intent === 'autopilot_request' &&
+      answer.action.payload?.goal
+    ) {
       try {
         return await this.autopilot.start(
           userId,
@@ -182,7 +206,9 @@ export class BazarService {
           answer.action.payload.budget,
         );
       } catch (e) {
-        this.logger.warn(`Autopilot start failed for ${userId}: ${(e as Error).message}`);
+        this.logger.warn(
+          `Autopilot start failed for ${userId}: ${(e as Error).message}`,
+        );
         // Fallback: не оставляем наполовину записанный текст, отдаём адекватную реплику.
         return this.prisma.bazarMessage.create({
           data: {
@@ -233,7 +259,11 @@ export class BazarService {
     await this.prisma.bazarMessage.deleteMany({ where: { userId } });
     // Закрываем зависший автоподбор, чтобы новый запрос начал свежий run, а не refine старого.
     await this.prisma.autopilotRun.updateMany({
-      where: { userId, kind: 'AUTOPILOT', status: { in: ['RUNNING', 'AWAITING_USER'] } },
+      where: {
+        userId,
+        kind: 'AUTOPILOT',
+        status: { in: ['RUNNING', 'AWAITING_USER'] },
+      },
       data: { status: 'CANCELLED', lastStepAt: new Date() },
     });
     const newSessionKey = `${userId}_${Date.now()}`;
@@ -310,7 +340,11 @@ export class BazarService {
     if (!t) return false;
     // Явное согласие / выбор
     if (/(?:^|[^а-яё])да(?:[^а-яё]|$)/.test(t)) return true;
-    if (/(?:беру|возьму|согласен|согласна|ок|окей|го|давай|этот|эту|это|его|её|первый|второй|третий)/.test(t)) {
+    if (
+      /(?:беру|возьму|согласен|согласна|ок|окей|го|давай|этот|эту|это|его|её|первый|второй|третий)/.test(
+        t,
+      )
+    ) {
       return true;
     }
     return false;

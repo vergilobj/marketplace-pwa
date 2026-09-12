@@ -61,7 +61,10 @@ export class SocialService {
    * ⚠️ Совместимость: ответ читается фронтом как МАССИВ. Форму не меняем.
    * Дефолт 100 — у обычного поста лайков меньше, UI ничего не теряет.
    */
-  async getLikes(postId: string, params: { page?: number; limit?: number } = {}) {
+  async getLikes(
+    postId: string,
+    params: { page?: number; limit?: number } = {},
+  ) {
     const page = clampPage(params.page, 1);
     const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     return this.prisma.like.findMany({
@@ -117,7 +120,10 @@ export class SocialService {
    * Дефолт 100 (не 20!): 20 обрезало бы обсуждение в UI. Порядок — старые
    * сверху, как было.
    */
-  async getComments(postId: string, params: { page?: number; limit?: number } = {}) {
+  async getComments(
+    postId: string,
+    params: { page?: number; limit?: number } = {},
+  ) {
     const page = clampPage(params.page, 1);
     const limit = clampLimit(params.limit, PAGINATION_BULK_LIMIT);
     return this.prisma.comment.findMany({
@@ -140,7 +146,9 @@ export class SocialService {
     });
     if (!comment) throw new NotFoundException('Комментарий не найден');
     if (comment.userId !== userId && userRole !== 'ADMIN') {
-      throw new ForbiddenException('Редактировать можно только свои комментарии');
+      throw new ForbiddenException(
+        'Редактировать можно только свои комментарии',
+      );
     }
 
     // M1: модерация на РЕДАКТИРОВАНИИ комментария. Обход был: написать

@@ -60,7 +60,7 @@ export class ModerationService {
   // Границы `(?<!\d)`/`(?!\d)` не дают совпасть куску длинного числа:
   // «861234567890123» (15 цифр) и «1 234 567 890» остаются артикулами.
   private readonly phoneRe =
-    /(?<!\d)(?:(?:\+7|8)[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}|\d{3}[\s\-]\d{3}[\s\-]\d{4}|\d{3}[\s\-]\d{3}[\s\-]\d{2}[\s\-]\d{2})(?!\d)/;
+    /(?<!\d)(?:(?:\+7|8)[\s-]?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}|\d{3}[\s-]\d{3}[\s-]\d{4}|\d{3}[\s-]\d{3}[\s-]\d{2}[\s-]\d{2})(?!\d)/;
 
   // Email
   private readonly emailRe = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
@@ -93,7 +93,10 @@ export class ModerationService {
    * доверяют админы» выражается существующей ролью MODERATOR — она и есть
    * доверенный уровень между BUYER/SELLER и ADMIN.
    */
-  private static readonly TRUSTED_ROLES: readonly string[] = ['ADMIN', 'MODERATOR'];
+  private static readonly TRUSTED_ROLES: readonly string[] = [
+    'ADMIN',
+    'MODERATOR',
+  ];
 
   /** Доверенная роль → любые ссылки разрешены. */
   private isTrustedRole(role?: string | null): boolean {
@@ -295,10 +298,13 @@ export class ModerationService {
   }
 
   private reasonFor(violations: string[]): string {
-    if (violations.includes('phone')) return 'передавать телефон напрямую нельзя — площадка защищает контакты';
+    if (violations.includes('phone'))
+      return 'передавать телефон напрямую нельзя — площадка защищает контакты';
     if (violations.includes('email')) return 'передавать email напрямую нельзя';
-    if (violations.includes('external_link')) return 'внешние ссылки в чате запрещены';
-    if (violations.includes('off_platform')) return 'уводить общение с площадки запрещено';
+    if (violations.includes('external_link'))
+      return 'внешние ссылки в чате запрещены';
+    if (violations.includes('off_platform'))
+      return 'уводить общение с площадки запрещено';
     return 'сообщение не прошло модерацию';
   }
 }

@@ -43,7 +43,10 @@ describe('UsersController', () => {
       controllers: [UsersController],
       providers: [
         { provide: UsersService, useValue: mockUsersService },
-        { provide: JwtService, useValue: { sign: jest.fn().mockReturnValue('t') } },
+        {
+          provide: JwtService,
+          useValue: { sign: jest.fn().mockReturnValue('t') },
+        },
       ],
     }).compile();
     controller = module.get<UsersController>(UsersController);

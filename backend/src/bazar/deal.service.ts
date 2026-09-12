@@ -52,7 +52,7 @@ export class DealService {
     p: { productId?: string; sellerId?: string },
     originMsg?: { id: string; text?: string | null },
   ) {
-    let productId = p.productId;
+    const productId = p.productId;
     let sellerId = p.sellerId;
 
     if (productId && !sellerId) {
@@ -61,8 +61,10 @@ export class DealService {
       });
       sellerId = prod?.sellerId;
     }
-    if (!sellerId) throw new BadRequestException('Не удалось определить продавца');
-    if (buyerId === sellerId) throw new BadRequestException('Нельзя создать сделку с самим собой');
+    if (!sellerId)
+      throw new BadRequestException('Не удалось определить продавца');
+    if (buyerId === sellerId)
+      throw new BadRequestException('Нельзя создать сделку с самим собой');
 
     // Модерация текста первого сообщения, если он есть.
     if (originMsg?.text) {
@@ -200,12 +202,17 @@ export class DealService {
   async accept(buyerId: string, dealId: string) {
     const deal = await this.prisma.deal.findUnique({
       where: { id: dealId },
-      include: { product: { select: { id: true, price: true, isActive: true } } },
+      include: {
+        product: { select: { id: true, price: true, isActive: true } },
+      },
     });
     if (!deal) throw new NotFoundException('Сделка не найдена');
-    if (deal.buyerId !== buyerId) throw new ForbiddenException('Вы не покупатель сделки');
+    if (deal.buyerId !== buyerId)
+      throw new ForbiddenException('Вы не покупатель сделки');
     if (!deal.productId) {
-      throw new BadRequestException('Сделка без товара — уточните, что именно берёте');
+      throw new BadRequestException(
+        'Сделка без товара — уточните, что именно берёте',
+      );
     }
     // N4: accept разрешён ТОЛЬКО из статусов активного диалога.
     //   NEW        — сделка создана, покупатель сразу нажал «беру»;
@@ -318,15 +325,18 @@ export class DealService {
     }
 
     const msg = reason ? `Сделка отменена: ${reason}` : 'Сделка отменена';
-    await this.pushDealEvent(userId === deal.buyerId ? deal.sellerId : deal.buyerId, 'Сделка отменена', msg, 'deal_lost', dealId);
+    await this.pushDealEvent(
+      userId === deal.buyerId ? deal.sellerId : deal.buyerId,
+      'Сделка отменена',
+      msg,
+      'deal_lost',
+      dealId,
+    );
     return { lost: true };
   }
 
   /** Фича 2: контр-оффер (торг). Валидация цены, перевод в NEGOTIATING, ретрансляция. */
-  async counterOffer(
-    userId: string,
-    p: { dealId: string; amount: number },
-  ) {
+  async counterOffer(userId: string, p: { dealId: string; amount: number }) {
     const deal = await this.prisma.deal.findUnique({
       where: { id: p.dealId },
       include: { product: { select: { price: true, title: true } } },
@@ -355,7 +365,11 @@ export class DealService {
     });
 
     // Согласованная цена ещё не зафиксирована — пока NEGOTIATING.
-    const statusPatch: Prisma.DealUpdateInput = { status: DealStatus.NEGOTIATING, lastMsgAt: new Date(), msgCount: { increment: 1 } };
+    const statusPatch: Prisma.DealUpdateInput = {
+      status: DealStatus.NEGOTIATING,
+      lastMsgAt: new Date(),
+      msgCount: { increment: 1 },
+    };
     await this.prisma.deal.update({
       where: { id: deal.id },
       data: statusPatch,
@@ -377,7 +391,13 @@ export class DealService {
         amount,
       },
     });
-    await this.pushDealEvent(receiverId, 'Новое предложение по сделке', baseText, 'counter_offer', deal.id);
+    await this.pushDealEvent(
+      receiverId,
+      'Новое предложение по сделке',
+      baseText,
+      'counter_offer',
+      deal.id,
+    );
 
     return offer;
   }
@@ -390,7 +410,9 @@ export class DealService {
       throw new ForbiddenException('Вы не участник сделки');
     }
 
-    const offer = await this.prisma.counterOffer.findUnique({ where: { id: p.offerId } });
+    const offer = await this.prisma.counterOffer.findUnique({
+      where: { id: p.offerId },
+    });
     if (!offer || offer.dealId !== deal.id) {
       throw new NotFoundException('Предложение не найдено');
     }
@@ -430,7 +452,9 @@ export class DealService {
     if (deal.buyerId !== userId && deal.sellerId !== userId) {
       throw new ForbiddenException('Вы не участник сделки');
     }
-    const offer = await this.prisma.counterOffer.findUnique({ where: { id: p.offerId } });
+    const offer = await this.prisma.counterOffer.findUnique({
+      where: { id: p.offerId },
+    });
     if (!offer || offer.dealId !== deal.id) {
       throw new NotFoundException('Предложение не найдено');
     }
@@ -563,11 +587,7 @@ export class DealService {
           where: {
             id: deal.orderId,
             status: {
-              in: [
-                OrderStatus.PAID,
-                OrderStatus.SHIPPED,
-                OrderStatus.DISPUTED,
-              ],
+              in: [OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DISPUTED],
             },
           },
           data: {
@@ -610,7 +630,7 @@ export class DealService {
     }
 
     const order = await this.prisma.order.findUnique({
-      where: { id: orderId as string },
+      where: { id: orderId },
     });
     if (!order) throw new NotFoundException('Заказ не найден');
     if (order.buyerId !== userId && order.sellerId !== userId) {
@@ -619,7 +639,11 @@ export class DealService {
     return this.orderStatusText(order);
   }
 
-  private orderStatusText(order: { status: string; id: string; amount: number }) {
+  private orderStatusText(order: {
+    status: string;
+    id: string;
+    amount: number;
+  }) {
     const map: Record<string, string> = {
       PENDING: 'ожидает оплаты',
       PAID: 'оплачен',
@@ -635,14 +659,19 @@ export class DealService {
 
   /** ask_availability — ретранслирует вопрос продавцу без deal. */
   async relayAvailability(askerId: string, productId: string) {
-    const prod = await this.prisma.product.findUnique({ where: { id: productId } });
+    const prod = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
     if (!prod) throw new NotFoundException('Товар не найден');
     const text = prod.isActive
       ? `Товар «${prod.title}» в наличии.`
       : `Товар «${prod.title}» снят с продажи.`;
     await this.writeAssistantMsg(askerId, {
       text,
-      meta: { relay: false, action: { intent: 'ask_availability', payload: { productId } } },
+      meta: {
+        relay: false,
+        action: { intent: 'ask_availability', payload: { productId } },
+      },
     });
     return { text, inStock: prod.isActive };
   }
@@ -666,7 +695,9 @@ export class DealService {
       include: {
         buyer: { select: { id: true, name: true } },
         seller: { select: { id: true, name: true } },
-        product: { select: { id: true, title: true, price: true, media: true } },
+        product: {
+          select: { id: true, title: true, price: true, media: true },
+        },
         order: { select: { id: true, status: true, amount: true } },
       },
     });
@@ -714,7 +745,9 @@ export class DealService {
       include: {
         buyer: { select: { id: true, name: true } },
         seller: { select: { id: true, name: true } },
-        product: { select: { id: true, title: true, price: true, media: true } },
+        product: {
+          select: { id: true, title: true, price: true, media: true },
+        },
         order: { select: { id: true, status: true, amount: true } },
       },
     });
@@ -742,7 +775,9 @@ export class DealService {
     type: string,
     dealId: string,
   ) {
-    await this.notify.createNotification(userId, type, content, dealId).catch(() => null);
+    await this.notify
+      .createNotification(userId, type, content, dealId)
+      .catch(() => null);
     try {
       await this.notify.sendToUser(
         userId,

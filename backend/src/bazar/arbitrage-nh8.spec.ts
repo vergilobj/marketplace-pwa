@@ -41,14 +41,16 @@ describe('NH8: арбитраж по заказу без Deal', () => {
     deals: [],
   };
 
-  const mk = (over: {
-    orderFindMany?: jest.Mock;
-    dealFindMany?: jest.Mock;
-    orderFindUnique?: jest.Mock;
-    complete?: jest.Mock;
-    refund?: jest.Mock;
-    release?: jest.Mock;
-  } = {}) => {
+  const mk = (
+    over: {
+      orderFindMany?: jest.Mock;
+      dealFindMany?: jest.Mock;
+      orderFindUnique?: jest.Mock;
+      complete?: jest.Mock;
+      refund?: jest.Mock;
+      release?: jest.Mock;
+    } = {},
+  ) => {
     const orderFindMany =
       over.orderFindMany ??
       jest.fn().mockResolvedValue([{ id: 'order-1', cancelReason: null }]);
@@ -68,8 +70,10 @@ describe('NH8: арбитраж по заказу без Deal', () => {
     };
     const complete = over.complete ?? jest.fn();
     const escrow = {
-      refundEscrow: over.refund ?? jest.fn().mockResolvedValue({ refunded: true }),
-      releaseEscrow: over.release ?? jest.fn().mockResolvedValue({ released: true }),
+      refundEscrow:
+        over.refund ?? jest.fn().mockResolvedValue({ refunded: true }),
+      releaseEscrow:
+        over.release ?? jest.fn().mockResolvedValue({ released: true }),
     };
 
     const service = new ArbitrageService(
@@ -96,7 +100,11 @@ describe('NH8: арбитраж по заказу без Deal', () => {
     expect(complete).toHaveBeenCalledTimes(1);
 
     // 2. Деньги двинуты: полный возврат покупателю.
-    expect(refund).toHaveBeenCalledWith('order-1', 'arbitration_buyer_right', 100);
+    expect(refund).toHaveBeenCalledWith(
+      'order-1',
+      'arbitration_buyer_right',
+      100,
+    );
 
     // 3. Вердикт зафиксирован в cancelReason тем же контрактом, что payments
     //    читает из Deal.disputeNote.
@@ -157,7 +165,9 @@ describe('NH8: арбитраж по заказу без Deal', () => {
     const { service, orderUpdate } = mk({
       orderFindMany: jest
         .fn()
-        .mockResolvedValue([{ id: 'order-1', cancelReason: `${ORDER_RETRY_MARKER}3` }]),
+        .mockResolvedValue([
+          { id: 'order-1', cancelReason: `${ORDER_RETRY_MARKER}3` },
+        ]),
       complete,
     });
 
@@ -210,11 +220,14 @@ describe('NH8: арбитраж по заказу без Deal', () => {
   });
 
   it('deal-путь (NH6) не сломан: оба прохода выполняются', async () => {
-    const dealFindMany = jest
-      .fn()
-      .mockResolvedValue([
-        { id: 'deal-1', buyerId: 'buyer-1', dispute: 'OPEN', disputeNote: null },
-      ]);
+    const dealFindMany = jest.fn().mockResolvedValue([
+      {
+        id: 'deal-1',
+        buyerId: 'buyer-1',
+        dispute: 'OPEN',
+        disputeNote: null,
+      },
+    ]);
     const orderFindMany = jest
       .fn()
       .mockResolvedValue([{ id: 'order-1', cancelReason: null }]);

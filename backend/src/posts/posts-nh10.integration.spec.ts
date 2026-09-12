@@ -146,7 +146,7 @@ describe('NH10 (integration): возврат рекламы через арби�
 
   const mockPaymodPayment = () =>
     fakePaymodProvider.createPayment.mockImplementation(
-      async (_amount: number, _orderId: string, metadata: any) => ({
+      (_amount: number, _orderId: string, metadata: any) => ({
         success: true,
         transactionId: metadata.clientRef,
         status: 'pending',
@@ -236,7 +236,10 @@ describe('NH10 (integration): возврат рекламы через арби�
   // ============================================================
 
   it('арбитраж BUYER_RIGHT на рекламном заказе: объявление погашено, возврат только за неотработанные дни', async () => {
-    const { advertiser, orderId, postId } = await createPaidAd('arb-buyer', AD_DAYS);
+    const { advertiser, orderId, postId } = await createPaidAd(
+      'arb-buyer',
+      AD_DAYS,
+    );
 
     // Показ шёл 5 дней, потом рекламодатель открыл спор на своём заказе.
     const SHOWN_DAYS = 5;
@@ -312,18 +315,24 @@ describe('NH10 (integration): возврат рекламы через арби�
     const parsed = JSON.parse(
       String(settled.cancelReason).slice(VERDICT_MARKER.length),
     );
-    expect(parsed).toMatchObject({ verdict: 'BUYER_RIGHT', source: 'order_no_deal' });
+    expect(parsed).toMatchObject({
+      verdict: 'BUYER_RIGHT',
+      source: 'order_no_deal',
+    });
 
     // Повторный проход — no-op (заказ уже не DISPUTED + HELD).
     await arbitrage.resolveDisputes();
     expect(apiClient.complete).toHaveBeenCalledTimes(1);
-    expect(
-      await sumLedger({ orderId, account: LedgerAccount.PLATFORM }),
-    ).toBe(platformGot);
+    expect(await sumLedger({ orderId, account: LedgerAccount.PLATFORM })).toBe(
+      platformGot,
+    );
   });
 
   it('арбитраж SPLIT на рекламном заказе: объявление погашено, деньги не теряются', async () => {
-    const { advertiser, orderId, postId } = await createPaidAd('arb-split', AD_DAYS);
+    const { advertiser, orderId, postId } = await createPaidAd(
+      'arb-split',
+      AD_DAYS,
+    );
 
     // Показ не начинался (isPinned=false) — при SPLIT/частичном услуга не
     // оказана, рекламодателю возвращается всё. Объявление при этом не должно
@@ -340,7 +349,11 @@ describe('NH10 (integration): возврат рекламы через арби�
 
     const apiClient = {
       complete: jest.fn().mockResolvedValue({
-        text: JSON.stringify({ verdict: 'SPLIT', confidence: 0.9, note: 'пополам' }),
+        text: JSON.stringify({
+          verdict: 'SPLIT',
+          confidence: 0.9,
+          note: 'пополам',
+        }),
       }),
     };
     const arbitrage = new ArbitrageService(
@@ -356,7 +369,9 @@ describe('NH10 (integration): возврат рекламы через арби�
     });
     expect(settled.escrowStatus).toBe(EscrowStatus.RELEASED);
 
-    const closed = await prisma.post.findUniqueOrThrow({ where: { id: postId } });
+    const closed = await prisma.post.findUniqueOrThrow({
+      where: { id: postId },
+    });
     expect(closed.isPinned).toBe(false);
 
     // Сумма частей сходится с эскроу: деньги не потеряны и не размножены.
@@ -377,7 +392,10 @@ describe('NH10 (integration): возврат рекламы через арби�
   // ============================================================
 
   it('adminForceStatus REFUNDED на рекламном заказе: объявление погашено, возврат не 100%', async () => {
-    const { advertiser, orderId, postId } = await createPaidAd('admin-refund', AD_DAYS);
+    const { advertiser, orderId, postId } = await createPaidAd(
+      'admin-refund',
+      AD_DAYS,
+    );
 
     const SHOWN_DAYS = 5;
     await rewindAdStart(postId, SHOWN_DAYS);
@@ -385,7 +403,7 @@ describe('NH10 (integration): возврат рекламы через арби�
     // Реальный админский путь — тот же, что был вторым входом дыры.
     await orders.adminForceStatus(
       orderId,
-      { status: OrderStatus.REFUNDED } as any,
+      { status: OrderStatus.REFUNDED },
       'ручной возврат рекламодателю',
     );
 
@@ -396,7 +414,9 @@ describe('NH10 (integration): возврат рекламы через арби�
     expect(settled.escrowStatus).toBe(EscrowStatus.RELEASED);
 
     // ГЛАВНОЕ: объявление погашено админским возвратом.
-    const closed = await prisma.post.findUniqueOrThrow({ where: { id: postId } });
+    const closed = await prisma.post.findUniqueOrThrow({
+      where: { id: postId },
+    });
     expect(closed.isPinned).toBe(false);
     expect(closed.adExpireDate!.getTime()).toBeLessThanOrEqual(Date.now());
 
@@ -422,15 +442,20 @@ describe('NH10 (integration): возврат рекламы через арби�
   });
 
   it('adminForceStatus CANCELLED на рекламном заказе: объявление погашено', async () => {
-    const { advertiser, orderId, postId } = await createPaidAd('admin-cancel', AD_DAYS);
+    const { advertiser, orderId, postId } = await createPaidAd(
+      'admin-cancel',
+      AD_DAYS,
+    );
 
     await orders.adminForceStatus(
       orderId,
-      { status: OrderStatus.CANCELLED } as any,
+      { status: OrderStatus.CANCELLED },
       'отмена рекламного размещения',
     );
 
-    const closed = await prisma.post.findUniqueOrThrow({ where: { id: postId } });
+    const closed = await prisma.post.findUniqueOrThrow({
+      where: { id: postId },
+    });
     expect(closed.isPinned).toBe(false);
     expect(closed.adExpireDate!.getTime()).toBeLessThanOrEqual(Date.now());
 
@@ -453,7 +478,10 @@ describe('NH10 (integration): возврат рекламы через арби�
   // ============================================================
 
   it('вариант B: покупатель-рекламодатель НЕ может открыть спор на рекламном заказе', async () => {
-    const { advertiser, orderId, postId } = await createPaidAd('no-dispute', AD_DAYS);
+    const { advertiser, orderId, postId } = await createPaidAd(
+      'no-dispute',
+      AD_DAYS,
+    );
 
     // Рекламодатель в рекламном заказе — ПОКУПАТЕЛЬ (buyerId = он сам),
     // поэтому ровно так он и открывал спор на своём заказе.
@@ -464,7 +492,9 @@ describe('NH10 (integration): возврат рекламы через арби�
     ).rejects.toThrow(/спор/i);
 
     // Заказ не тронут: деньги в эскроу, объявление показывается.
-    const fresh = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    const fresh = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+    });
     expect(fresh.status).toBe(OrderStatus.PAID);
     expect(fresh.escrowStatus).toBe(EscrowStatus.HELD);
 
@@ -522,7 +552,11 @@ describe('NH10 (integration): возврат рекламы через арби�
 
     const apiClient = {
       complete: jest.fn().mockResolvedValue({
-        text: JSON.stringify({ verdict: 'BUYER_RIGHT', confidence: 0.95, note: 'не прислали' }),
+        text: JSON.stringify({
+          verdict: 'BUYER_RIGHT',
+          confidence: 0.95,
+          note: 'не прислали',
+        }),
       }),
     };
     const arbitrage = new ArbitrageService(
@@ -533,7 +567,9 @@ describe('NH10 (integration): возврат рекламы через арби�
     );
     await arbitrage.resolveDisputes();
 
-    const fresh = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    const fresh = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
     // Обычный путь НЕ изменился: escrowStatus=REFUNDED, полный возврат.
     expect(fresh.escrowStatus).toBe(EscrowStatus.REFUNDED);
     expect(fresh.status).toBe(OrderStatus.REFUNDED);
@@ -571,11 +607,13 @@ describe('NH10 (integration): возврат рекламы через арби�
     await escrow.holdForOrder(order.id);
     await orders.adminForceStatus(
       order.id,
-      { status: OrderStatus.REFUNDED } as any,
+      { status: OrderStatus.REFUNDED },
       'ручной возврат',
     );
 
-    const fresh = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    const fresh = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
     expect(fresh.status).toBe(OrderStatus.REFUNDED);
     expect(fresh.escrowStatus).toBe(EscrowStatus.REFUNDED);
 
@@ -609,7 +647,7 @@ describe('NH10 (integration): возврат рекламы через арби�
 
     const updated = await orders.updateStatus(order.id, buyer.id, 'BUYER', {
       status: OrderStatus.DISPUTED,
-    } as any);
+    });
     expect(updated.status).toBe(OrderStatus.DISPUTED);
   });
 });

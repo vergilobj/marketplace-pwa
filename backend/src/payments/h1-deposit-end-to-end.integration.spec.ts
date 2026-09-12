@@ -84,9 +84,24 @@ function buildLiveWebhook(deposit: Record<string, unknown>): LiveEnvelope {
       `build_watcher_webhook.py failed (status=${res.status}): ${res.stderr || res.stdout}`,
     );
   }
-  const parsed = JSON.parse(res.stdout.trim()) as LiveEnvelope & { error?: string };
+  const parsed = JSON.parse(res.stdout.trim()) as LiveEnvelope & {
+    error?: string;
+  };
   if (parsed.error) throw new Error(`builder error: ${parsed.error}`);
   return parsed;
+}
+
+/**
+ * Явное приведение скаляра из нетипизированного JSON к строке.
+ * `String(unknown)` на объекте даёт '[object Object]' — поэтому сужаем
+ * осознанно: только строки/числа, остальное → ''.
+ */
+function scalarString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'bigint') {
+    return String(value);
+  }
+  return '';
 }
 
 /** Тело, которое собирал background.py ДО фикса (для контрольного прогона). */
@@ -95,14 +110,14 @@ function legacyBody(deposit: Record<string, unknown>): string {
   return JSON.stringify({
     event: 'deposit',
     client_ref: deposit.client_ref ?? deposit.wallet_id ?? '',
-    chain: String(chainId).toLowerCase(),
+    chain: scalarString(chainId).toLowerCase(),
     token: deposit.token ?? deposit.symbol ?? '',
     token_address: deposit.token_address ?? '',
     tx_hash: deposit.tx_hash ?? '',
     from: deposit.from ?? '',
     to: deposit.to ?? '',
     amount: deposit.amount ?? '',
-    amount_raw: String(deposit.amount_raw ?? ''),
+    amount_raw: scalarString(deposit.amount_raw),
     block_number: deposit.block_number ?? null,
   });
 }
@@ -169,7 +184,8 @@ describe('H1 (integration): реальный депозит paymod подтве�
     orderIds.push(order.id);
 
     const amountRaw = (
-      BigInt(Math.round(amount * 1_000_000)) * 10n ** 12n
+      BigInt(Math.round(amount * 1_000_000)) *
+      10n ** 12n
     ).toString();
     const clientRef = `mp-txn-${order.id}`;
     const tx = await prisma.transaction.create({
@@ -233,7 +249,11 @@ describe('H1 (integration): реальный депозит paymod подтве�
   // ── 0. sidecar действительно отдаёт контракт бэкенда ─────────────────────
 
   it('background._on_deposit отдаёт amount_raw в 18 decimals и непустой chain', () => {
-    const deposit = watcherDeposit('mp-txn-smoke', 1_000_000, '0x' + 'aa'.repeat(32));
+    const deposit = watcherDeposit(
+      'mp-txn-smoke',
+      1_000_000,
+      '0x' + 'aa'.repeat(32),
+    );
     const live = buildLiveWebhook(deposit);
 
     expect(live.payload.amount_raw).toBe('1000000000000000000');
@@ -251,13 +271,20 @@ describe('H1 (integration): реальный депозит paymod подтве�
 
   it('ДО фикса тот же deposit → unverifiable_amount_raw, заказ PENDING, эскроу NONE', async () => {
     const { order, tx, clientRef } = await mkOrder(1, '0xDepositH1Legacy');
-    const deposit = watcherDeposit(clientRef, 1_000_000, '0x' + 'b1'.repeat(32));
+    const deposit = watcherDeposit(
+      clientRef,
+      1_000_000,
+      '0x' + 'b1'.repeat(32),
+    );
     const body = legacyBody(deposit);
 
     // HMAC считается ровно как в PaymodService.sign и проверяется его же кодом —
     // то есть контрольный прогон не «обходит» валидацию подписи.
     const timestamp = String(Math.floor(Date.now() / 1000));
-    const signature = createHmac('sha256', process.env.PAYMOD_SHARED_SECRET as string)
+    const signature = createHmac(
+      'sha256',
+      process.env.PAYMOD_SHARED_SECRET as string,
+    )
       .update(`${timestamp}.${body}`)
       .digest('base64');
     expect(
@@ -268,8 +295,12 @@ describe('H1 (integration): реальный депозит paymod подтве�
 
     await handler.handleDeposit(JSON.parse(body));
 
-    const after = await prisma.transaction.findUniqueOrThrow({ where: { id: tx.id } });
-    const afterOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    const after = await prisma.transaction.findUniqueOrThrow({
+      where: { id: tx.id },
+    });
+    const afterOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
 
     expect(after.status).toBe(TransactionStatus.PENDING);
     expect(after.mismatchReason).toBe('unverifiable_amount_raw');
@@ -289,13 +320,21 @@ describe('H1 (integration): реальный депозит paymod подтве�
 
     // HMAC-валидация ровно как в контроллере
     expect(
-      paymodService.verifyWebhookSignature(live.timestamp, live.body, live.signature),
+      paymodService.verifyWebhookSignature(
+        live.timestamp,
+        live.body,
+        live.signature,
+      ),
     ).toBe(true);
 
     await handler.handleDeposit(JSON.parse(live.body));
 
-    const after = await prisma.transaction.findUniqueOrThrow({ where: { id: tx.id } });
-    const afterOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    const after = await prisma.transaction.findUniqueOrThrow({
+      where: { id: tx.id },
+    });
+    const afterOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
 
     // Transaction
     expect(after.status).toBe(TransactionStatus.CONFIRMED);
@@ -326,16 +365,27 @@ describe('H1 (integration): реальный депозит paymod подтве�
   // ── 3. Сумма: 12.34 USDT не уезжает в UNDERPAID ──────────────────────────
 
   it('12.34 USDT (12_340_000 atomic) → CONFIRMED, эскроу 12.34', async () => {
-    const { order, tx, clientRef } = await mkOrder(12.34, '0xDepositH1Precision');
-    const deposit = watcherDeposit(clientRef, 12_340_000, '0x' + 'c2'.repeat(32));
+    const { order, tx, clientRef } = await mkOrder(
+      12.34,
+      '0xDepositH1Precision',
+    );
+    const deposit = watcherDeposit(
+      clientRef,
+      12_340_000,
+      '0x' + 'c2'.repeat(32),
+    );
     const live = buildLiveWebhook(deposit);
 
     expect(live.payload.amount_raw).toBe('12340000000000000000');
 
     await handler.handleDeposit(JSON.parse(live.body));
 
-    const after = await prisma.transaction.findUniqueOrThrow({ where: { id: tx.id } });
-    const afterOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    const after = await prisma.transaction.findUniqueOrThrow({
+      where: { id: tx.id },
+    });
+    const afterOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
     expect(after.status).toBe(TransactionStatus.CONFIRMED);
     expect(afterOrder.status).toBe(OrderStatus.PAID);
     expect(afterOrder.escrowStatus).toBe(EscrowStatus.HELD);
@@ -353,8 +403,12 @@ describe('H1 (integration): реальный депозит paymod подтве�
 
     await handler.handleDeposit(JSON.parse(live.body));
 
-    const after = await prisma.transaction.findUniqueOrThrow({ where: { id: tx.id } });
-    const afterOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    const after = await prisma.transaction.findUniqueOrThrow({
+      where: { id: tx.id },
+    });
+    const afterOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
     expect(after.status).toBe(TransactionStatus.UNDERPAID);
     expect(after.mismatchReason).toBe('underpaid');
     expect(afterOrder.status).toBe(OrderStatus.PENDING);
@@ -376,7 +430,9 @@ describe('H1 (integration): реальный депозит paymod подтве�
 
     await handler.handleDeposit(JSON.parse(live.body));
 
-    const after = await prisma.transaction.findUniqueOrThrow({ where: { id: tx.id } });
+    const after = await prisma.transaction.findUniqueOrThrow({
+      where: { id: tx.id },
+    });
     expect(after.status).toBe(TransactionStatus.FAILED);
     expect(after.mismatchReason).toBe('address_mismatch');
   });
@@ -385,7 +441,11 @@ describe('H1 (integration): реальный депозит paymod подтве�
 
   it('повторный webhook того же tx_hash не задваивает холд', async () => {
     const { order, clientRef } = await mkOrder(1, '0xDepositH1Idem');
-    const deposit = watcherDeposit(clientRef, 1_000_000, '0x' + 'c5'.repeat(32));
+    const deposit = watcherDeposit(
+      clientRef,
+      1_000_000,
+      '0x' + 'c5'.repeat(32),
+    );
     const live = buildLiveWebhook(deposit);
 
     await handler.handleDeposit(JSON.parse(live.body));
@@ -395,7 +455,9 @@ describe('H1 (integration): реальный депозит paymod подтве�
       where: { orderId: order.id, type: 'escrow_hold' },
     });
     expect(holds).toHaveLength(1);
-    const afterOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
+    const afterOrder = await prisma.order.findUniqueOrThrow({
+      where: { id: order.id },
+    });
     expect(afterOrder.escrowStatus).toBe(EscrowStatus.HELD);
     expect(afterOrder.escrowAmount).toBe(1);
   });

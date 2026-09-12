@@ -90,7 +90,11 @@ export class BazarController {
   ) {
     return this.dealService.thread(id, req.user.userId, {
       page: parsePage(page),
-      limit: parseLimit(limit, DEAL_THREAD_DEFAULT_LIMIT, DEAL_THREAD_MAX_LIMIT),
+      limit: parseLimit(
+        limit,
+        DEAL_THREAD_DEFAULT_LIMIT,
+        DEAL_THREAD_MAX_LIMIT,
+      ),
     });
   }
 
@@ -101,7 +105,10 @@ export class BazarController {
     @Param('id') id: string,
     @Body() body: { text: string },
   ) {
-    return this.dealService.relay(req.user.userId, { dealId: id, text: body.text });
+    return this.dealService.relay(req.user.userId, {
+      dealId: id,
+      text: body.text,
+    });
   }
 
   /** «беру» напрямую с фронта. */
@@ -140,7 +147,10 @@ export class BazarController {
     @Param('id') id: string,
     @Param('offerId') offerId: string,
   ) {
-    return this.dealService.acceptOffer(req.user.userId, { dealId: id, offerId });
+    return this.dealService.acceptOffer(req.user.userId, {
+      dealId: id,
+      offerId,
+    });
   }
 
   /** Отклонить оффер. */
@@ -150,7 +160,10 @@ export class BazarController {
     @Param('id') id: string,
     @Param('offerId') offerId: string,
   ) {
-    return this.dealService.rejectOffer(req.user.userId, { dealId: id, offerId });
+    return this.dealService.rejectOffer(req.user.userId, {
+      dealId: id,
+      offerId,
+    });
   }
 
   /** N2: открыть спор по сделке (доступно участникам). Запускает нейро-арбитраж. */
@@ -165,7 +178,10 @@ export class BazarController {
 
   /** Записать ViewEvent (открытие карточки товара). */
   @Post('views')
-  recordView(@Req() req: AuthenticatedRequest, @Body() body: { productId: string }) {
+  recordView(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: { productId: string },
+  ) {
     return this.bazarService.recordView(req.user.userId, body.productId);
   }
 
@@ -182,14 +198,23 @@ export class BazarController {
   @Post('autopilot/resume')
   autopilotResume(
     @Req() req: AuthenticatedRequest,
-    @Body() body: { type: 'confirm' | 'refine'; accept?: boolean; productId?: string; feedback?: string },
+    @Body()
+    body: {
+      type: 'confirm' | 'refine';
+      accept?: boolean;
+      productId?: string;
+      feedback?: string;
+    },
   ) {
     return this.autopilotService.resume(req.user.userId, body);
   }
 
   /** Сгенерировать описание товара (фича 6). */
   @Post('products/generate')
-  generateDescription(@Req() req: AuthenticatedRequest, @Body() body: { rawText: string }) {
+  generateDescription(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: { rawText: string },
+  ) {
     void req;
     return this.bazarService.generateDescription(body.rawText);
   }

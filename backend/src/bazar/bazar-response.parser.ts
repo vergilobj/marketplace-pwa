@@ -91,10 +91,13 @@ export function parseBazarContent(raw: string): BazarResponse {
   };
 
   // 1) Закрытые блоки — вырезаем всегда, извлекаем что валидно.
-  text = text.replace(FENCED_RE, (_full: string, kind: string, body: string) => {
-    extract(kind, body);
-    return '';
-  });
+  text = text.replace(
+    FENCED_RE,
+    (_full: string, kind: string, body: string) => {
+      extract(kind, body);
+      return '';
+    },
+  );
 
   // 2) Незакрытый фенс — блок тянется до конца текста.
   const m = UNTERMINATED_RE.exec(text);

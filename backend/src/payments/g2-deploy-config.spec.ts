@@ -165,7 +165,10 @@ describe('G2: конфигурация деплоя', () => {
           value.startsWith('https://<') ||
           value.startsWith('postgresql://<') ||
           value.startsWith('redis://127.0.0.1:');
-        expect({ value, isPlaceholder }).toEqual({ value, isPlaceholder: true });
+        expect({ value, isPlaceholder }).toEqual({
+          value,
+          isPlaceholder: true,
+        });
       }
 
       // Реальный прод-URL и пароли в шаблоне недопустимы. Смотрим только

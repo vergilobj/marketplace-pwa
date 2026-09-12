@@ -44,7 +44,9 @@ describe('SocialService', () => {
         { provide: AuditService, useValue: mockAudit },
         {
           provide: ModerationService,
-          useValue: { moderate: jest.fn().mockResolvedValue({ verdict: 'allow' }) },
+          useValue: {
+            moderate: jest.fn().mockResolvedValue({ verdict: 'allow' }),
+          },
         },
       ],
     }).compile();

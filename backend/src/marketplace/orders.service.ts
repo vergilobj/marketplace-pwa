@@ -6,7 +6,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { EscrowStatus, OrderStatus, Prisma, TransactionStatus } from '@prisma/client';
+import {
+  EscrowStatus,
+  OrderStatus,
+  Prisma,
+  TransactionStatus,
+} from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -1001,7 +1006,10 @@ export class OrdersService {
         // Заказ уже был SHIPPED: holdForOrder выставил дедлайн «отправки»,
         // которого он уже не ждёт — переносим на срок авто-подтверждения.
         if (before?.status === OrderStatus.SHIPPED) {
-          const days = await this.settings.getInt('escrow_autocomplete_days', 7);
+          const days = await this.settings.getInt(
+            'escrow_autocomplete_days',
+            7,
+          );
           await this.prisma.order.updateMany({
             where: { id: orderId, escrowStatus: EscrowStatus.HELD },
             data: { autoCompleteAt: addDays(new Date(), days) },

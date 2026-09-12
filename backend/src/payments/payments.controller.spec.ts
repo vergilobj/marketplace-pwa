@@ -106,7 +106,10 @@ describe('PaymentsController', () => {
     it('should reject invalid signature', async () => {
       mockNowPayments.verifyIpnSignature.mockReturnValue(false);
       const result = await controller.handleIpn({}, 'bad-sig');
-      expect(result).toEqual({ status: 'rejected', reason: 'invalid_signature' });
+      expect(result).toEqual({
+        status: 'rejected',
+        reason: 'invalid_signature',
+      });
     });
 
     it('should process payment on finished status', async () => {

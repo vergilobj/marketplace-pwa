@@ -18,7 +18,7 @@ export class AuditService {
     metadata?: Record<string, unknown>;
   }) {
     try {
-      await this.prisma.auditLog.create({ 
+      await this.prisma.auditLog.create({
         data: {
           userId: params.userId ?? null,
           action: params.action,
@@ -26,8 +26,9 @@ export class AuditService {
           entityId: params.entityId ?? null,
           ip: params.ip ?? null,
           userAgent: params.userAgent ?? null,
-          metadata: (params.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
-        }
+          metadata:
+            (params.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
+        },
       });
     } catch (err) {
       this.logger.warn(`Failed to write audit log: ${err.message}`);

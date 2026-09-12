@@ -165,7 +165,9 @@ describe('AllExceptionsFilter', () => {
 
     it('http-errors-подобный объект: статус сохраняется, путь вырезается', () => {
       const { host, captured } = createHttpHost();
-      const err: any = new Error('ENOENT: /Users/vergilobj/marketplace-pwa/.env');
+      const err: any = new Error(
+        'ENOENT: /Users/vergilobj/marketplace-pwa/.env',
+      );
       err.statusCode = 500;
 
       filter.catch(err, host);

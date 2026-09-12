@@ -108,7 +108,10 @@ describe('UsersService', () => {
       pendingEscrow: 0,
       totalWithdrawable: 500,
     });
-    mockPaymod.payout.mockResolvedValue({ tx_hash: '0x0', status: 'submitted' });
+    mockPaymod.payout.mockResolvedValue({
+      tx_hash: '0x0',
+      status: 'submitted',
+    });
   });
 
   it('should be defined', () => {

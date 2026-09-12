@@ -13,7 +13,7 @@
  */
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { LedgerAccount, OrderStatus } from '@prisma/client';
+import { OrderStatus } from '@prisma/client';
 import { UsersService } from '../users/users.service';
 import { OrdersService } from '../marketplace/orders.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -101,7 +101,10 @@ describe('NH1: повторное списание вывода (деньги и
         UsersService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditService, useValue: { log: jest.fn() } },
-        { provide: NotificationsService, useValue: { createNotification: jest.fn() } },
+        {
+          provide: NotificationsService,
+          useValue: { createNotification: jest.fn() },
+        },
         { provide: SettingsService, useValue: { getFloat: jest.fn() } },
         { provide: PaymodService, useValue: mockPaymod },
         { provide: LedgerService, useValue: mockLedger },
@@ -233,7 +236,9 @@ describe('NH2: ретрай холда доходит до холда', () => {
       update: jest.fn().mockResolvedValue({}),
     },
   };
-  const mockLedger = { credit: jest.fn().mockResolvedValue({ applied: [], skipped: [] }) };
+  const mockLedger = {
+    credit: jest.fn().mockResolvedValue({ applied: [], skipped: [] }),
+  };
   const mockPayments = { processSuccessfulPayment: jest.fn() };
   let handler: PaymodWebhookHandler;
 
@@ -292,7 +297,10 @@ describe('NH2: ретрай холда доходит до холда', () => {
     // И только теперь фиксируется CONFIRMED.
     expect(mockPrisma.transaction.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: 'CONFIRMED', txHash: '0xhash1' }),
+        data: expect.objectContaining({
+          status: 'CONFIRMED',
+          txHash: '0xhash1',
+        }),
       }),
     );
   });
@@ -377,7 +385,10 @@ describe('NH3: adminForceStatus не оставляет эскроу висет�
         OrdersService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditService, useValue: { log: jest.fn() } },
-        { provide: PaymentsService, useValue: { createPaymentForOrder: jest.fn() } },
+        {
+          provide: PaymentsService,
+          useValue: { createPaymentForOrder: jest.fn() },
+        },
         { provide: EscrowService, useValue: mockEscrow },
         { provide: SettingsService, useValue: mockSettings },
         {
@@ -401,7 +412,7 @@ describe('NH3: adminForceStatus не оставляет эскроу висет�
 
     await service.adminForceStatus(
       'order-1',
-      { status: OrderStatus.CANCELLED } as any,
+      { status: OrderStatus.CANCELLED },
       'отмена админом',
     );
 
@@ -424,7 +435,7 @@ describe('NH3: adminForceStatus не оставляет эскроу висет�
 
     await service.adminForceStatus(
       'order-1',
-      { status: OrderStatus.CANCELLED } as any,
+      { status: OrderStatus.CANCELLED },
       'отмена',
     );
 
@@ -440,7 +451,7 @@ describe('NH3: adminForceStatus не оставляет эскроу висет�
 
     await service.adminForceStatus(
       'order-1',
-      { status: OrderStatus.CANCELLED } as any,
+      { status: OrderStatus.CANCELLED },
       'отмена неоплаченного',
     );
 
@@ -457,7 +468,7 @@ describe('NH3: adminForceStatus не оставляет эскроу висет�
 
     await service.adminForceStatus(
       'order-1',
-      { status: OrderStatus.SHIPPED } as any,
+      { status: OrderStatus.SHIPPED },
       'продавец отправил',
     );
 
@@ -498,7 +509,7 @@ describe('NH3: adminForceStatus не оставляет эскроу висет�
 
     await service.adminForceStatus(
       'order-1',
-      { status: OrderStatus.REFUNDED } as any,
+      { status: OrderStatus.REFUNDED },
       'возврат',
     );
 
@@ -541,12 +552,18 @@ describe('NH4: reconcile берёт номер попытки из провод�
       providers: [
         PaymentsService,
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: SettingsService, useValue: { get: jest.fn(), getFloat: jest.fn() } },
+        {
+          provide: SettingsService,
+          useValue: { get: jest.fn(), getFloat: jest.fn() },
+        },
         { provide: NowPaymentsProvider, useValue: {} },
         { provide: PaymodProvider, useValue: {} },
         { provide: PaymodService, useValue: paymodSvc },
         { provide: LedgerService, useValue: mockLedger },
-        { provide: NotificationsService, useValue: { createNotification: jest.fn() } },
+        {
+          provide: NotificationsService,
+          useValue: { createNotification: jest.fn() },
+        },
         { provide: EscrowService, useValue: { holdForOrder: jest.fn() } },
       ],
     }).compile();
@@ -607,7 +624,11 @@ describe('NH4: reconcile берёт номер попытки из провод�
       },
     ]);
     mockPrisma.ledgerEntry.findMany.mockResolvedValue([
-      { account: 'AVAILABLE', amount: -25, refKey: 'withdrawal_debit:wr-10:AVAILABLE' },
+      {
+        account: 'AVAILABLE',
+        amount: -25,
+        refKey: 'withdrawal_debit:wr-10:AVAILABLE',
+      },
     ]);
     mockPrisma.withdrawalRequest.findUniqueOrThrow.mockResolvedValue({
       id: 'wr-10',
@@ -655,8 +676,10 @@ describe('NH4b: завышенный возврат при нескольких 
   const routeLedger = (debits: any[], reversals: any[] = []) => {
     mockPrisma.ledgerEntry.findMany.mockImplementation((args: any) => {
       const prefix = args?.where?.refKey?.startsWith ?? '';
-      if (prefix.startsWith('withdrawal_reversal:')) return Promise.resolve(reversals);
-      if (prefix.startsWith('withdrawal_debit:')) return Promise.resolve(debits);
+      if (prefix.startsWith('withdrawal_reversal:'))
+        return Promise.resolve(reversals);
+      if (prefix.startsWith('withdrawal_debit:'))
+        return Promise.resolve(debits);
       return Promise.resolve([]);
     });
   };
@@ -683,12 +706,18 @@ describe('NH4b: завышенный возврат при нескольких 
       providers: [
         PaymentsService,
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: SettingsService, useValue: { get: jest.fn(), getFloat: jest.fn() } },
+        {
+          provide: SettingsService,
+          useValue: { get: jest.fn(), getFloat: jest.fn() },
+        },
         { provide: NowPaymentsProvider, useValue: {} },
         { provide: PaymodProvider, useValue: {} },
         { provide: PaymodService, useValue: paymodSvc },
         { provide: LedgerService, useValue: mockLedger },
-        { provide: NotificationsService, useValue: { createNotification: jest.fn() } },
+        {
+          provide: NotificationsService,
+          useValue: { createNotification: jest.fn() },
+        },
         { provide: EscrowService, useValue: { holdForOrder: jest.fn() } },
       ],
     }).compile();
@@ -699,11 +728,21 @@ describe('NH4b: завышенный возврат при нескольких 
     // Сценарий дыры NH4b: 100 → debit(1) → reversal(1) → debit(2) → failed.
     // Баланс пользователя после reversal(1) снова 100; debit(2) списал их.
     // Значит вернуть надо ровно 100 (остаток попытки 2).
-    mockPrisma.withdrawalRequest.findMany.mockResolvedValue([submittedRequest()]);
+    mockPrisma.withdrawalRequest.findMany.mockResolvedValue([
+      submittedRequest(),
+    ]);
     routeLedger(
       [
-        { account: 'AVAILABLE', amount: -100, refKey: 'withdrawal_debit:wr-1:1:AVAILABLE' },
-        { account: 'AVAILABLE', amount: -100, refKey: 'withdrawal_debit:wr-1:2:AVAILABLE' },
+        {
+          account: 'AVAILABLE',
+          amount: -100,
+          refKey: 'withdrawal_debit:wr-1:1:AVAILABLE',
+        },
+        {
+          account: 'AVAILABLE',
+          amount: -100,
+          refKey: 'withdrawal_debit:wr-1:2:AVAILABLE',
+        },
       ],
       [{ refKey: 'withdrawal_reversal:wr-1:1:AVAILABLE' }],
     );
@@ -728,13 +767,29 @@ describe('NH4b: завышенный возврат при нескольких 
 
   it('ТРИ попытки, две откачены → возврат только остатка последней (100)', async () => {
     mockPrisma.withdrawalRequest.findMany.mockResolvedValue([
-      submittedRequest({ id: 'wr-2', payoutTxHash: '0xtx2', payoutAttempts: 3 }),
+      submittedRequest({
+        id: 'wr-2',
+        payoutTxHash: '0xtx2',
+        payoutAttempts: 3,
+      }),
     ]);
     routeLedger(
       [
-        { account: 'AVAILABLE', amount: -100, refKey: 'withdrawal_debit:wr-2:1:AVAILABLE' },
-        { account: 'AVAILABLE', amount: -100, refKey: 'withdrawal_debit:wr-2:2:AVAILABLE' },
-        { account: 'AVAILABLE', amount: -100, refKey: 'withdrawal_debit:wr-2:3:AVAILABLE' },
+        {
+          account: 'AVAILABLE',
+          amount: -100,
+          refKey: 'withdrawal_debit:wr-2:1:AVAILABLE',
+        },
+        {
+          account: 'AVAILABLE',
+          amount: -100,
+          refKey: 'withdrawal_debit:wr-2:2:AVAILABLE',
+        },
+        {
+          account: 'AVAILABLE',
+          amount: -100,
+          refKey: 'withdrawal_debit:wr-2:3:AVAILABLE',
+        },
       ],
       [
         { refKey: 'withdrawal_reversal:wr-2:1:AVAILABLE' },
@@ -765,8 +820,16 @@ describe('NH4b: завышенный возврат при нескольких 
     ]);
     routeLedger(
       [
-        { account: 'AVAILABLE', amount: -100, refKey: 'withdrawal_debit:wr-3:1:AVAILABLE' },
-        { account: 'AVAILABLE', amount: -100, refKey: 'withdrawal_debit:wr-3:2:AVAILABLE' },
+        {
+          account: 'AVAILABLE',
+          amount: -100,
+          refKey: 'withdrawal_debit:wr-3:1:AVAILABLE',
+        },
+        {
+          account: 'AVAILABLE',
+          amount: -100,
+          refKey: 'withdrawal_debit:wr-3:2:AVAILABLE',
+        },
       ],
       [
         { refKey: 'withdrawal_reversal:wr-3:1:AVAILABLE' },
@@ -785,7 +848,10 @@ describe('NH4b: завышенный возврат при нескольких 
     // Заявка всё равно переводится в pending/FAILED.
     expect(mockPrisma.withdrawalRequest.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: 'pending', payoutStatus: 'FAILED' }),
+        data: expect.objectContaining({
+          status: 'pending',
+          payoutStatus: 'FAILED',
+        }),
       }),
     );
   });
@@ -811,10 +877,19 @@ describe('NH4b: завышенный возврат при нескольких 
 
   it('ОДНА попытка (регресс NH4-теста) → возврат 50 как раньше', async () => {
     mockPrisma.withdrawalRequest.findMany.mockResolvedValue([
-      submittedRequest({ id: 'wr-5', amount: 50, payoutTxHash: '0xtx5', payoutAttempts: 1 }),
+      submittedRequest({
+        id: 'wr-5',
+        amount: 50,
+        payoutTxHash: '0xtx5',
+        payoutAttempts: 1,
+      }),
     ]);
     routeLedger([
-      { account: 'AVAILABLE', amount: -50, refKey: 'withdrawal_debit:wr-5:1:AVAILABLE' },
+      {
+        account: 'AVAILABLE',
+        amount: -50,
+        refKey: 'withdrawal_debit:wr-5:1:AVAILABLE',
+      },
     ]);
     mockPrisma.withdrawalRequest.findUniqueOrThrow.mockResolvedValue({
       id: 'wr-5',
@@ -839,8 +914,16 @@ describe('NH4b: завышенный возврат при нескольких 
     ]);
     routeLedger(
       [
-        { account: 'AVAILABLE', amount: -60, refKey: 'withdrawal_debit:wr-6:1:AVAILABLE' },
-        { account: 'REFERRAL', amount: -40, refKey: 'withdrawal_debit:wr-6:1:REFERRAL' },
+        {
+          account: 'AVAILABLE',
+          amount: -60,
+          refKey: 'withdrawal_debit:wr-6:1:AVAILABLE',
+        },
+        {
+          account: 'REFERRAL',
+          amount: -40,
+          refKey: 'withdrawal_debit:wr-6:1:REFERRAL',
+        },
       ],
       [{ refKey: 'withdrawal_reversal:wr-6:1:AVAILABLE' }],
     );
@@ -929,7 +1012,10 @@ describe('D3: потерянный ответ payout не приводит к д
         UsersService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditService, useValue: { log: jest.fn() } },
-        { provide: NotificationsService, useValue: { createNotification: jest.fn() } },
+        {
+          provide: NotificationsService,
+          useValue: { createNotification: jest.fn() },
+        },
         { provide: SettingsService, useValue: { getFloat: jest.fn() } },
         { provide: PaymodService, useValue: mockPaymod },
         { provide: LedgerService, useValue: mockLedger },

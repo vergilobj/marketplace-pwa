@@ -178,7 +178,9 @@ describe('NotificationsService', () => {
 
     /** Перехватить вызовы logger.warn конкретного инстанса. */
     const spyWarn = (svc: NotificationsService) =>
-      jest.spyOn((svc as any).logger, 'warn').mockImplementation(() => undefined);
+      jest
+        .spyOn((svc as any).logger, 'warn')
+        .mockImplementation(() => undefined);
 
     const REAL_UUID = 'd1cb2724-f8e5-40c4-8dec-2db841c83cba';
 
