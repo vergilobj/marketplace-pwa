@@ -312,11 +312,22 @@ export default function CheckoutPage() {
                   </div>
                 ))}
               </div>
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-center mb-4">
                 <span className="text-base font-bold text-[var(--color-text)]">Итого</span>
                 <span className="text-xl font-extrabold text-[#22c55e]">{formatPrice(total)}</span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-[var(--color-muted)] mb-6"><ShieldCheck size={14} className="text-[#22c55e]" /> Безопасная оплата через платформу</div>
+
+              {/* Эскроу: покупатель должен понимать, куда уходят деньги.
+                  Формулировка и стиль — как на ProductDetailPage / ProfilePage /
+                  OrdersPage (иконка ShieldCheck, тот же текст). */}
+              <div className="flex items-start gap-2 text-xs text-[var(--color-muted)] leading-relaxed mb-6">
+                <ShieldCheck size={15} className="text-[#22c55e] shrink-0 mt-0.5" />
+                <span>
+                  Деньги замораживаются в эскроу и уходят продавцу только после того, как вы
+                  подтвердите получение заказа. Как только оплата дойдёт, продавец получит
+                  уведомление и начнёт сборку заказа.
+                </span>
+              </div>
 
               {/* Кнопка — только пока не созданы счета */}
               {invoices.length === 0 && (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -12,7 +12,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../hooks/useAuth';
 import { useApp } from '../context/AppContext';
 import { resolveMedia } from '../utils/media';
-import { getVideoEmbed } from '../utils/video';
+import { getVideoEmbed, buildGallery } from '../utils/video';
 import { formatPrice } from '../utils/format';
 import toast from 'react-hot-toast';
 import { errorMessage } from '../utils/error';
@@ -81,6 +81,22 @@ export default function ProductDetailPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const total = product ? product.price * quantity : 0;
+
+  /**
+   * J1: единая галерея товара — видео первым слайдом, затем фото.
+   * До этого видео жило отдельным блоком ПОД галереей, а владелец требует
+   * первым слайдом (та же утилита, что в PostDetailPage и карточках каталога).
+   *
+   * Считаем ДО ранних return'ов (loading / !product) — иначе useMemo
+   * вызывался бы не на каждом рендере и порядок хуков поехал бы.
+   */
+  const gallery = useMemo(
+    () => buildGallery(product?.media as string[] | string | null | undefined, product?.videoUrl),
+    [product],
+  );
+  const galleryLen = gallery.length;
+  const slideIdx = galleryLen > 0 ? ((activeImg % galleryLen) + galleryLen) % galleryLen : 0;
+  const currentSlide = galleryLen > 0 ? gallery[slideIdx] : null;
 
   const scrollSimilar = (dir: number) => {
     similarRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' });
@@ -227,10 +243,16 @@ export default function ProductDetailPage() {
     );
   }
 
-  const media = Array.isArray(product.media) ? product.media : [];
-  const videoEmbed = getVideoEmbed(product.videoUrl);
   const paid = isPaidStatus(payment?.status);
   const sellerId = product.seller?.id || product.sellerId;
+
+  /**
+   * Видео-ССЫЛКА (Яндекс.Диск / Google Диск / Telegram): такие хосты не
+   * встраиваются, buildGallery их в слайды не кладёт. Показываем ссылкой,
+   * как и раньше — этот путь нельзя потерять.
+   */
+  const rawEmbed = getVideoEmbed(product.videoUrl);
+  const linkEmbed = rawEmbed?.type === 'link' ? rawEmbed : null;
 
   /**
    * A5.3: блок количества. На мобиле он живёт в нижней панели (там же, где
@@ -275,37 +297,101 @@ export default function ProductDetailPage() {
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        {/* Галерея */}
+        {/* J1: ЕДИНАЯ галерея — видео первым слайдом, затем фото.
+            Подход повторяет PostDetailPage: buildGallery(product.media, product.videoUrl).
+            Ссылки-видео (Яндекс/Google/Telegram) в слайды не попадают —
+            они остаются отдельным блоком ниже, отображение сохранено. */}
         <div>
-          {/* Основное фото */}
-          <div className="rounded-2xl overflow-hidden bg-[var(--color-surface)] border border-[var(--color-border)] aspect-square mb-3">
-            {media[activeImg] ? (
+          <div className="relative rounded-2xl overflow-hidden bg-[var(--color-surface)] border border-[var(--color-border)] aspect-square mb-3">
+            {currentSlide?.type === 'video' ? (
+              <video
+                src={resolveMedia(currentSlide.src)}
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full h-full object-cover bg-black"
+              />
+            ) : currentSlide?.type === 'embed' ? (
+              <iframe
+                src={currentSlide.src}
+                title={currentSlide.label || 'Видео'}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allowFullScreen
+                className="w-full h-full"
+              />
+            ) : currentSlide ? (
               <img
-                src={resolveMedia(media[activeImg])}
+                src={resolveMedia(currentSlide.src)}
                 alt={product.title}
                 className="w-full h-full object-cover cursor-zoom-in"
-                onClick={() => setSelectedImage(resolveMedia(media[activeImg]))}
+                onClick={() => setSelectedImage(resolveMedia(currentSlide.src))}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-[var(--color-faint)]">
                 <ShoppingCart size={40} />
               </div>
             )}
+
+            {gallery.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveImg((slideIdx - 1 + gallery.length) % gallery.length)}
+                  aria-label="Предыдущий слайд"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/55 backdrop-blur text-white flex items-center justify-center hover:bg-black/75 transition-colors"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveImg((slideIdx + 1) % gallery.length)}
+                  aria-label="Следующий слайд"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/55 backdrop-blur text-white flex items-center justify-center hover:bg-black/75 transition-colors"
+                >
+                  <ChevronRight size={18} />
+                </button>
+                <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+                  {gallery.map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setActiveImg(i)}
+                      aria-label={`Показать слайд ${i + 1}`}
+                      className={`h-1.5 rounded-full transition-all duration-200 ${i === slideIdx ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
+                    />
+                  ))}
+                  {currentSlide?.type === 'video' && (
+                    <span className="ml-1 text-[10px] font-bold uppercase text-white/80">видео</span>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Таумбнейлы */}
-          {media.length > 1 && (
+          {/* Таумбнейлы: видео-слайд первым, фото после */}
+          {gallery.length > 1 && (
             <div className="flex flex-wrap gap-2">
-              {media.map((url: string, idx: number) => (
+              {gallery.map((slide, idx) => (
                 <button
                   key={idx}
+                  type="button"
                   onClick={() => setActiveImg(idx)}
-                  aria-label={`Фото ${idx + 1}`}
-                  className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
-                    idx === activeImg ? 'border-[#22c55e]' : 'border-[var(--color-border)] hover:border-[#22c55e]/40'
+                  aria-label={
+                    slide.type === 'image'
+                      ? `Фото ${gallery.slice(0, idx + 1).filter((s) => s.type === 'image').length}`
+                      : 'Видео'
+                  }
+                  className={`relative shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                    idx === slideIdx ? 'border-[#22c55e]' : 'border-[var(--color-border)] hover:border-[#22c55e]/40'
                   }`}
                 >
-                  <img src={resolveMedia(url)} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  {slide.type === 'image' ? (
+                    <img src={resolveMedia(slide.src)} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  ) : (
+                    <div className="w-full h-full bg-black flex items-center justify-center text-white">
+                      <Video size={18} />
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -395,34 +481,21 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* Видео товара */}
-      {videoEmbed && (
+      {/* Видео-ССЫЛКА (Яндекс.Диск / Google Диск / Telegram).
+          Файловые видео и embed-хостинги теперь живут первым слайдом галереи,
+          а сюда попадают только ссылки: buildGallery их не берёт, а показать
+          их покупателю нужно — этот путь сохранён. */}
+      {linkEmbed && (
         <div className="mt-8">
           <h2 className="text-lg font-bold text-[var(--color-text)] mb-3">Видео</h2>
-          {videoEmbed.type === 'video' ? (
-            <div className="rounded-2xl overflow-hidden border border-[var(--color-border)] bg-black">
-              <video src={resolveMedia(videoEmbed.src)} controls playsInline className="w-full max-h-[520px]" />
-            </div>
-          ) : videoEmbed.type === 'iframe' ? (
-            <div className="rounded-2xl overflow-hidden border border-[var(--color-border)] aspect-video">
-              <iframe
-                src={videoEmbed.src}
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                allowFullScreen
-                title="Видео товара"
-              />
-            </div>
-          ) : (
-            <a
-              href={videoEmbed.src}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-[#22c55e]/40 text-[#22c55e] hover:bg-[#22c55e]/10 transition-colors text-sm font-bold"
-            >
-              <Video size={17} /> Открыть видео {videoEmbed.label ? `(${videoEmbed.label})` : ''}
-            </a>
-          )}
+          <a
+            href={linkEmbed.src}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-xl border border-[#22c55e]/40 text-[#22c55e] hover:bg-[#22c55e]/10 transition-colors text-sm font-bold"
+          >
+            <Video size={17} /> Открыть видео {linkEmbed.label ? `(${linkEmbed.label})` : ''}
+          </a>
         </div>
       )}
 
