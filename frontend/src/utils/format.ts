@@ -31,4 +31,25 @@ export function formatPrice(value: number): string {
   return `${negative ? '-' : ''}${grouped}${fracPart ? `.${fracPart}` : ''} USDT`;
 }
 
+/**
+ * G3: склонение существительного по числу (русские правила).
+ *
+ * В проекте утилиты склонения не было — введена здесь, в файле форматирования
+ * чисел, и применена ТОЛЬКО в FavoritesPage («2 товаров» → «2 товара»).
+ *
+ *   plural(1, ['товар','товара','товаров'])  -> 'товар'
+ *   plural(2, ['товар','товара','товаров'])  -> 'товара'
+ *   plural(5, ['товар','товара','товаров'])  -> 'товаров'
+ *   plural(11,...) -> 'товаров', plural(21,...) -> 'товар'
+ */
+export function plural(n: number, forms: [string, string, string]): string {
+  const abs = Math.abs(Math.trunc(n));
+  const mod100 = abs % 100;
+  const mod10 = abs % 10;
+  if (mod100 >= 11 && mod100 <= 14) return forms[2];
+  if (mod10 === 1) return forms[0];
+  if (mod10 >= 2 && mod10 <= 4) return forms[1];
+  return forms[2];
+}
+
 export default formatPrice;

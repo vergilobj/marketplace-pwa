@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatPrice, formatNumber } from './format';
+import { formatPrice, formatNumber, plural } from './format';
 
 describe('formatPrice', () => {
   it('groups thousands with a space', () => {
@@ -40,5 +40,40 @@ describe('formatNumber', () => {
 
   it('formats millions', () => {
     expect(formatNumber(2500000)).toBe('2 500 000');
+  });
+});
+
+describe('plural (G3)', () => {
+  const товары: [string, string, string] = ['товар', 'товара', 'товаров'];
+
+  it('склоняет по русским правилам', () => {
+    expect(plural(1, товары)).toBe('товар');
+    expect(plural(2, товары)).toBe('товара');
+    expect(plural(3, товары)).toBe('товара');
+    expect(plural(4, товары)).toBe('товара');
+    expect(plural(5, товары)).toBe('товаров');
+    expect(plural(0, товары)).toBe('товаров');
+    expect(plural(10, товары)).toBe('товаров');
+    expect(plural(20, товары)).toBe('товаров');
+  });
+
+  it('обрабатывает 11–14 как исключение', () => {
+    expect(plural(11, товары)).toBe('товаров');
+    expect(plural(12, товары)).toBe('товаров');
+    expect(plural(13, товары)).toBe('товаров');
+    expect(plural(14, товары)).toBe('товаров');
+    expect(plural(111, товары)).toBe('товаров');
+  });
+
+  it('21 → товар, 22 → товара, 25 → товаров', () => {
+    expect(plural(21, товары)).toBe('товар');
+    expect(plural(22, товары)).toBe('товара');
+    expect(plural(25, товары)).toBe('товаров');
+    expect(plural(101, товары)).toBe('товар');
+    expect(plural(102, товары)).toBe('товара');
+  });
+
+  it('не ломается на отрицательных', () => {
+    expect(plural(-2, товары)).toBe('товара');
   });
 });

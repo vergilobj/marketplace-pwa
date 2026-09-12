@@ -113,4 +113,42 @@ describe('FavoritesPage (L2)', () => {
 
     contextValue.favorites = ['p1', 'p2', 'p3'];
   });
+
+  /**
+   * G3: плюрализация счётчика избранного.
+   *
+   * Было «{n} товаров» — «1 товаров», «2 товаров». Теперь plural() из
+   * utils/format: «1 товар», «2 товара», «5 товаров».
+   */
+  it('склоняет счётчик: «2 товара», а не «2 товаров»', async () => {
+    contextValue.favorites = ['p1', 'p2'];
+    getProductById.mockImplementation(async (id: string) => product(id, `Товар ${id}`));
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Товар p1')).toBeTruthy());
+
+    expect(screen.getByText('2 товара')).toBeTruthy();
+    expect(screen.queryByText('2 товаров')).toBeNull();
+  });
+
+  it('склоняет счётчик для одного товара: «1 товар»', async () => {
+    contextValue.favorites = ['p1'];
+    getProductById.mockImplementation(async (id: string) => product(id, `Товар ${id}`));
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Товар p1')).toBeTruthy());
+
+    expect(screen.getByText('1 товар')).toBeTruthy();
+    expect(screen.queryByText('1 товаров')).toBeNull();
+  });
+
+  it('склоняет счётчик для пяти: «5 товаров»', async () => {
+    contextValue.favorites = ['p1', 'p2', 'p3', 'p4', 'p5'];
+    getProductById.mockImplementation(async (id: string) => product(id, `Товар ${id}`));
+
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Товар p5')).toBeTruthy());
+
+    expect(screen.getByText('5 товаров')).toBeTruthy();
+  });
 });

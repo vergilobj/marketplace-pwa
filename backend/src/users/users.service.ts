@@ -297,33 +297,52 @@ export class UsersService {
       toAddress = trimmed;
     }
 
-    const pendingRequests = await this.prisma.withdrawalRequest.findMany({
-      where: { userId, status: 'pending' },
-    });
-    const totalPending = pendingRequests.reduce((sum, r) => sum + r.amount, 0);
     const balances = await this.ledger.getBalances(userId);
-    const available = round2(balances.totalWithdrawable - totalPending);
-    if (available < amount)
-      throw new BadRequestException(
-        `Insufficient balance. Available: ${available} USDT`,
-      );
 
-    // Сохраняем адрес вывода и на юзере (если передан) — удобно для следующих выводов.
-    if (toAddress) {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { walletAddress: toAddress },
+    // G3: проверка свободного остатка и INSERT заявки — в одной транзакции под
+    // pg_advisory_xact_lock по userId.
+    //
+    // Раньше: два параллельных POST /users/me/withdrawal читали Σpending
+    // одновременно, оба видели «хватает» и создавали по заявке на всю сумму.
+    // Реально вывести больше нельзя (approveWithdrawal сверяется с актуальным
+    // ledger), но вторая заявка зависает в pending и её сумма морозит лимит
+    // вывода — «заявки зависают».
+    //
+    // Приём тот же, что в LedgerService.notifyAdminsSafely
+    // (payments/ledger.service.ts:735): hashtext(lockKey) берётся на время
+    // транзакции, второй запрос ждёт коммита первого и видит уже созданную
+    // заявку в Σpending. Ключ — per-user, разные юзеры не сериализуются.
+    // Логику расчёта баланса не трогаем: те же getBalances + Σpending.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`withdrawal:${userId}`}))`;
+
+      const pendingRequests = await tx.withdrawalRequest.findMany({
+        where: { userId, status: 'pending' },
       });
-    }
+      const totalPending = pendingRequests.reduce((sum, r) => sum + r.amount, 0);
+      const available = round2(balances.totalWithdrawable - totalPending);
+      if (available < amount)
+        throw new BadRequestException(
+          `Insufficient balance. Available: ${available} USDT`,
+        );
 
-    return this.prisma.withdrawalRequest.create({
-      data: {
-        userId,
-        amount: round2(amount),
-        status: 'pending',
-        toAddress: toAddress ?? null,
-        provider: 'PAYMOD',
-      },
+      // Сохраняем адрес вывода и на юзере (если передан) — удобно для следующих выводов.
+      if (toAddress) {
+        await tx.user.update({
+          where: { id: userId },
+          data: { walletAddress: toAddress },
+        });
+      }
+
+      return tx.withdrawalRequest.create({
+        data: {
+          userId,
+          amount: round2(amount),
+          status: 'pending',
+          toAddress: toAddress ?? null,
+          provider: 'PAYMOD',
+        },
+      });
     });
   }
 

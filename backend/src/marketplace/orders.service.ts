@@ -184,8 +184,11 @@ export class OrdersService {
         status: 'PENDING',
       },
       include: {
-        buyer: { select: { id: true, name: true, phone: true } },
-        seller: { select: { id: true, name: true, phone: true } },
+        // G3: телефон контрагента не отдаём ни здесь, ни в GET /orders/:id.
+        // Фронт его не читает (ApiOrder в api/types.ts не содержит buyer/seller;
+        // в UI только сравнение с order.buyerId) — это была утечка PII.
+        buyer: { select: { id: true, name: true } },
+        seller: { select: { id: true, name: true } },
         product: true,
       },
     });
@@ -286,8 +289,9 @@ export class OrdersService {
       where: { id: orderId },
       include: {
         product: true,
-        buyer: { select: { id: true, name: true, phone: true } },
-        seller: { select: { id: true, name: true, phone: true } },
+        // G3: PII контрагента не отдаём — см. комментарий в create().
+        buyer: { select: { id: true, name: true } },
+        seller: { select: { id: true, name: true } },
         referralUser: { select: { id: true, name: true } },
         // NH10: признак рекламного заказа для перехода в DISPUTED / admin-путей.
         post: { select: { id: true, isAd: true } },

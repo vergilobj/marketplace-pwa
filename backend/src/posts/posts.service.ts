@@ -250,7 +250,7 @@ export class PostsService implements OnModuleInit {
     };
   }
 
-  async findById(id: string, userId?: string) {
+  async findById(id: string, userId?: string, role?: string) {
     const post = await this.prisma.post.findUnique({
       where: { id },
       include: {
@@ -261,6 +261,18 @@ export class PostsService implements OnModuleInit {
       },
     });
     if (!post) throw new NotFoundException('Пост не найден');
+
+    // G3: неоплаченная/просроченная реклама не должна открываться по прямому
+    // URL тому, кто не является её владельцем или админом.
+    //
+    // Лента (`publicAdVisibility`) такую рекламу уже не показывает, но
+    // `GET /posts/:id` под OptionalJwtAuthGuard отдавал её анонимному
+    // пользователю: он видел «реклама выложилась, хотя я не платил».
+    // Отвечаем 404 (а не 403) — не подтверждаем существование поста.
+    if (this.isUnpaidOrExpiredAd(post) && !this.canSeeUnpaidAd(post, userId, role)) {
+      throw new NotFoundException('Пост не найден');
+    }
+
     return {
       ...post,
       likeCount: post._count?.likes ?? 0,
@@ -269,6 +281,38 @@ export class PostsService implements OnModuleInit {
       likes: undefined,
       _count: undefined,
     };
+  }
+
+  /**
+   * G3: реклама, которая ещё (или уже) не имеет права быть публичной.
+   *
+   * Публичность рекламы = `isPinned` + непустой `adExpireDate` в будущем.
+   * Ровно эти флаги выставляет `activateAdForOrder`, и только он (требует
+   * Order PAID + escrow HELD). Просроченную рекламу тоже считаем
+   * непубличной — она уже вне ленты (`publicAdVisibility`), и по прямому URL
+   * не должна раздаваться вечно.
+   *
+   * Обычные посты (`isAd: false`) сюда не попадают никогда.
+   */
+  private isUnpaidOrExpiredAd(post: {
+    isAd: boolean;
+    isPinned: boolean;
+    adExpireDate: Date | null;
+  }): boolean {
+    if (!post.isAd) return false;
+    if (!post.isPinned || !post.adExpireDate) return true;
+    return post.adExpireDate <= new Date();
+  }
+
+  /** G3: автор объявления и ADMIN видят его в любом статусе оплаты. */
+  private canSeeUnpaidAd(
+    post: { authorId: string; adOwnerId: string | null },
+    userId?: string,
+    role?: string,
+  ): boolean {
+    if (role === 'ADMIN') return true;
+    if (!userId) return false;
+    return post.authorId === userId || post.adOwnerId === userId;
   }
 
   async delete(id: string) {

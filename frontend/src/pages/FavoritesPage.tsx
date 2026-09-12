@@ -5,7 +5,7 @@ import EmptyState from '../components/ui/EmptyState';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { getProductById } from '../api/products';
-import { formatPrice } from "../utils/format";
+import { formatPrice, plural } from "../utils/format";
 import { resolveMedia } from '../utils/media';
 import type { ApiProduct } from '../api/types';
 
@@ -105,7 +105,7 @@ export default function FavoritesPage() {
 
       <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-20">
         <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Избранное</h1>
-        <p className="text-[var(--color-muted)] text-sm mb-6">{products.length} товаров</p>
+        <p className="text-[var(--color-muted)] text-sm mb-6">{products.length} {plural(products.length, ['товар', 'товара', 'товаров'])}</p>
 
         {products.length === 0 ? (
           <EmptyState

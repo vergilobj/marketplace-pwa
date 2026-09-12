@@ -50,6 +50,8 @@ describe('UsersService', () => {
       count: jest.fn(),
     },
     $transaction: jest.fn((cb: any) => cb(mockPrisma)),
+    // G3: requestWithdrawal берёт pg_advisory_xact_lock внутри транзакции.
+    $executeRaw: jest.fn().mockResolvedValue(1),
   };
 
   const mockAudit = { log: jest.fn().mockResolvedValue({}) };
