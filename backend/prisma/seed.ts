@@ -140,28 +140,70 @@ async function main() {
     console.log(`Created post: ${po.title}`);
   }
 
-  // 4. Создание пары заказов для истории
+  // 4. Исторические заказы (демо-история).
+  //
+  // K1: РАНЬШЕ здесь создавались заказы `status: 'PAID'` БЕЗ эскроу-холда и
+  // без Transaction. Это состояние в боевой системе невозможно: PAID
+  // появляется только после подтверждённого депозита и `holdForOrder`, т.е.
+  // обязательно с `escrowStatus = HELD` + проводкой LedgerEntry(ESCROW).
+  // Такой «PAID без холда» не видит НИ ОДИН крон (`autoCloseOrders`
+  // фильтрует `escrowStatus: HELD`, `cancelExpiredOrders` — `status:
+  // PENDING`), заказ висит вечно и засоряет эскроу-контур: reconciler
+  // `reconcileUnheldEscrow` вынужден разбирать его как аварию.
+  //
+  // Теперь сид создаёт КОНСИСТЕНТНУЮ историю: `COMPLETED + escrowStatus:
+  // NONE` — ровно то состояние, в котором лежат исторические закрытые
+  // заказы (сделка состоялась и закрыта, денег в системе нет, эскроу не
+  // открывался). Ledger НЕ трогаем: подтверждённых депозитов по этим
+  // заказам не было, а «нарисовать» оборот ради вида — значит отравить
+  // `verifyInvariants`, `soldEarned` продавцов и «доход платформы».
+  //
+  // Отдельно: цикл намеренно НЕ создаёт заказы в PAID/SHIPPED — инвариант
+  // «нет заказов PAID/SHIPPED без холда» проверяется self-check'ом ниже.
   const allProducts = await prisma.product.findMany();
   const buyers = users.filter(u => u.role === 'BUYER');
   if (allProducts.length > 0 && buyers.length > 0) {
     for (let i = 0; i < 5; i++) {
       const buyer = buyers[i % buyers.length];
       const product = allProducts[i % allProducts.length];
-      const order = await prisma.order.create({
+      // Заказ закрыт в прошлом (1..5 дней назад) — это история, не «только что».
+      const closedAt = new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000);
+      await prisma.order.create({
         data: {
           buyerId: buyer.id,
           sellerId: product.sellerId,
           productId: product.id,
           amount: product.price,
-          status: 'PAID',
+          status: 'COMPLETED',
+          escrowStatus: 'NONE',
           referralUserId: admin.id,
           referralBonus: (product.price * 5) / 100,
           platformFee: (product.price * 10) / 100,
-          paidAt: new Date(),
+          paidAt: closedAt,
+          completedAt: closedAt,
         },
       });
-      console.log(`Created order for ${buyer.name}: ${product.title}`);
+      console.log(`Created completed order for ${buyer.name}: ${product.title}`);
     }
+  }
+
+  // 5. K1 self-check: сид не имеет права оставить несогласованное состояние.
+  //
+  // Если кто-то снова добавит в сид `status: 'PAID'` без холда, `npm run
+  // seed` упадёт здесь, а не «успешно» нальёт в БД мусор, который потом
+  // придётся разбирать reconciler'ом.
+  const unheldEscrow = await prisma.order.count({
+    where: {
+      status: { in: ['PAID', 'SHIPPED'] },
+      escrowStatus: 'NONE',
+    },
+  });
+  if (unheldEscrow > 0) {
+    throw new Error(
+      `Seed inconsistency: ${unheldEscrow} заказ(ов) PAID/SHIPPED с ` +
+        `escrowStatus=NONE. PAID/SHIPPED появляются только после ` +
+        `подтверждённого депозита и эскроу-холда (HELD + LedgerEntry ESCROW).`,
+    );
   }
 
   console.log('Seeding complete!');
