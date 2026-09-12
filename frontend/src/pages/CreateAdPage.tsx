@@ -357,7 +357,7 @@ export default function CreateAdPage() {
 
                 {previews.map((src, idx) => (
                   <div key={idx} className="relative w-24 h-24 rounded-xl overflow-hidden border border-[var(--color-border)]">
-                    <img src={src} alt={`preview ${idx}`} className="w-full h-full object-cover" loading="eager" decoding="async" />
+                    <img src={src} alt={`preview ${idx}`} width={96} height={96} loading="eager" decoding="async" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removeFile(idx)}

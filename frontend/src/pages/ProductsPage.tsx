@@ -6,6 +6,7 @@ import { CreateMenu } from '../components/CreateMenu';
 import { formatPrice } from '../utils/format';
 import { mergeUniqueById } from '../utils/mergeUnique';
 import { useDebounced } from '../hooks/useDebounced';
+import { ProductGridSkeleton } from '../components/ui/Skeleton';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 const PAGE_SIZE = 24;
@@ -169,19 +170,11 @@ export default function ProductsPage() {
           ))}
         </div>
 
-        {/* Сетка — адаптивная: 2 / 3 / 4 колонки */}
+        {/* Сетка — адаптивная: 2 / 3 / 4 колонки.
+            PERF-4: скелетон вынесен в общий ProductGridSkeleton и повторяет
+            габариты реальной ProductCard (квадрат-фото + название + цена). */}
         {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="rounded-2xl bg-[var(--color-surface)] overflow-hidden">
-                <div className="h-36 bg-[var(--bg-3)] animate-pulse" />
-                <div className="p-3 space-y-2">
-                  <div className="h-4 w-3/4 rounded-lg bg-[var(--bg-3)] animate-pulse" />
-                  <div className="h-3 w-1/2 rounded-lg bg-[var(--bg-3)] animate-pulse" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <ProductGridSkeleton count={8} />
         ) : filteredProducts.length === 0 ? (
           <div className="text-center py-24">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--color-surface)] flex items-center justify-center">

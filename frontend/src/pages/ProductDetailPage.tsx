@@ -17,6 +17,7 @@ import { formatPrice } from '../utils/format';
 import toast from 'react-hot-toast';
 import { errorMessage } from '../utils/error';
 import type { ApiProduct } from '../api/types';
+import { PageSkeleton } from '../components/ui/Skeleton';
 
 /**
  * A5.2: окно оплаты заказа. Значение совпадает с CheckoutPage и с серверной
@@ -204,12 +205,10 @@ export default function ProductDetailPage() {
     toast.success(`В корзине: ${product.title}`);
   };
 
+  // PERF-4: был серый квадрат 40×40 на пустом py-32 — заменён на скелетон
+  // карточки товара (галерея + заголовок + цена), совпадающий по высоте.
   if (loading) {
-    return (
-      <div className="flex justify-center py-32">
-        <div className="w-10 h-10 rounded-2xl bg-[var(--color-surface)] animate-pulse" />
-      </div>
-    );
+    return <PageSkeleton image rows={2} />;
   }
 
   // Загрузка завершена, но товара нет: сюда попадаем и по явной ошибке,
@@ -323,6 +322,10 @@ export default function ProductDetailPage() {
               <img
                 src={resolveMedia(currentSlide.src)}
                 alt={product.title}
+                width={1000}
+                height={1000}
+                loading={slideIdx === 0 ? 'eager' : 'lazy'}
+                decoding="async"
                 className="w-full h-full object-cover cursor-zoom-in"
                 onClick={() => setSelectedImage(resolveMedia(currentSlide.src))}
               />
@@ -386,7 +389,7 @@ export default function ProductDetailPage() {
                   }`}
                 >
                   {slide.type === 'image' ? (
-                    <img src={resolveMedia(slide.src)} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    <img src={resolveMedia(slide.src)} alt="" width={64} height={64} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                   ) : (
                     <div className="w-full h-full bg-black flex items-center justify-center text-white">
                       <Video size={18} />
@@ -598,7 +601,7 @@ export default function ProductDetailPage() {
                 className="shrink-0 w-36 rounded-2xl overflow-hidden cursor-pointer bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[#22c55e]/40 transition-colors group"
               >
                 <div className="aspect-square bg-[var(--bg-3)] overflow-hidden">
-                  {s.media?.[0] && <img src={resolveMedia(s.media[0])} alt={s.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />}
+                  {s.media?.[0] && <img src={resolveMedia(s.media[0])} alt={s.title} width={144} height={144} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />}
                 </div>
                 <div className="p-2.5">
                   <div className="text-[13px] font-medium text-[var(--color-text)] truncate mb-0.5">{s.title}</div>

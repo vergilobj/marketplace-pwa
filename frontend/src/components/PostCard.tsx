@@ -99,8 +99,11 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
                 src={resolveMedia(first.src)}
                 alt={post.title}
                 className="w-full h-48 object-cover"
-                loading="eager"
+                loading="lazy"
                 decoding="async"
+                width={640}
+                height={360}
+                style={{ aspectRatio: '16 / 9' }}
               />
             )}
             {extraCount > 0 && (

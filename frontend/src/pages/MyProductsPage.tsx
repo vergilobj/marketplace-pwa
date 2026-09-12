@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { formatPrice } from '../utils/format';
 import { resolveMedia } from '../utils/media';
 import { mergeUniqueById } from '../utils/mergeUnique';
+import { PageSkeleton } from '../components/ui/Skeleton';
 
 /**
  * A5: «Мои товары».
@@ -133,12 +134,9 @@ export default function MyProductsPage() {
     }
   };
 
+  // PERF-4: зелёный квадрат 40×40 → скелетон сетки «Мои товары»
   if (loading) {
-    return (
-      <div className="flex justify-center py-32">
-        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#34d399] animate-pulse" />
-      </div>
-    );
+    return <PageSkeleton rows={0} wide />;
   }
 
   return (
@@ -202,6 +200,9 @@ export default function MyProductsPage() {
                       src={resolveMedia(p.media[0])}
                       alt={p.title}
                       loading="lazy"
+                      decoding="async"
+                      width={640}
+                      height={360}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   ) : (

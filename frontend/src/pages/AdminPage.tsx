@@ -225,7 +225,7 @@ export default function AdminPage() {
       {products.map((p) => (
         <div key={p.id} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[var(--color-border)] overflow-hidden shrink-0">{p.media?.[0] && <img src={resolveMedia(p.media[0])} alt="" className="w-full h-full object-cover" />}</div>
+            <div className="w-12 h-12 rounded-xl bg-[rgba(255,255,255,0.03)] border border-[var(--color-border)] overflow-hidden shrink-0">{p.media?.[0] && <img src={resolveMedia(p.media[0])} alt="" width={48} height={48} loading="lazy" decoding="async" className="w-full h-full object-cover" />}</div>
             <div>
               <p className="text-sm font-semibold text-[var(--color-text)]">{p.title}</p>
               <p className="text-xs text-[var(--color-muted)]">{p.seller?.name} • {formatPrice(p.price)}</p>
@@ -408,7 +408,7 @@ export default function AdminPage() {
 
         {/* Content */}
         {loading ? (
-          <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}</div>
+          <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="skeleton h-16" />)}</div>
         ) : (
           <>
             {renderContent()}

@@ -13,6 +13,7 @@ import { formatPrice } from '../utils/format';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import type { ApiProduct, ApiPost } from '../api/types';
+import { PageSkeleton } from '../components/ui/Skeleton';
 
 /**
  * A5.8: публичный профиль пользователя.
@@ -141,12 +142,9 @@ export default function PublicProfilePage() {
     };
   }, [id]);
 
+  // PERF-4: зелёный квадрат 40×40 → скелетон публичного профиля
   if (loading) {
-    return (
-      <div className="flex justify-center py-32">
-        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#34d399] animate-pulse" />
-      </div>
-    );
+    return <PageSkeleton rows={3} />;
   }
 
   if (error || !user) {
@@ -220,7 +218,7 @@ export default function PublicProfilePage() {
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#34d399] flex items-center justify-center text-[#0d1512] text-2xl font-extrabold shrink-0 overflow-hidden">
               {user.avatar ? (
-                <img src={resolveMedia(user.avatar)} alt={displayName} className="w-full h-full object-cover" />
+                <img src={resolveMedia(user.avatar)} alt={displayName} width={128} height={128} loading="lazy" decoding="async" className="w-full h-full object-cover" />
               ) : (
                 displayName[0].toUpperCase()
               )}
@@ -327,6 +325,9 @@ export default function PublicProfilePage() {
                         src={resolveMedia(p.media[0])}
                         alt={p.title}
                         loading="lazy"
+                        decoding="async"
+                        width={640}
+                        height={640}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     ) : (

@@ -11,6 +11,7 @@ import { resolveMedia } from '../utils/media';
 import { buildGallery } from '../utils/video';
 import toast from 'react-hot-toast';
 import { errorMessage } from '../utils/error';
+import { PageSkeleton } from '../components/ui/Skeleton';
 
 /**
  * L2: размер страницы комментариев.
@@ -199,7 +200,9 @@ export default function PostDetailPage() {
   const current = total > 0 ? gallery[idx] : null;
   const nextSlide = total > 1 ? gallery[(idx + 1) % total] : null;
 
-  if (loading) return <div className="flex justify-center py-32"><div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#34d399] animate-pulse" /></div>;
+  // PERF-4: был зелёный квадрат 40×40 на пустом py-32 — заменён на честный
+  // скелетон поста (аватар+заголовок+строки+картинка), чтобы не было CLS.
+  if (loading) return <PageSkeleton image rows={3} />;
   if (!post) return <div className="text-center py-32"><p className="text-[var(--color-muted)]">Пост сняли. Может, автор передумал, может, что-то не зашло.</p></div>;
 
   return (
@@ -278,6 +281,8 @@ export default function PostDetailPage() {
                         loading={idx === 0 ? 'eager' : 'lazy'}
                         decoding="async"
                         fetchPriority={idx === 0 ? 'high' : 'auto'}
+                        width={1200}
+                        height={800}
                         className="w-full max-h-[480px] object-cover"
                       />
                     ) : null}

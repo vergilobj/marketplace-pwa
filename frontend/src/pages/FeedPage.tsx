@@ -17,6 +17,7 @@ import { useDebounced } from '../hooks/useDebounced';
 import { mergeUniqueById } from '../utils/mergeUnique';
 import { readFeedCache, writeFeedCache } from './feedCache';
 import type { ApiPost, ApiProduct } from '../api/types';
+import { FeedSkeleton } from '../components/ui/Skeleton';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 type TabType = 'all' | 'posts' | 'products' | 'ads';
@@ -300,7 +301,7 @@ export default function FeedPage() {
             </div>
 
             <div className="lg:w-96 xl:w-[420px] shrink-0 relative">
-              <img src="/manifest-cart.webp" alt="Безопасный чеккаут" className="w-full h-auto" loading="eager" />
+              <img src="/manifest-cart.webp" alt="Безопасный чеккаут" width={600} height={600} className="w-full h-auto" loading="eager" decoding="async" fetchPriority="high" />
             </div>
           </div>
         </div>
@@ -350,11 +351,11 @@ export default function FeedPage() {
           </div>
         </div>
 
-        {/* ЛЕНТА */}
+        {/* ЛЕНТА — PERF-4: скелетон повторяет структуру реальных карточек
+            (аватар+имя+2 строки+картинка, чередуясь с компактной строкой товара).
+            Раньше был ряд div'ов h-16 на реальную карточку ~350px → CLS 0.108. */}
         {loading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 6 }).map((_, idx) => <div key={idx} className="h-16 rounded-lg bg-[var(--color-surface)] animate-pulse" />)}
-          </div>
+          <FeedSkeleton count={4} />
         ) : items.length === 0 ? (
           <div className="text-center py-24">
             <div className="text-[var(--color-faint)] text-sm">
@@ -513,6 +514,8 @@ function PostMedia({ media, title }: { media: string[]; title: string }) {
         <img
           src={resolveMedia(media[idx])}
           alt={`${title} ${idx + 1}`}
+          width={1200}
+          height={900}
           className="w-full h-auto max-h-[480px] object-cover"
           loading="lazy"
           decoding="async"
@@ -527,7 +530,7 @@ function PostMedia({ media, title }: { media: string[]; title: string }) {
         */}
         <div className="hidden" aria-hidden="true">
           {media.map((m, i) => (
-            i === idx ? null : <img key={i} src={resolveMedia(m)} alt="" loading="lazy" decoding="async" />
+            i === idx ? null : <img key={i} src={resolveMedia(m)} alt="" width={1200} height={900} loading="lazy" decoding="async" />
           ))}
         </div>
         {count > 1 && (

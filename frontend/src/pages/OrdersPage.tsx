@@ -10,6 +10,7 @@ import { formatPrice } from "../utils/format";
 import { useAuth } from '../hooks/useAuth';
 import { errorMessage } from '../utils/error';
 import type { ApiOrder } from '../api/types';
+import { PageSkeleton } from '../components/ui/Skeleton';
 
 const statusConfig: Record<string, { icon: React.ReactNode; cls: string; label: string }> = {
   PENDING: { icon: <Clock size={14} />, cls: 'text-amber-400 bg-amber-400/10', label: 'ждёт' },
@@ -131,11 +132,8 @@ export default function OrdersPage() {
   // L2: смена фильтра — счётчик показа снова с первой страницы.
   const handleFilter = (s: string) => { setFilter(s); setVisibleCount(ORDERS_PAGE_SIZE); };
 
-  if (loading) return (
-    <div className="flex justify-center py-32">
-      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#34d399] animate-pulse" />
-    </div>
-  );
+  // PERF-4: зелёный квадрат 40×40 → скелетон списка заказов
+  if (loading) return <PageSkeleton rows={4} />;
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">

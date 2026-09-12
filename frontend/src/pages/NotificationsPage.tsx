@@ -5,6 +5,7 @@ import { Bell, Heart, MessageCircle, ShoppingBag, Gift, CheckCheck } from 'lucid
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import toast from 'react-hot-toast';
+import { PageSkeleton } from '../components/ui/Skeleton';
 
 const icons: Record<string, React.ReactNode> = {
   like: <Heart size={13} className="text-red-400" />,
@@ -68,7 +69,8 @@ export default function NotificationsPage() {
   const readAll = async () => { try { await api.patch('/notifications/read-all'); setList(p => p.map(n=>({...n,isRead:true}))); toast.success('Всё прочитано'); } catch { toast.error('Ошибка'); } };
   const markRead = async (id:string) => { try { await api.patch(`/notifications/${id}/read`); setList(p => p.map(n=>n.id===id?{...n,isRead:true}:n)); } catch { /* ignore */ } };
 
-  if (loading) return <div className="flex justify-center py-32"><div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#34d399] animate-pulse" /></div>;
+  // PERF-4: зелёный квадрат 40×40 → скелетон списка уведомлений
+  if (loading) return <PageSkeleton rows={4} />;
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">

@@ -118,7 +118,7 @@ export default function EditPostPage() {
               <div className="flex flex-wrap gap-2">
                 {existingMedia.map((url, idx) => (
                   <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-[var(--color-border)]">
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <img src={url} alt="" width={80} height={80} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     <button type="button" onClick={() => removeExistingMedia(idx)} className="absolute top-0 right-0 bg-black/60 text-[var(--color-text)] rounded-full w-5 h-5 flex items-center justify-center"><X size={12} /></button>
                   </div>
                 ))}
@@ -132,7 +132,7 @@ export default function EditPostPage() {
             <div className="flex flex-wrap gap-2 mb-2">
               {previews.map((src, idx) => (
                 <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-[var(--color-border)]">
-                  <img src={src} alt="" className="w-full h-full object-cover" />
+                  <img src={src} alt="" width={80} height={80} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   <button type="button" onClick={() => removeFile(idx)} className="absolute top-0 right-0 bg-black/60 text-[var(--color-text)] rounded-full w-5 h-5 flex items-center justify-center"><X size={12} /></button>
                 </div>
               ))}

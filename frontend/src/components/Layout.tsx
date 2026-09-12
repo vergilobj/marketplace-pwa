@@ -66,7 +66,7 @@ export default function Layout() {
           {/* Логотип */}
           {/* R14: лого было 36px высотой — тач-зона ≥44px */}
           <Link to="/" className={`${searchOpen ? 'hidden' : 'flex'} items-center gap-2.5 shrink-0 group min-h-[44px]`}>
-            <img src="/logo.webp" alt="Базар" className="w-9 h-9 rounded-xl object-cover group-hover:scale-105 transition-transform" />
+            <img src="/logo.webp" alt="Базар" width={96} height={96} loading="eager" decoding="async" className="w-9 h-9 rounded-xl object-cover group-hover:scale-105 transition-transform" />
             <span className="text-lg font-extrabold tracking-tight text-[var(--color-text)]">Базар</span>
           </Link>
 
@@ -155,7 +155,7 @@ export default function Layout() {
       <footer className="mt-12 border-t border-[rgba(255,255,255,0.06)] px-4 pt-12 pb-24 md:pb-12">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
           <div className="flex items-center gap-3">
-            <img src="/logo.webp" alt="Базар" className="w-12 h-12 rounded-2xl object-cover" />
+            <img src="/logo.webp" alt="Базар" width={96} height={96} loading="lazy" decoding="async" className="w-12 h-12 rounded-2xl object-cover" />
             <div>
               <div className="text-xl font-extrabold tracking-tight text-[var(--color-text)]">Базар</div>
               <div className="text-[12px] text-[var(--color-muted)]">закрытая площадка. только для своих.</div>

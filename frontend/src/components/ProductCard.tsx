@@ -39,7 +39,7 @@ export default function ProductCard({ product }: { product: ApiProduct }) {
               <Play size={28} className="text-white/70" />
             </div>
           ) : (
-            <img src={resolveMedia(first!.src)} alt={product.title} className="w-full h-full object-cover" loading="eager" decoding="async" />
+            <img src={resolveMedia(first!.src)} alt={product.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width={640} height={480} style={{ aspectRatio: '4 / 3' }} />
           )
         ) : (
           <div className="w-full h-full flex items-center justify-center"><ShoppingCart size={28} className="text-[var(--color-faint)]" /></div>

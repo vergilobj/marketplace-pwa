@@ -79,6 +79,10 @@ export default function LeadsPage() {
                   <img
                     src={resolveMedia(d.product.media[0])}
                     alt=""
+                    width={48}
+                    height={48}
+                    loading="lazy"
+                    decoding="async"
                     className="w-12 h-12 rounded-xl object-cover shrink-0"
                   />
                 ) : (

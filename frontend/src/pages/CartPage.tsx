@@ -57,7 +57,7 @@ export default function CartPage() {
               >
                 <div className="w-16 h-16 rounded-xl overflow-hidden bg-[var(--bg-3)] shrink-0">
                   {item.media?.[0]
-                    ? <img src={resolveMedia(item.media[0])} alt={item.title} className="w-full h-full object-cover" />
+                    ? <img src={resolveMedia(item.media[0])} alt={item.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width={128} height={128} />
                     : <div className="w-full h-full flex items-center justify-center"><ShoppingBag size={20} className="text-[var(--color-faint)]" /></div>}
                 </div>
                 <div className="flex-1 min-w-0">

@@ -8,6 +8,7 @@ import { User, Settings, TrendingUp, Gift, LogOut, Save, ShieldCheck, Store, Meg
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { CreateMenu } from '../components/CreateMenu';
+import { PageSkeleton } from '../components/ui/Skeleton';
 import type { ApiUser, ApiUserStats, SellerRequestStatus } from '../api/types';
 
 export default function ProfilePage() {
@@ -87,11 +88,8 @@ export default function ProfilePage() {
     ] : []),
   ];
 
-  if (loading) return (
-    <div className="flex justify-center py-32">
-      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#34d399] animate-pulse" />
-    </div>
-  );
+  // PERF-4: зелёный квадрат 40×40 → скелетон профиля (аватар+заголовок+строки)
+  if (loading) return <PageSkeleton rows={3} />;
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">

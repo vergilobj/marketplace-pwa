@@ -9,6 +9,7 @@ import { formatPrice } from '../utils/format';
 import toast from 'react-hot-toast';
 import { errorMessage } from '../utils/error';
 import type { ApiWithdrawal } from '../api/types';
+import { PageSkeleton } from '../components/ui/Skeleton';
 
 const sc: Record<string, { i: React.ReactNode; v: string; l: string }> = {
   pending: { i: <Clock size={13} />, v: 'pending', l: 'На рассмотрении' },
@@ -129,7 +130,8 @@ export default function WithdrawalsPage() {
     finally { setReq(false); }
   };
 
-  if (loading) return <div className="flex justify-center py-32"><div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#34d399] animate-pulse" /></div>;
+  // PERF-4: зелёный квадрат 40×40 → скелетон списка заявок на вывод
+  if (loading) return <PageSkeleton rows={4} />;
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">

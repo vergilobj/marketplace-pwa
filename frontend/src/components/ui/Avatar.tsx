@@ -8,7 +8,7 @@ const iconSizes: Record<string, number> = { xs: 12, sm: 14, md: 16, lg: 20, xl: 
 export default function Avatar({ src, name, size = 'md', ring = false, className = '' }: AvatarProps) {
   const initials = name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '';
   const content = src ? (
-    <img src={src} alt={name || 'Avatar'} className={`${sizes[size]} rounded-full object-cover ${ring ? 'ring-2 ring-white dark:ring-slate-800' : ''}`} />
+    <img src={src} alt={name || 'Avatar'} width={96} height={96} loading="lazy" decoding="async" className={`${sizes[size]} rounded-full object-cover ${ring ? 'ring-2 ring-white dark:ring-slate-800' : ''}`} />
   ) : (
     <div className={`${sizes[size]} rounded-full bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center text-[var(--color-text)] font-bold ${ring ? 'ring-2 ring-white dark:ring-slate-800' : ''}`}>
       {initials || <User size={iconSizes[size]} />}

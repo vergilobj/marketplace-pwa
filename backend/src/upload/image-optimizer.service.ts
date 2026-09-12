@@ -44,6 +44,14 @@ export class ImageOptimizerService {
   private readonly optimizable = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
   /**
+   * PERF-3: про отсутствие sharp ругаемся ровно один раз за жизнь процесса.
+   * Без этого «sharp не встал на ноде» выглядит как обычный warn на каждой
+   * загрузке — то есть деградация (все фото уходят в прод несжатыми) тонет в
+   * логах. Поведение не меняется: файл так же остаётся как есть.
+   */
+  private sharpUnavailableLogged = false;
+
+  /**
    * Сжимает картинку на месте. Возвращает статистику для лога/тестов.
    * Никогда не бросает — при любой ошибке возвращает { skipped }.
    */
@@ -69,17 +77,47 @@ export class ImageOptimizerService {
       // встал на этой ноде, упасть должен ТОЛЬКО этот вызов, а не старт
       // всего приложения.
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const sharp = require('sharp');
+      let sharp: typeof import('sharp');
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        sharp = require('sharp');
+      } catch (sharpErr) {
+        // PERF-3: раньше это тонуло в общем catch с текстом «optimize failed».
+        // Теперь явно и однократно: это НЕ «плохая картинка», это сломанная
+        // нода — все загрузки идут в прод несжатыми, нужен ремонт окружения.
+        if (!this.sharpUnavailableLogged) {
+          this.sharpUnavailableLogged = true;
+          this.logger.error(
+            `sharp недоступен — оптимизация картинок ОТКЛЮЧЕНА на этой ноде, ` +
+              `фото сохраняются как есть (проверь node_modules/sharp): ${(sharpErr as Error).message}`,
+          );
+        }
+        return { skipped: true, before, after: before, reason: 'sharp-unavailable' };
+      }
 
       const meta = await sharp(absPath).metadata();
-      const longEdge = Math.max(meta.width || 0, meta.height || 0);
+
+      // PERF-3 (найденный баг): EXIF-ориентация 5–8 означает, что при рендере
+      // картинка поворачивается на 90°, то есть «ширина» и «высота» меняются
+      // местами. `rotate()` в пайплайне выполняется ДО resize, поэтому решать,
+      // какая сторона длинная, нужно по РАЗМЕРАМ ПОСЛЕ поворота — иначе resize
+      // выбирал не ту сторону, и длинная сторона оставалась больше 1600.
+      // Живой пример с прода: `146160b5-...jpeg` (4032x3024, orientation=6)
+      // давал на выходе 1600x2133 вместо 1200x1600.
+      const swapSides =
+        typeof meta.orientation === 'number' && meta.orientation >= 5;
+      const rawW = meta.width || 0;
+      const rawH = meta.height || 0;
+      const effW = swapSides ? rawH : rawW;
+      const effH = swapSides ? rawW : rawH;
+      const longEdge = Math.max(effW, effH);
       const needsResize = longEdge > this.maxDimension;
 
       let pipeline = sharp(absPath).rotate(); // rotate() без аргумента = по EXIF
       if (needsResize) {
         pipeline = pipeline.resize({
-          width: meta.width && meta.width >= (meta.height || 0) ? this.maxDimension : undefined,
-          height: meta.height && meta.height > (meta.width || 0) ? this.maxDimension : undefined,
+          width: effW >= effH ? this.maxDimension : undefined,
+          height: effH > effW ? this.maxDimension : undefined,
           fit: 'inside',
           withoutEnlargement: true,
         });

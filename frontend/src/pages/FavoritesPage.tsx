@@ -8,6 +8,7 @@ import { getProductById } from '../api/products';
 import { formatPrice, plural } from "../utils/format";
 import { resolveMedia } from '../utils/media';
 import type { ApiProduct } from '../api/types';
+import { PageSkeleton } from '../components/ui/Skeleton';
 
 /**
  * L2: избранное больше НЕ тянет каталог.
@@ -91,11 +92,8 @@ export default function FavoritesPage() {
     };
   }, [favoritesKey]);
 
-  if (loading) return (
-    <div className="flex justify-center py-32">
-      <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#22c55e] to-[#34d399] animate-pulse" />
-    </div>
-  );
+  // PERF-4: зелёный квадрат 40×40 → скелетон сетки избранного
+  if (loading) return <PageSkeleton rows={0} wide />;
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
@@ -131,7 +129,7 @@ export default function FavoritesPage() {
                   onClick={() => navigate(`/products/${product.id}`)}
                 >
                   <div className="aspect-square bg-[var(--bg-3)] relative shrink-0">
-                    {product.media?.[0] && <img src={resolveMedia(product.media[0])} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />}
+                    {product.media?.[0] && <img src={resolveMedia(product.media[0])} alt={product.title} width={640} height={640} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />}
                     <span className="absolute bottom-3 left-3 px-3 py-1.5 rounded-xl bg-black/70 backdrop-blur-xl text-sm font-bold text-white">{price}</span>
                   </div>
                   <div className="p-3.5 flex flex-col flex-1">

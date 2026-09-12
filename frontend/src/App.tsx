@@ -34,7 +34,27 @@ const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 function Lazy({ children }: { children: React.ReactNode }) {
-  return <Suspense fallback={<div className="flex justify-center py-20"><div className="w-8 h-8 rounded-full border-2 border-green-500 border-t-transparent animate-spin" /></div>}>{children}</Suspense>;
+  // PERF-4: фолбэк резервирует высоту экрана.
+  // Раньше здесь был спиннер 32px в блоке py-20 (итого ~160px). Пока
+  // лениво подгруженный чанк ехал, <main> был 344px высотой, футер стоял
+  // в первом экране (y=456) — а когда страница отрисовывалась на всю
+  // высоту, футер уезжал вниз. Замер CDP: один сдвиг 0.339 на FOOTER
+  // (/posts/:id) и 0.439 (/products) — это и был остаточный CLS.
+  // Теперь высота занята заранее → сдвига нет.
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen" role="status" aria-label="Загрузка">
+          <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-10">
+            <div className="skeleton h-7 w-2/5 mb-3" />
+            <div className="skeleton h-3.5 w-1/4" />
+          </div>
+        </div>
+      }
+    >
+      {children}
+    </Suspense>
+  );
 }
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) {
