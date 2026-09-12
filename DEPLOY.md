@@ -149,6 +149,46 @@ npx prisma db push --accept-data-loss
 `rsync -avz backend/prisma/ root@91.229.9.83:/opt/marketplace/backend/prisma/`, либо
 (б) накатить `db push` с Hetzner-ноды. Мастер-схему держать в одном месте — **Hetzner**.
 
+---
+
+### 2.1-bis 🔴 M1 (аудит 2026-09-12): миграции были НЕСАМОДОСТАТОЧНЫ + не в git
+
+Найдено и исправлено. Два независимых дефекта, каждый из которых ломал DR.
+
+**Дефект 1: миграции не в git.**
+`backend/prisma/migrations/` стоял в `.gitignore` (строка 36) и НИ ОДНА миграция
+никогда не была в репозитории (`git log --all -- backend/prisma/migrations/*` пуст).
+Папка жила только на машине разработчика. → Правило убрано из `.gitignore`,
+добавлен `backend/prisma/migrations/README.md`. **Миграции — это исходник.**
+
+**Дефект 2: миграции не воспроизводимы на чистой БД.**
+13 ранних миграций не создавали 7 enum-типов (`TransactionStatus`, `ProductType`,
+`BazarRole`, `DealStatus`, `DealSource`, `PaymentProvider`, `PayoutStatus`),
+8 таблиц (`Deal`, `BazarMessage`, `ChatMessage`, `AuditLog`, `AutopilotRun`,
+`CounterOffer`, `ViewEvent`, `ProactiveEvent`) и колонки `Product.*`, `User.*`,
+`Transaction.*`, `WithdrawalRequest.*` — всё это накатывалось через `db push`.
+Результат: на чистой БД `migrate deploy` падал на `money_contour` с
+`type "TransactionStatus" does not exist` (SQLSTATE 42704).
+
+**Исправление:** миграция `20260911080000_missing_schema_objects` — идемпотентная
+(`DO $$ ... EXCEPTION WHEN duplicate_object`, `IF NOT EXISTS`), вставлена по timestamp
+МЕЖДУ `add_avatar` и `money_contour` (Prisma применяет по лексикографическому порядку
+имён каталогов, поэтому вставка «назад» работает без переименований).
+Существующие миграции НЕ редактировались — checksum `money_contour` в проде не менялся.
+
+Доказательства (2026-09-12):
+- чистая БД `mp_migtest_clean`: `migrate deploy` → exit 0, 16 миграций;
+- `prisma migrate diff` БД↔`schema.prisma` → **пусто** (схема воспроизводится точно);
+- 12 enum / 23 таблицы на месте;
+- клон боевой БД `mp_prodclone`: `migrate deploy` применил ТОЛЬКО новую миграцию,
+  схема до/после побайтово идентична (sha256 `5365f08c…`) → **no-op на боевой**;
+- боевая `marketplace` не тронута: схема sha256 идентична, данные md5 `11ef3ce2…`,
+  `migrate status` → up to date.
+
+**Правило на будущее:** новая схема → `npx prisma migrate dev --name <что_сделал>`.
+`db push` — только для разовых локальных экспериментов, **никогда** на прод.
+Не редактировать уже применённые миграции.
+
 ### 2.2 Второй питфолл: схема и БД разъезжаются
 
 `db push`/миграция меняет `schema.prisma` и Prisma-клиент, но колонки в БД может **не быть**.
@@ -494,8 +534,59 @@ ssh root@89.167.0.215 "docker exec marketplace-db psql -U market_user -d marketp
 9. **Backend-тесты:** `tsc --noEmit` — 1 ошибка (`posts.controller.spec.ts:85`,
    `findById` без `req`). Jest — часть сьютов падает (DI + тот же `req`). Это
    **пред-существующее** состояние, продакшен-код без type-ошибок.
+   ⚠️ **УСТАРЕЛО на 2026-09-12** (аудит M1): `npx tsc --noEmit` → **0 ошибок**,
+   `npm run build` → exit 0, `npx jest --silent --runInBand` → **52 сьюта / 526 тестов, все PASS**.
 10. **`ONESIGNAL_APP_ID` локально пуст** — пуши локально мертвы; на серверах реальный UUID.
 11. **`UPLOAD_BASE_URL` локально = `http://localhost:3000`** — при копировании `.env`
     на сервер **обязательно** менять на прод-домен, иначе битые картинки.
 12. **Локальный логин для тестов:** админ `79000000000` / `password123`.
     Логин-эндпоинт имеет rate-limit (429) — не долбить подряд.
+
+---
+
+## 10. Disaster recovery (DR) — восстановление с нуля
+
+⚠️ **До 2026-09-12 DR был невозможен.** Миграции не были в git (`.gitignore`),
+и были несамодостаточны: `migrate deploy` падал на чистой БД. Исправлено (см. §2.1-bis).
+
+### 10.1 Полное восстановление (потеря БД / новый сервер)
+
+```bash
+# --- Схема: из репозитория, НЕ из дампа ---
+git clone <repo> /opt/marketplace && cd /opt/marketplace/backend
+npm ci
+npx prisma migrate deploy        # 16 миграций, exit 0 на чистой БД
+npx prisma generate
+npm run build
+
+# --- Данные: из последнего дампа ---
+pg_restore -d marketplace --data-only --disable-triggers latest.dump
+```
+
+Схема восстанавливается **из миграций** (проверено: `prisma migrate diff` между
+чистой БД после `deploy` и `schema.prisma` → пусто). Дамп нужен только ради данных —
+это и есть страховка от «БД потерялась, развернуть нечего».
+
+### 10.2 Проверка после восстановления
+
+```bash
+npx prisma migrate status        # → "Database schema is up to date!"
+npx prisma migrate diff \
+  --from-schema-datasource prisma/schema.prisma \
+  --to-schema-datamodel prisma/schema.prisma
+# ожидаем "This is an empty migration."
+
+psql "$DATABASE_URL" -tAc "SELECT count(*) FROM pg_type WHERE typtype='e';"   # → 12
+psql "$DATABASE_URL" -tAc "SELECT count(*) FROM pg_tables WHERE schemaname='public';"  # → 23
+```
+
+### 10.3 Чеклист деплоя новых миграций
+
+1. Разработка: `npx prisma migrate dev --name <что_сделал>` (НЕ `db push`).
+2. Миграция коммитится в git (`backend/prisma/migrations/` больше не в ignore).
+3. На сервере: `git pull` → `npx prisma migrate deploy` → `npx prisma generate` → `npm run build`.
+4. ⚠️ **Перед `migrate deploy` на проде — прогнать на клоне**:
+   `createdb -O market_user clone && pg_dump prod | psql clone`, затем
+   `DATABASE_URL=<clone> npx prisma migrate deploy` + сравнить схему до/после.
+5. ⚠️ Никогда не редактировать уже применённые миграции — ломает checksum,
+   Prisma откажется работать (`migration was modified after it was applied`).
