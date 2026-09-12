@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getFeed } from '../api/posts';
 import { getProducts } from '../api/products';
-import { Search, X, Loader2, Heart, MessageCircle, ShoppingCart, Plus, Minus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, X, Loader2, Heart, MessageCircle, ShoppingCart, Plus, Minus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useApp } from '../context/AppContext';
 import api from '../api/axios';
@@ -170,6 +170,20 @@ export default function FeedPage() {
     return () => obs.disconnect();
   }, [loading, loadingMore, hasMorePosts, hasMoreProducts, activeTab, loadMore]);
 
+  /**
+   * V4 (VISUAL-PROD фикс 4): удаление поста админом.
+   *
+   * В публичной ленте на каждой карточке висела голая красная надпись
+   * «удалить» 10px (`text-red-400`, 48×44, без фона) — 20 штук подряд,
+   * вперемешку с зелёными кнопками соседних карточек. Владелец описал это
+   * как «пздц». Теперь кнопка выглядит как обычный тач-таргет 44×44
+   * (иконка + подпись на sm+), в нейтральном цвете, красная только при
+   * наведении — модерация не кричит из публичной ленты.
+   *
+   * confirm() здесь уже был и сохранён: без него клик сносил боевой пост
+   * мгновенно (в отчёте аудита `hasConfirm: false` — это про DOM-диалог,
+   * который confirm() не создаёт).
+   */
   const delPost = async (id: string) => {
     if (!confirm('Удалить?')) return;
     try { await api.delete('/posts/' + id); setPosts(p => p.filter(x => x.id !== id)); toast.success('Удалён'); } catch { toast.error('Ошибка'); }
@@ -373,7 +387,7 @@ export default function FeedPage() {
                         {/* Картинка сверху на всю ширину */}
                         <div className="relative aspect-[16/10] w-full bg-[var(--color-surface)]">
                           {item.media?.[0]
-                            ? <img src={resolveMedia(item.media[0])} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
+                            ? <img src={resolveMedia(item.media[0])} alt={item.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width={640} height={400} />
                             : <div className="w-full h-full flex items-center justify-center"><ShoppingBagIcon /></div>}
                           <span className="absolute top-2.5 left-2.5 bg-[#22c55e] text-[#0d1512] text-[10px] font-extrabold uppercase px-2 py-1 rounded-full shadow-[0_0_12px_rgba(34,197,94,0.4)]">Реклама</span>
                         </div>
@@ -413,7 +427,7 @@ export default function FeedPage() {
                 return (
                   <motion.div key={'p-' + item.id} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }} transition={{ duration: 0.2 }} onClick={() => saveScrollAndNavigate(`/products/${item.id}`)} className="py-3.5 flex items-center gap-3.5 cursor-pointer group">
                     <div className="w-14 h-14 rounded-xl bg-[var(--color-surface)] shrink-0 overflow-hidden flex items-center justify-center">
-                      {item.media?.[0] ? <img src={resolveMedia(item.media[0])} alt={item.title} className="w-full h-full object-cover" loading="lazy" /> : <ShoppingBagIcon />}
+                      {item.media?.[0] ? <img src={resolveMedia(item.media[0])} alt={item.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width={56} height={56} /> : <ShoppingBagIcon />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold text-[var(--color-text)] truncate group-hover:text-[#22c55e] transition-colors">{item.title}</div>
@@ -456,7 +470,17 @@ export default function FeedPage() {
                       <MessageCircle size={14} />
                       {(item.commentCount ?? 0) > 0 && item.commentCount}
                     </button>
-                    {isAdmin && <button onClick={(e) => { e.stopPropagation(); delPost(item.id); }} className="tap-link px-1 ml-auto text-[10px] text-red-400 hover:underline">удалить</button>}
+                    {isAdmin && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); delPost(item.id); }}
+                        aria-label="Удалить пост"
+                        title="Удалить пост"
+                        className="ml-auto flex items-center justify-center gap-1.5 px-2.5 min-h-[44px] min-w-[44px] rounded-lg text-xs text-[var(--color-muted)] hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                        <span className="hidden sm:inline">Удалить</span>
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               );
@@ -491,8 +515,21 @@ function PostMedia({ media, title }: { media: string[]; title: string }) {
           alt={`${title} ${idx + 1}`}
           className="w-full h-auto max-h-[480px] object-cover"
           loading="lazy"
+          decoding="async"
           onClick={(e) => e.stopPropagation()}
         />
+        {/*
+          FIX-REST фикс 3 (карусель): рендерился ТОЛЬКО текущий слайд, поэтому
+          остальные фотографии поста не запрашивались вообще. Листание давало
+          пустой прямоугольник на время загрузки — тот же «серый квадрат»,
+          только по клику. Предзагружаем соседние слайды заранее: они попадают
+          в кэш браузера, листание становится мгновенным.
+        */}
+        <div className="hidden" aria-hidden="true">
+          {media.map((m, i) => (
+            i === idx ? null : <img key={i} src={resolveMedia(m)} alt="" loading="lazy" decoding="async" />
+          ))}
+        </div>
         {count > 1 && (
           <>
             <button

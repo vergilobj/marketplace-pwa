@@ -291,7 +291,7 @@ export default function ProductDetailPage() {
   );
 
   return (
-    <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-6 pb-56 lg:pb-20 overflow-x-hidden">
+    <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-6 pb-72 lg:pb-20 overflow-x-hidden">
       <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
         <ArrowLeft size={16} /> Назад
       </button>
@@ -614,9 +614,17 @@ export default function ProductDetailPage() {
           Раньше кнопки стояли в общем flex-ряду с nowrap-подписью
           «Купить через Базара» и вылезали за 390px. Теперь на мобиле все
           действия закреплены внизу и укладываются в ширину экрана, а на
-          десктопе остаются в колонке с описанием. */}
+          десктопе остаются в колонке с описанием.
+
+          V1 (VISUAL-PROD фикс 1): панель стояла на `bottom-0` с тем же
+          z-index 40, что и таб-бар навигации. Таб-бар идёт позже в DOM →
+          при равном z-index он выигрывал хит-тест и перехватывал 419 из 420
+          точек кнопки «Купить через Базара» (clickablePct: 0). Поднимаем
+          панель НАД таб-баром (bottom-3 + ~62px высоты → 76px), а не
+          z-index'ом: z-index спрятал бы таб-бар под панелью и лишил
+          покупателя навигации на странице товара. */}
       <div
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-bg)]/95 backdrop-blur px-3 pt-2.5"
+        className="lg:hidden fixed bottom-[76px] inset-x-0 z-40 border-t border-[var(--color-border)] bg-[var(--color-bg)]/95 backdrop-blur px-3 pt-2.5"
         style={{ paddingBottom: 'max(0.625rem, env(safe-area-inset-bottom))' }}
       >
         <div className="flex items-center justify-between gap-3 mb-2">

@@ -204,7 +204,7 @@ export default function CreatePostPage() {
             className="hidden"
           />
           <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileChange} className="hidden" />
-          <p className="text-[11px] text-[var(--color-faint)]">Видео: mp4, webm, mov, mkv, до 100 МБ. Фото: до 5 МБ каждое.</p>
+          <p className="text-[11px] text-[var(--color-faint)]">Видео: mp4, webm, mov, mkv, до 100 МБ. Фото: до 20 МБ каждое.</p>
         </div>
 
         {error && <p className="text-sm text-red-400 bg-red-400/5 rounded-xl px-4 py-2.5">{error}</p>}

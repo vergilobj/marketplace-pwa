@@ -14,6 +14,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UploadService } from './upload.service';
 import { UploadsReplicationService } from './uploads-replication.service';
+import { ImageOptimizerService } from './image-optimizer.service';
+import { join } from 'path';
 
 const VIDEO_MIMES = new Set([
   'video/mp4',
@@ -70,6 +72,7 @@ export class UploadController {
   constructor(
     private uploadService: UploadService,
     private replication: UploadsReplicationService,
+    private optimizer: ImageOptimizerService,
   ) {}
 
   // Картинки (оставляем существующий эндпоинт).
@@ -78,7 +81,7 @@ export class UploadController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: imageStorage,
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+      limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
       fileFilter: (req, file, cb) => {
         const ext = extname(file.originalname).toLowerCase();
         const isImageMime = IMAGE_MIMES.has(file.mimetype);
@@ -91,7 +94,12 @@ export class UploadController {
       },
     }),
   )
-  uploadFile(@UploadedFile() file: Express.Multer.File) {
+  async uploadFile(@UploadedFile() file: Express.Multer.File) {
+    // FIX-REST фикс 3: файл сжимается ДО репликации — иначе на вторую ноду
+    // уедет тяжёлый оригинал, а оптимизируется только локальная копия.
+    // Best-effort: сбой сжатия не должен ломать загрузку (см. сервис).
+    await this.optimizer.optimize(join('./uploads', file.filename));
+
     // PD-FIX-1: файл лёг только на ЭТУ ноду — копируем на вторую (best-effort),
     // иначе у половины пользователей картинка будет 404 (nginx гео-роутит).
     this.replication.replicate(file.filename);
