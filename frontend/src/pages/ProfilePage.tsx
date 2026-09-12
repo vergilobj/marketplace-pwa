@@ -9,10 +9,12 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { CreateMenu } from '../components/CreateMenu';
 import { PageSkeleton } from '../components/ui/Skeleton';
+import { useAuth, clearAuthState } from '../hooks/useAuth';
 import type { ApiUser, ApiUserStats, SellerRequestStatus } from '../api/types';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
+  const { refresh: refreshAuth, role: authRole } = useAuth();
   const [profile, setProfile] = useState<ApiUser | null>(null);
   const [stats, setStats] = useState<ApiUserStats | null>(null);
   const [balances, setBalances] = useState<BalanceResponse | null>(null);
@@ -23,11 +25,30 @@ export default function ProfilePage() {
   const [sellerRequest, setSellerRequest] = useState<SellerRequestStatus | null>(null);
 
   useEffect(() => {
-    Promise.all([getProfile(), getStats(), getBalance().catch(() => null), getMySellerRequest().catch(() => null)]).then(([p, s, b, sr]) => { setProfile(p); setStats(s); setBalances(b); setSellerRequest(sr?.status ?? null); setForm({ name: p.name || '', phone: p.phone || '' }); }).finally(() => setLoading(false));
-  }, []);
+    let alive = true;
+    Promise.all([getProfile(), getStats(), getBalance().catch(() => null), getMySellerRequest().catch(() => null)])
+      .then(([p, s, b, sr]) => {
+        if (!alive) return;
+        setProfile(p); setStats(s); setBalances(b); setSellerRequest(sr?.status ?? null); setForm({ name: p.name || '', phone: p.phone || '' });
+      })
+      .finally(() => { if (alive) setLoading(false); });
+    // BUG-2: админ мог одобрить заявку, пока профиль был открыт — подтягиваем
+    // серверную роль (и свежий токен, если роль в клейме устарела).
+    void refreshAuth();
+    return () => { alive = false; };
+  }, [refreshAuth]);
 
   const handleSave = async () => { try { await updateProfile({ ...form, phone: unformatPhone(form.phone) }); const p = await getProfile(); setProfile(p); setEditing(false); toast.success('Профиль обновлён'); } catch { toast.error('Ошибка'); } };
-  const handleLogout = () => { window.OneSignal?.logout()?.catch(() => {}); localStorage.clear(); navigate('/login'); };
+  const handleLogout = () => { window.OneSignal?.logout()?.catch(() => {}); localStorage.clear(); clearAuthState(); navigate('/login'); };
+
+  /** BUG-2: ручной ре-фетч серверной роли (админ одобрил заявку, пока мы тут). */
+  const handleRoleRefresh = async () => {
+    await refreshAuth(true);
+    const [p, sr] = await Promise.all([getProfile(), getMySellerRequest().catch(() => null)]);
+    setProfile(p);
+    setSellerRequest(sr?.status ?? null);
+    toast.success(p.role === 'SELLER' ? 'Роль обновлена: продавец' : 'Роль обновлена');
+  };
 
   /** A4: подать заявку на продавца — роль меняет админ после модерации. */
   const handleBecomeSeller = async () => {
@@ -40,9 +61,15 @@ export default function ProfilePage() {
         const refreshed = await becomeSeller();
         if (refreshed?.accessToken) localStorage.setItem('accessToken', refreshed.accessToken);
         setProfile((p) => ({ ...p, ...refreshed?.user, role: refreshed?.user?.role || 'SELLER' }) as ApiUser);
+        // BUG-2: обновляем общий auth-стор — иначе guard'ы продолжают видеть старую роль.
+        await refreshAuth();
         toast.success('Ты уже продавец');
       } else {
         setSellerRequest(res?.status || 'PENDING');
+        // BUG-2: перезапрашиваем профиль — UI сразу знает актуальную заявку/роль.
+        const p = await getProfile().catch(() => null);
+        if (p) setProfile(p);
+        await refreshAuth();
         toast.success('Заявка отправлена — ждём решения админа');
       }
     } catch (e) {
@@ -59,7 +86,27 @@ export default function ProfilePage() {
     }
   };
 
-  const role: string = profile?.role || 'BUYER';
+  /**
+   * BUG-2: роль берём из общего auth-стора (он перезапрашивает серверную роль),
+   * а не только из локального profile — иначе после одобрения заявки, пока
+   * страница открыта, бейдж и меню остаются «Покупатель» до перезагрузки.
+   */
+  const role: string = authRole || profile?.role || 'BUYER';
+
+  // Серверная роль изменилась (focus-ре-фетч) — синхронизируем локальный profile,
+  // чтобы меню/статус заявки соответствовали новой роли.
+  useEffect(() => {
+    if (!profile || !authRole || profile.role === authRole) return;
+    let alive = true;
+    Promise.all([getProfile(), getMySellerRequest().catch(() => null)])
+      .then(([p, sr]) => {
+        if (!alive) return;
+        setProfile(p);
+        setSellerRequest(sr?.status ?? null);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [authRole, profile]);
   const isSeller = role === 'SELLER' || role === 'ADMIN';
   const sellerRequestPending = sellerRequest === 'PENDING';
   const sellerRequestRejected = sellerRequest === 'REJECTED';
@@ -112,6 +159,17 @@ export default function ProfilePage() {
               <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-[#22c55e]/10 text-[#22c55e] text-[11px] font-bold">
                 {profile?.role === 'ADMIN' ? 'Админ' : profile?.role === 'SELLER' ? 'Продавец' : 'Покупатель'}
               </span>
+              {/* BUG-2: заявку могли одобрить, пока страница открыта — не заставляем перелогиниваться */}
+              {role === 'BUYER' && (
+                <button
+                  type="button"
+                  onClick={() => void handleRoleRefresh()}
+                  data-testid="role-refresh"
+                  className="block mt-2 text-[11px] font-semibold text-[var(--color-muted)] hover:text-[#22c55e] transition-colors"
+                >
+                  Роль изменилась? Обновить
+                </button>
+              )}
             </div>
           </div>
           {editing ? (

@@ -19,6 +19,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ReviewSellerRequestDto } from './dto/review-seller-request.dto';
 import { UserRole } from '@prisma/client';
 import {
   parseLimit,
@@ -67,20 +68,24 @@ export class UsersController {
     });
   }
 
-  /** A4: одобрить/отклонить заявку. approve=false → роль не меняется. */
+  /** A4: одобрить/отклонить заявку. approve=false → роль не меняется.
+   *
+   * BUG-1: approve — обязательный строгий boolean (ReviewSellerRequestDto).
+   * Опечатка в имени поля или пустое тело → 400, а не молчаливое REJECTED.
+   */
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Patch('seller-requests/:id')
   async reviewSellerRequest(
     @Param('id') id: string,
-    @Body() body: { approve: boolean; note?: string },
+    @Body() dto: ReviewSellerRequestDto,
     @Request() req: AuthenticatedRequest,
   ) {
     return this.usersService.reviewSellerRequest(
       id,
       req.user.userId,
-      Boolean(body?.approve),
-      body?.note,
+      dto.approve,
+      dto.note,
     );
   }
 

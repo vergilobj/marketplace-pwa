@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import { useAuth } from './hooks/useAuth';
@@ -58,10 +58,51 @@ function Lazy({ children }: { children: React.ReactNode }) {
 }
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, rolePending, refresh } = useAuth();
   const location = useLocation();
+
+  /**
+   * BUG-2: роль в клейме access-токена статична. Если админ одобрил заявку
+   * (или сменил роль напрямую), пока приложение открыто, токен остаётся
+   * старым и requiredRole редиректил на `/`. Ре-фетчим серверную роль при
+   * входе на защищённый роут.
+   */
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    void refresh();
+  }, [isAuthenticated, refresh, location.pathname]);
+
+  /**
+   * BUG-2: пользователь может получить роль, стоя на любой странице.
+   * Ловим возврат фокуса/вкладки и подстраховываемся минутным опросом.
+   * Здесь force=true: токен не менялся, но роль на сервере могла.
+   */
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const onFocus = () => void refresh(true);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refresh(true);
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    const timer = window.setInterval(onFocus, 60000);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.clearInterval(timer);
+    };
+  }, [isAuthenticated, refresh]);
+
   // location.state.from — чтобы после логина вернуть юзера туда, откуда выкинуло.
   if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location }} />;
+  /**
+   * BUG-2: пока серверная роль не подтверждена, требуемую роль не проверяем —
+   * иначе первый клик по /products/new выкинул бы BUYER'а на `/` раньше, чем
+   * приедет ответ с новой ролью. Это НЕ ослабление guard'а: показывается
+   * заглушка, страница не рендерится, и по приходу роли всё равно произойдёт
+   * либо рендер, либо редирект.
+   */
+  if (requiredRole && rolePending) return <div className="min-h-screen" role="status" aria-label="Загрузка" />;
   if (requiredRole && user?.role !== requiredRole && user?.role !== 'ADMIN') return <Navigate to="/" replace />;
   return <>{children}</>;
 }

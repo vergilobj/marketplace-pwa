@@ -65,6 +65,7 @@ export const ALL_TEST_PHONE_PREFIXES = [
   'hv-', // arbitrage-nh8.integration.spec.ts
   'arb-', // arbitrage-*.spec.ts
   'g3-test-', // test/g3-idor-ad-url-race.e2e-spec.ts
+  'bug1-sr-', // test/bug1-seller-request-validation.e2e-spec.ts
   'l1-cancel-', // l1-cancel-expired.integration.spec.ts
   'e2e-', // scripts/money-e2e.ts
   'alert-', // scripts/verify-money-alerts.js
@@ -287,6 +288,8 @@ export async function cleanupTestData(
   // ── 1. Листья: всё, что ссылается на User/Order/Product ───────────────
   await prisma.notification.deleteMany({ where: { userId: inUsers } });
   await prisma.auditLog.deleteMany({ where: { userId: inUsers } });
+  // SellerRequest.userId — RESTRICT: без этого `user.deleteMany` падает.
+  await prisma.sellerRequest.deleteMany({ where: { userId: inUsers } });
   await prisma.withdrawalRequest.deleteMany({ where: { userId: inUsers } });
   await prisma.autopilotRun.deleteMany({ where: { userId: inUsers } });
   await prisma.proactiveEvent.deleteMany({ where: { userId: inUsers } });

@@ -47,6 +47,7 @@ import {
   copyFileSync,
   renameSync,
   unlinkSync,
+  rmdirSync,
   readFileSync,
   writeFileSync,
 } from 'fs';
