@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { EscrowStatus, OrderStatus, Prisma } from '@prisma/client';
+import { EscrowStatus, OrderStatus, Prisma, TransactionStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -36,6 +36,43 @@ type Actor = 'BUYER' | 'SELLER' | 'ADMIN' | 'SYSTEM';
  * покупателя. После вердикта cancelReason перезаписывается на `VERDICT:{...}`.
  */
 export const ORDER_DECISION_MARKER = 'USER_DECISION:';
+
+/**
+ * ФИКС 1: отчёт прогона `reconcileUnheldEscrow`.
+ *
+ * `held` / `reverted` заполняются только в режиме `apply=true`: в dry-run
+ * заказы лишь классифицируются (`withConfirmedTx` / `withoutConfirmedTx`),
+ * и ни одна строка не мутируется.
+ */
+export interface EscrowReconcileReport {
+  /** Был ли реальный проход (true) или только отчёт (false). */
+  apply: boolean;
+  /** Сколько заказов `PAID/SHIPPED + escrowStatus=NONE` попало в пачку. */
+  scanned: number;
+  /** Случай (а): есть подтверждённый депозит → досоздан холд. */
+  held: number;
+  /** Случай (б): депозита нет → возвращены в PENDING. */
+  reverted: number;
+  /** Ошибки обработки (заказ остался как был). */
+  failed: number;
+  /** Классификация пачки (считается и в dry-run). */
+  withConfirmedTx: number;
+  withoutConfirmedTx: number;
+  orderIds: { held: string[]; reverted: string[]; failed: string[] };
+}
+
+/**
+ * Настройка-рубильник реального прохода reconciler'а. Ключа по умолчанию в
+ * БД НЕТ — значит `get()` вернёт `null` и reconciler работает в dry-run.
+ */
+export const ESCROW_RECONCILE_APPLY_SETTING = 'escrow_reconcile_legacy_apply';
+
+/** Статусы Transaction, означающие «деньги покупателя реально пришли». */
+const FUNDED_TX_STATUSES: TransactionStatus[] = [
+  TransactionStatus.CONFIRMED,
+  TransactionStatus.OVERPAID,
+  TransactionStatus.SWEPT,
+];
 
 export interface OrderDisputeDecision {
   /** `refund` — покупатель требует возврат; `keep` — отзывает спор. */
@@ -849,6 +886,199 @@ export class OrdersService {
     }
 
     return { count };
+  }
+
+  // ─── ФИКС 1: reconciler «PAID/SHIPPED + escrowStatus=NONE» ─────────────
+
+  /**
+   * Разбор «зависших» заказов: `status IN (PAID, SHIPPED)` при
+   * `escrowStatus = NONE`.
+   *
+   * Как такие заказы появляются: `processSuccessfulPayment` делает два шага
+   * неатомарно (D4) — сначала `PENDING → PAID`, потом `holdForOrder`. Если
+   * процесс умер между шагами, а компенсация в `PENDING` тоже не доехала,
+   * заказ остаётся PAID без холда. Его не видит **ни один** крон:
+   * `autoCloseOrders` фильтрует `escrowStatus: HELD`, `cancelExpiredOrders` —
+   * `status: PENDING`. Заказ висит вечно: деньги в блокчейне, эскроу нет.
+   *
+   * Классификация (обе ветки обязательны — что реально встречается, решает БД):
+   *  - **(а)** есть `Transaction` с этим orderId и статусом
+   *    `CONFIRMED | OVERPAID | SWEPT` → деньги пришли, холд не создан →
+   *    досоздаём его `holdForOrder` (заказ уходит в HELD и живёт обычным путём);
+   *  - **(б)** подтверждённой транзакции нет → деньги не пришли → возвращаем в
+   *    `PENDING` (`paidAt: null`) — ровно компенсация из
+   *    `processSuccessfulPayment`. Дальше заказ подберёт `cancelExpiredOrders`.
+   *
+   * ⚠️ РЕЖИМ ПО УМОЛЧАНИЮ — DRY-RUN. Реальный проход только при
+   * `apply: true` ИЛИ настройке `escrow_reconcile_legacy_apply = 'true'`.
+   * Причина: на живой БД таких заказов 654, и ветка (б) массово переводит их
+   * в PENDING, откуда `cancelExpiredOrders` (30 сек) отменит их навсегда —
+   * это необратимая мутация боевых данных. Рубильник вынесен наружу.
+   *
+   * Идемпотентность: холд — атомарный `updateMany({ escrowStatus: NONE })`
+   * + unique refKey проводки; ветка (б) — `updateMany` с полным набором
+   * условий (`status IN (...) AND escrowStatus = NONE`). Повторный прогон по
+   * уже обработанным заказам не пишет ни строк.
+   */
+  async reconcileUnheldEscrow(
+    opts: { apply?: boolean; batchSize?: number; orderIds?: string[] } = {},
+  ): Promise<EscrowReconcileReport> {
+    const settingOn =
+      (await this.settings.get(ESCROW_RECONCILE_APPLY_SETTING)) === 'true';
+    const apply = opts.apply ?? settingOn;
+    const batchSize = Math.max(1, opts.batchSize ?? 100);
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        status: { in: [OrderStatus.PAID, OrderStatus.SHIPPED] },
+        escrowStatus: EscrowStatus.NONE,
+        // Адресный прогон: когда передан список id, пачка ограничена им.
+        // Нужно и админу («разобрать вот эти заказы»), и тестам — иначе
+        // самый старый батч всегда составляют легаси-заказы 01.08, и ни
+        // проверить, ни точечно починить что-то другое невозможно.
+        ...(opts.orderIds?.length ? { id: { in: opts.orderIds } } : {}),
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+      take: batchSize,
+    });
+
+    const report: EscrowReconcileReport = {
+      apply,
+      scanned: orders.length,
+      held: 0,
+      reverted: 0,
+      failed: 0,
+      withConfirmedTx: 0,
+      withoutConfirmedTx: 0,
+      orderIds: { held: [], reverted: [], failed: [] },
+    };
+    if (!orders.length) return report;
+
+    const funded = new Set(
+      (
+        await this.prisma.transaction.findMany({
+          where: {
+            orderId: { in: orders.map((o) => o.id) },
+            status: { in: FUNDED_TX_STATUSES },
+          },
+          select: { orderId: true },
+        })
+      ).map((t) => t.orderId),
+    );
+
+    const caseA: string[] = [];
+    const caseB: string[] = [];
+    for (const o of orders) (funded.has(o.id) ? caseA : caseB).push(o.id);
+    report.withConfirmedTx = caseA.length;
+    report.withoutConfirmedTx = caseB.length;
+
+    if (!apply) {
+      // Dry-run: только отчёт и алерт. НИ ОДНОЙ мутации.
+      this.logger.error(
+        `ALERT escrow reconcile (DRY-RUN): найдено ${report.scanned} заказов ` +
+          `PAID/SHIPPED без холда — (а) с подтверждённым депозитом: ${caseA.length}, ` +
+          `(б) без депозита (вернуть в PENDING): ${caseB.length}. ` +
+          `Мутации НЕ выполнялись. Включение: ${ESCROW_RECONCILE_APPLY_SETTING}='true'.`,
+      );
+      return report;
+    }
+
+    // ---- случай (а): деньги пришли — досоздаём холд ----
+    for (const orderId of caseA) {
+      try {
+        const before = await this.prisma.order.findUnique({
+          where: { id: orderId },
+          select: { status: true },
+        });
+        const hold = await this.escrowService.holdForOrder(orderId);
+        if (!hold.held) continue;
+
+        // Заказ уже был SHIPPED: holdForOrder выставил дедлайн «отправки»,
+        // которого он уже не ждёт — переносим на срок авто-подтверждения.
+        if (before?.status === OrderStatus.SHIPPED) {
+          const days = await this.settings.getInt('escrow_autocomplete_days', 7);
+          await this.prisma.order.updateMany({
+            where: { id: orderId, escrowStatus: EscrowStatus.HELD },
+            data: { autoCompleteAt: addDays(new Date(), days) },
+          });
+        }
+
+        report.held++;
+        report.orderIds.held.push(orderId);
+        this.logger.warn(
+          `ALERT escrow reconcile: заказ ${orderId} был PAID/SHIPPED без холда, ` +
+            `депозит подтверждён — холд досоздан на ${hold.amount} USDT`,
+        );
+      } catch (err) {
+        report.failed++;
+        report.orderIds.failed.push(orderId);
+        this.logger.error(
+          `escrow reconcile hold ${orderId} failed: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    // ---- случай (б): денег нет — возвращаем в PENDING ----
+    for (const orderId of caseB) {
+      try {
+        // Условия те же, что в компенсации processSuccessfulPayment, плюс
+        // escrowStatus=NONE — иначе можно было бы снести холд, созданный
+        // параллельно (webhook/другой прогон).
+        const { count } = await this.prisma.order.updateMany({
+          where: {
+            id: orderId,
+            status: { in: [OrderStatus.PAID, OrderStatus.SHIPPED] },
+            escrowStatus: EscrowStatus.NONE,
+          },
+          data: { status: OrderStatus.PENDING, paidAt: null, shippedAt: null },
+        });
+        if (count === 0) continue;
+        report.reverted++;
+        report.orderIds.reverted.push(orderId);
+      } catch (err) {
+        report.failed++;
+        report.orderIds.failed.push(orderId);
+        this.logger.error(
+          `escrow reconcile revert ${orderId} failed: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    this.logger.warn(
+      `ALERT escrow reconcile (APPLY): scanned=${report.scanned}, ` +
+        `held=${report.held}, reverted=${report.reverted}, failed=${report.failed}`,
+    );
+
+    return report;
+  }
+
+  /**
+   * Крон reconciler'а. Периодичность — 10 минут (не чаще раза в час, как
+   * требует ТЗ):
+   *  - 5 минут (`autoCloseOrders`) избыточно: у `PAID + NONE` нет таймера
+   *    (`autoCompleteAt = NULL`), окно эскроу измеряется днями
+   *    (`escrow_ship_deadline_days = 5`), а не минутами;
+   *  - 10 минут — тот же класс задач, что `reconcilePayouts` и
+   *    `runInvariantCheck` («догнать состояние с внешним миром»), одинаковая
+   *    нагрузка на БД;
+   *  - пачка ограничена `batchSize` (100) — на 654 легаси-заказах это 7
+   *    прогонов вместо одного тяжёлого findMany с N транзакциями.
+   *
+   * Крон всегда работает в режиме, который задаёт настройка. Пока ключа
+   * `escrow_reconcile_legacy_apply` нет — это безопасный dry-run.
+   */
+  @Cron(CronExpression.EVERY_10_MINUTES)
+  async reconcileUnheldEscrowCron(): Promise<{ scanned: number }> {
+    try {
+      const report = await this.reconcileUnheldEscrow();
+      return { scanned: report.scanned };
+    } catch (err) {
+      this.logger.error(
+        `escrow reconcile cron failed: ${(err as Error).message}`,
+      );
+      return { scanned: 0 };
+    }
   }
 
   // ─── внутреннее ────────────────────────────────────────────────────────

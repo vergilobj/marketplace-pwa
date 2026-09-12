@@ -780,45 +780,67 @@ export class LedgerService {
    * Запись проводок с защитой от дублей по refKey.
    * createMany({ skipDuplicates: true }) — единственный атомарный способ
    * сделать «insert if not exists» одним запросом.
+   *
+   * Журнал append-only: строка проводки создаётся ОДИН раз и больше не
+   * меняется. Поэтому `balanceAfter` считается ДО вставки и пишется в ту же
+   * строку (projectBalances), а не догоняется отдельным UPDATE после неё.
+   * Дедуп-набор тоже определяется заранее — он нужен и для расчёта баланса.
    */
   private async applyInTx(
     tx: LedgerTx,
     ops: LedgerOp[],
     idempotent: boolean,
   ): Promise<LedgerApplyResult> {
-    const data: Prisma.LedgerEntryCreateManyInput[] = ops.map((op) => ({
-      account: op.account,
-      amount: round2(op.amount),
-      type: op.type,
-      refKey: op.refKey,
-      userId: op.userId ?? null,
-      orderId: op.orderId ?? null,
-      dealId: op.dealId ?? null,
-      currency: op.currency ?? 'USDT',
-      meta: (op.meta ?? undefined) as Prisma.InputJsonValue | undefined,
-    }));
+    const existing = idempotent
+      ? new Set(await this.findExistingRefKeys(tx, ops.map((op) => op.refKey)))
+      : new Set<string>();
 
-    const result = await tx.ledgerEntry.createMany({
-      data,
-      skipDuplicates: idempotent,
-    });
+    const appliedOps = ops.filter((op) => !existing.has(op.refKey));
+    const skipped = ops
+      .filter((op) => existing.has(op.refKey))
+      .map((op) => op.refKey);
 
-    const applied = ops.map((op) => op.refKey);
+    if (appliedOps.length) {
+      // balanceAfter — кэш баланса аккаунта после операции (для аудита UI).
+      // Считается по состоянию журнала ДО вставки + накопление внутри батча.
+      const projected = await this.projectBalances(tx, appliedOps);
 
-    if (result.count !== ops.length && !idempotent) {
-      throw new LedgerInvariantError(
-        `apply: expected ${ops.length} entries, wrote ${result.count}`,
-      );
+      const data: Prisma.LedgerEntryCreateManyInput[] = appliedOps.map((op) => ({
+        account: op.account,
+        amount: round2(op.amount),
+        type: op.type,
+        refKey: op.refKey,
+        userId: op.userId ?? null,
+        orderId: op.orderId ?? null,
+        dealId: op.dealId ?? null,
+        currency: op.currency ?? 'USDT',
+        balanceAfter: projected.get(op.refKey) ?? null,
+        meta: (op.meta ?? undefined) as Prisma.InputJsonValue | undefined,
+      }));
+
+      const result = await tx.ledgerEntry.createMany({
+        data,
+        skipDuplicates: idempotent,
+      });
+
+      if (result.count !== appliedOps.length) {
+        if (!idempotent) {
+          throw new LedgerInvariantError(
+            `apply: expected ${appliedOps.length} entries, wrote ${result.count}`,
+          );
+        }
+        // Гонка: параллельный писатель вставил тот же refKey между нашим
+        // SELECT и INSERT. Проводка не записана — её balanceAfter не в счёт.
+        this.logger.warn(
+          `apply: ${appliedOps.length - result.count} refKey(s) skipped by concurrent writer`,
+        );
+      }
     }
 
-    const skipped =
-      result.count === ops.length
-        ? []
-        : await this.findExistingRefKeys(tx, ops.map((op) => op.refKey));
+    const applied = appliedOps.map((op) => op.refKey);
 
-    // balanceAfter — кэш баланса аккаунта после операции (для аудита UI).
-    if (result.count > 0) {
-      await this.updateBalanceCache(tx, applied.filter((k) => !skipped.includes(k)));
+    if (applied.length) {
+      await this.updateBalanceCache(tx, applied);
     }
 
     if (skipped.length) {
@@ -827,10 +849,78 @@ export class LedgerService {
       );
     }
 
-    return {
-      applied: applied.filter((k) => !skipped.includes(k)),
-      skipped,
-    };
+    return { applied, skipped };
+  }
+
+  /**
+   * Предрасчёт `balanceAfter` для пачки проводок (append-only журнал).
+   *
+   * Базы отсчёта — ровно те же, что в updateBalanceCache:
+   *   AVAILABLE — сумма проводок журнала (источник истины, §4.1);
+   *   REFERRAL  — кэш `User.bonusBalance`, потому что в нём сидит легаси-сид,
+   *               которого в журнале нет: перезапись суммой журнала обнулила
+   *               бы пользовательские деньги (§1.3.3 ТЗ).
+   * Для нескольких проводок одного пользователя баланс накапливается в
+   * порядке следования ops (running), по каждому аккаунту отдельно.
+   */
+  private async projectBalances(
+    tx: LedgerTx,
+    ops: LedgerOp[],
+  ): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    const userIds = [
+      ...new Set(
+        ops
+          .filter(
+            (op) =>
+              op.userId &&
+              (op.account === LedgerAccount.AVAILABLE ||
+                op.account === LedgerAccount.REFERRAL),
+          )
+          .map((op) => op.userId as string),
+      ),
+    ];
+    if (!userIds.length) return out;
+
+    const [availableAgg, users] = await Promise.all([
+      tx.ledgerEntry.groupBy({
+        by: ['userId'],
+        where: { userId: { in: userIds }, account: LedgerAccount.AVAILABLE },
+        _sum: { amount: true },
+      }),
+      tx.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, bonusBalance: true },
+      }),
+    ]);
+
+    const availableBefore = new Map(
+      availableAgg.map((r) => [r.userId, round2(r._sum.amount ?? 0)]),
+    );
+    const bonusBefore = new Map(
+      users.map((u) => [u.id, round2(u.bonusBalance ?? 0)]),
+    );
+
+    const running = new Map<string, number>();
+    for (const op of ops) {
+      if (!op.userId) continue;
+      if (
+        op.account !== LedgerAccount.AVAILABLE &&
+        op.account !== LedgerAccount.REFERRAL
+      ) {
+        continue;
+      }
+      const key = `${op.userId}:${op.account}`;
+      const base =
+        op.account === LedgerAccount.AVAILABLE
+          ? availableBefore.get(op.userId) ?? 0
+          : bonusBefore.get(op.userId) ?? 0;
+      const next = round2((running.get(key) ?? base) + round2(op.amount));
+      running.set(key, next);
+      out.set(op.refKey, next);
+    }
+
+    return out;
   }
 
   private async findExistingRefKeys(
@@ -845,7 +935,16 @@ export class LedgerService {
   }
 
   /**
-   * Обновить кэш балансов на User и balanceAfter в проводках.
+   * Обновить кэши балансов: `User.availableBalance` / `User.bonusBalance`.
+   *
+   * `LedgerEntry.balanceAfter` здесь БОЛЬШЕ НЕ ОБНОВЛЯЕТСЯ (ФИКС 3).
+   * Прежний `ledgerEntry.update({ data: { balanceAfter } })` нарушал
+   * append-only-принцип журнала: строка проводки переписывалась спустя время.
+   * Значение пишется сразу при `create` (см. applyInTx/projectBalances).
+   * Никто, кроме этого метода, журнал не мутировал, значит после правки
+   * LedgerEntry — строго append-only по ВСЕМ полям, включая денежные
+   * (`amount`, `account`, `userId`, `refKey`, `type`), которые не
+   * обновлялись и раньше.
    *
    * availableBalance — производная от журнала: пересчитываем из суммы
    * AVAILABLE-проводок (инкремент разъехался бы при пропущенной проводке).
@@ -901,30 +1000,6 @@ export class LedgerService {
             ? { bonusBalance: { increment: referralDelta } }
             : {}),
         },
-      });
-    }
-
-    // balanceAfter — только для пользовательских аккаунтов.
-    for (const entry of entries) {
-      if (!entry.userId) continue;
-      if (
-        entry.account !== LedgerAccount.AVAILABLE &&
-        entry.account !== LedgerAccount.REFERRAL
-      ) {
-        continue;
-      }
-      const user = await tx.user.findUnique({
-        where: { id: entry.userId },
-        select: { availableBalance: true, bonusBalance: true },
-      });
-      if (!user) continue;
-      const balanceAfter =
-        entry.account === LedgerAccount.AVAILABLE
-          ? user.availableBalance
-          : user.bonusBalance;
-      await tx.ledgerEntry.update({
-        where: { id: entry.id },
-        data: { balanceAfter },
       });
     }
   }

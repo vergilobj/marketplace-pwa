@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+"""H1 — живое доказательство: payload для webhook'а собирает САМ background.py.
+
+Не тест-хелпер «с правильным полем», а реальная функция: скрипт вызывает
+`app.background._on_deposit` с deposit-словарём вида `paymod.watcher._handle_log`
+и перехватывает то, что функция отправляет в webhook. Подпись HMAC считается
+тем же кодом, что и в сервисе (`app.auth.hmac_sign_headers`).
+
+stdout: JSON {"payload", "body", "timestamp", "signature"}
+  body — ровно те байты, что ушли бы по HTTP: `json.dumps(payload)` (как в
+  `background._post_webhook`). Backend проверяет HMAC по сырому телу, поэтому
+  интеграционный тест обязан отправить ИМЕННО эту строку.
+
+usage: python tests/build_watcher_webhook.py '<deposit-json>'
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import pathlib
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+# То же окружение, что у сервиса (run-local.sh / paymod.service): PAYMOD_DIR,
+# PAYMOD_SHARED_SECRET, DB_PATH берутся из .env sidecar.
+_env_file = ROOT / ".env"
+if _env_file.exists():
+    for _raw in _env_file.read_text(encoding="utf-8").splitlines():
+        _line = _raw.strip()
+        if not _line or _line.startswith("#") or "=" not in _line:
+            continue
+        _k, _v = _line.split("=", 1)
+        os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+
+from app import background  # noqa: E402
+from app.auth import hmac_sign_headers  # noqa: E402
+
+
+def main() -> int:
+    deposit = json.loads(sys.argv[1])
+    sent: list[dict] = []
+
+    async def fake_post(payload: dict) -> None:
+        sent.append(payload)
+
+    background._post_webhook = fake_post  # type: ignore[assignment]
+    asyncio.run(background._on_deposit(deposit))
+
+    if len(sent) != 1:
+        print(json.dumps({"error": f"expected 1 webhook, got {len(sent)}"}))
+        return 1
+
+    payload = sent[0]
+    body = json.dumps(payload)
+    headers = hmac_sign_headers(
+        os.environ["PAYMOD_SHARED_SECRET"].encode("utf-8"), body.encode("utf-8")
+    )
+    print(
+        json.dumps(
+            {
+                "payload": payload,
+                "body": body,
+                "timestamp": headers["X-Paymod-Timestamp"],
+                "signature": headers["X-Paymod-Signature"],
+            }
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

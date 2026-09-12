@@ -9,7 +9,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LedgerService } from './ledger.service';
-import { LedgerOp } from './dto/ledger.dto';
+import { LedgerApplyResult, LedgerInvariantError, LedgerOp } from './dto/ledger.dto';
 import { addDays, round2 } from './money.util';
 
 export type EscrowCloseReason =
@@ -138,11 +138,18 @@ export class EscrowService {
       });
       if (guard.count === 0) return false;
 
-      await this.ledger.hold(tx, {
+      // ФИКС 4: холд — такая же денежная операция, как релиз и возврат.
+      // Пропуск проводки по дублю refKey при уже выставленном HELD = в
+      // журнале нет заморозки, а заказ считается оплаченным → ALERT + откат.
+      this.assertLedgerApplied(
+        await this.ledger.hold(tx, {
+          orderId,
+          userId: order.buyerId,
+          amount: order.amount,
+        }),
+        'holdForOrder',
         orderId,
-        userId: order.buyerId,
-        amount: order.amount,
-      });
+      );
 
       return true;
     });
@@ -387,20 +394,31 @@ export class EscrowService {
             orderId,
           });
         }
-        await this.ledger.apply(tx, ops, { assertZeroSum: true });
+        // ФИКС 4: пропуск проводки по дублю refKey = расхождение с уже
+        // изменённым состоянием заказа → ALERT + откат.
+        this.assertLedgerApplied(
+          await this.ledger.apply(tx, ops, { assertZeroSum: true }),
+          `settleRelease(adSplit, ${reason})`,
+          orderId,
+        );
       } else {
         // Обычный путь без изменений (§4.3).
-        await this.ledger.release(tx, {
+        // ФИКС 4: см. assertLedgerApplied.
+        this.assertLedgerApplied(
+          await this.ledger.release(tx, {
+            orderId,
+            buyerId: order.buyerId,
+            sellerId: order.sellerId,
+            amount,
+            platformFee: platformCut,
+            sellerNet,
+            referralUserId: order.referralUserId,
+            referralBonus,
+            meta: { reason },
+          }),
+          `settleRelease(${reason})`,
           orderId,
-          buyerId: order.buyerId,
-          sellerId: order.sellerId,
-          amount,
-          platformFee: platformCut,
-          sellerNet,
-          referralUserId: order.referralUserId,
-          referralBonus,
-          meta: { reason },
-        });
+        );
       }
 
       return true;
@@ -588,7 +606,10 @@ export class EscrowService {
       });
       if (guard.count === 0) return false;
 
-      await this.ledger.refund(tx, {
+      // ФИКС 4: возврат уже перевёл заказ в REFUNDED/SPLIT — если проводки
+      // не записались, деньги остались в эскроу при закрытом заказе.
+      // Алерт + откат транзакции (заказ вернётся в HELD, деньги на месте).
+      const refundResult = await this.ledger.refund(tx, {
         orderId,
         buyerId: order.buyerId,
         sellerId: order.sellerId,
@@ -598,6 +619,11 @@ export class EscrowService {
         feeCut,
         meta: { reason, buyerSharePct: pct },
       });
+      this.assertLedgerApplied(
+        refundResult,
+        `refundEscrow(${reason})`,
+        orderId,
+      );
 
       return true;
     });
@@ -785,7 +811,12 @@ export class EscrowService {
           orderId: order.id,
         });
       }
-      await this.ledger.apply(tx, ops, { assertZeroSum: true });
+      // ФИКС 4: см. assertLedgerApplied.
+      this.assertLedgerApplied(
+        await this.ledger.apply(tx, ops, { assertZeroSum: true }),
+        `refundAdOrder(${reason})`,
+        order.id,
+      );
 
       return true;
     });
@@ -884,6 +915,41 @@ export class EscrowService {
     const raw = await this.settings.getFloat(key);
     if (!Number.isFinite(raw) || raw <= 0) return fallback;
     return Math.round(raw);
+  }
+
+  /**
+   * ФИКС 4: «проводка не применилась, а должна была» — это ошибка, а не
+   * тихий пропуск.
+   *
+   * `LedgerService.apply` идемпотентен: `createMany({ skipDuplicates: true })`
+   * молча пропускает уже существующий refKey. Для легитимного повтора это
+   * правильно, но если refKey уже занят, а состояние заказа при этом
+   * ПЕРЕШЛО в целевое (escrowStatus=RELEASED/REFUNDED, деньги списаны с
+   * эскроу), значит проводки разошлись с реальностью — деньги потерялись
+   * или нарисовались.
+   *
+   * Отличие от легитимного повтора: там до записи НЕ доходит вовсе — гард
+   * `updateMany({ escrowStatus: HELD })` возвращает count=0, транзакция
+   * выходит по `claimed=false`, и `apply` не вызывается. То есть любой
+   * skipped внутри этой транзакции — коллизия refKey, а не повтор операции.
+   * Ровно так же это различает `approveWithdrawal` (users.service.ts:470):
+   * `applied.length === 1 && skipped.length === 0`.
+   *
+   * Реакция как в NH1: `logger.error` ALERT + бросок наверх. Транзакция
+   * откатится целиком — заказ останется в HELD, деньги на месте, а не
+   * «эскроу закрыт, проводок нет».
+   */
+  private assertLedgerApplied(
+    result: LedgerApplyResult,
+    what: string,
+    orderId: string,
+  ): void {
+    if (!result.skipped.length) return;
+    const message =
+      `${what}: проводка не применилась (дубль refKey), но состояние заказа уже ` +
+      `изменено — откат транзакции. order=${orderId}, skipped=${result.skipped.join(', ')}`;
+    this.logger.error(`ALERT ${message}`);
+    throw new LedgerInvariantError(message);
   }
 
   /** Уведомления не должны ронять денежную операцию. */
