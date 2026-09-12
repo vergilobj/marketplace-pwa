@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { OrderStatus, DealStatus, EscrowStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EscrowService } from '../payments/escrow.service';
+import { AlertsService } from '../common/alerts/alerts.service';
 import { BazarApiClient } from './bazar.api-client';
 import { DealService } from './deal.service';
 // NH8: маркер позиции покупателя (пишется orders API в Order.cancelReason).
@@ -105,6 +106,9 @@ export class ArbitrageService {
     private readonly apiClient: BazarApiClient,
     private readonly deals: DealService,
     private readonly escrow: EscrowService,
+    // G2: внешний канал алертов. @Optional — спеки конструируют сервис
+    // руками (new ArbitrageService(prisma, api, deals, escrow)).
+    @Optional() private readonly alerts?: AlertsService,
   ) {}
 
   @Cron('*/10 * * * *')
@@ -369,6 +373,15 @@ export class ArbitrageService {
     this.logger.warn(
       `ALERT arbitration escalated to admin: order ${orderId} (no deal, ${MAX_ATTEMPTS} attempts)`,
     );
+    // G2: эскалация без сделки = арбитраж не смог разобрать спор сам.
+    await this.alerts?.send({
+      code: 'arbitration_escalated',
+      severity: 'error',
+      message:
+        `Арбитраж эскалирован админу: заказ ${orderId} ` +
+        `(нет сделки, ${MAX_ATTEMPTS} попыток)`,
+      context: { orderId, attempts: MAX_ATTEMPTS },
+    });
   }
 
   /**
@@ -502,6 +515,17 @@ export class ArbitrageService {
       this.logger.error(
         `ALERT arbitration escrow settlement failed for order ${order.id} (deal ${dealId}): ${message}`,
       );
+      // G2: расчёт эскроу по вердикту не прошёл, Deal остаётся OPEN и cron
+      // повторит через 10 минут — но если сторона недоступна, спор зависнет
+      // навсегда. Дедуп в AlertsService не даст спамить каждые 10 минут.
+      await this.alerts?.send({
+        code: 'arbitration_escrow_settlement_failed',
+        severity: 'error',
+        message:
+          `Арбитраж: расчёт эскроу не прошёл для заказа ${order.id} ` +
+          `(сделка ${dealId}): ${message}`,
+        context: { orderId: order.id, dealId },
+      });
       throw e;
     }
   }

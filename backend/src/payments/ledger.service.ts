@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   EscrowStatus,
@@ -9,6 +9,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AlertsService } from '../common/alerts/alerts.service';
 import { round2 } from './money.util';
 import {
   LedgerApplyOptions,
@@ -38,6 +39,11 @@ export class LedgerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    // G2: внешний канал алертов. @Optional — LedgerService инстанцируется
+    // в десятке спек руками (`new LedgerService(prisma, notify)`); без
+    // @Optional каждый такой спек пришлось бы править, а в Nest DI резолвится
+    // реальный AlertsService (внутри — тихий fallback при пустом env).
+    @Optional() private readonly alerts?: AlertsService,
   ) {}
 
   // ============================================================
@@ -567,6 +573,45 @@ export class LedgerService {
         );
       }
 
+      // G2: наружу, а не только в БД. Раньше единственным адресатом были
+      // Notification админам — если админ не залогинился, потеря денег
+      // обнаруживалась через дни. Ошибки webhook глушатся внутри alerts.send,
+      // а `?.` покрывает спеки, конструирующие сервис без AlertsService.
+      //
+      // ⚠️ Порядок важен: внешний алерт уходит ПОСЛЕ проверок, но ДО
+      // alertAdmins — и обёрнут в safeSend, потому что брошенное исключение
+      // здесь попало бы в общий catch и отменило бы доставку админам в БД.
+      // Падение канала алертов не имеет права отменять основной алерт.
+      if (!report.ok) {
+        await this.safeSendAlert({
+          code: 'money_invariants_violated',
+          severity: 'error',
+          message:
+            `Нарушены инварианты журнала (${report.problems.length}): ` +
+            report.problems.slice(0, 5).join(' | '),
+          context: {
+            problems: report.problems.length,
+            sample: report.problems.slice(0, 5),
+          },
+        });
+      }
+      if (mismatches.length) {
+        await this.safeSendAlert({
+          code: 'escrow_registry_mismatch',
+          severity: 'error',
+          message:
+            `Расхождения реестра эскроу (${mismatches.length}): ` +
+            mismatches
+              .slice(0, 5)
+              .map((m) => `${m.orderId}=${m.escrowStatus}/${m.ledgerEscrow}`)
+              .join(' | '),
+          context: {
+            mismatches: mismatches.length,
+            sample: mismatches.slice(0, 5).map((m) => m.orderId),
+          },
+        });
+      }
+
       // Доставка админам: одна нотификация на прогон, а не на проблему —
       // иначе /notifications забивается одинаковыми записями каждые 10 мин.
       await this.alertAdmins(report.problems, mismatches);
@@ -627,6 +672,32 @@ export class LedgerService {
       ...warnings.slice(0, 5),
     ];
     await this.notifyAdminsSafely('money_warning', lines.join('\n'));
+  }
+
+  /**
+   * G2: отправить внешний алерт, не давая ему уронить вызывающий поток.
+   *
+   * `AlertsService.send` уже спроектирован так, что не бросает. Этот хелпер
+   * страхует саму проводку: если алерт-канал подменён/сломан и бросает,
+   * `runInvariantCheck` не должен из-за этого попасть в общий catch — иначе
+   * исключение отменит доставку алерта админам в БД (notifyAdminsSafely) и
+   * вернёт problems: -1, потеряв реальные нарушения.
+   */
+  private async safeSendAlert(alert: {
+    code: string;
+    severity?: 'error' | 'warning';
+    message: string;
+    context?: Record<string, unknown>;
+  }): Promise<void> {
+    try {
+      await this.alerts?.send(alert);
+    } catch (err) {
+      this.logger.warn(
+        `external alert delivery threw (code=${alert.code}): ${
+          (err as Error).message
+        }`,
+      );
+    }
   }
 
   /**

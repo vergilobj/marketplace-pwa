@@ -147,4 +147,112 @@ describe('NotificationsService', () => {
       expect(await service.getUnreadCount('user-1')).toBe(3);
     });
   });
+
+  /**
+   * G2, фикс 1 — блокер деплоя: `ONESIGNAL_APP_ID=test` молча выключал пуш.
+   *
+   * Раньше `hasKeys = Boolean(appId && apiKey)` → `Boolean('test' && key)` =
+   * true, и заглушка считалась настроенным OneSignal: на каждом push улетал
+   * запрос с app_id='test', OneSignal отвечал ошибкой, а при старте в логе
+   * не было ни строки. Теперь заглушка распознаётся и warning виден сразу.
+   */
+  describe('детект заглушки ONESIGNAL_APP_ID (G2)', () => {
+    const buildWith = (appId: string, apiKey: string) => {
+      const config = {
+        getOrThrow: jest.fn(),
+        get: jest.fn((key: string) => {
+          if (key === 'ONESIGNAL_APP_ID') return appId;
+          if (key === 'ONESIGNAL_REST_API_KEY') return apiKey;
+          return undefined;
+        }),
+      };
+      const moduleRef = Test.createTestingModule({
+        providers: [
+          NotificationsService,
+          { provide: PrismaService, useValue: mockPrisma },
+          { provide: ConfigService, useValue: config },
+        ],
+      });
+      return moduleRef.compile();
+    };
+
+    /** Перехватить вызовы logger.warn конкретного инстанса. */
+    const spyWarn = (svc: NotificationsService) =>
+      jest.spyOn((svc as any).logger, 'warn').mockImplementation(() => undefined);
+
+    const REAL_UUID = 'd1cb2724-f8e5-40c4-8dec-2db841c83cba';
+
+    it('app_id="test" → WARN при старте (было: тишина)', async () => {
+      const module = await buildWith('test', 'real-key');
+      const svc = module.get<NotificationsService>(NotificationsService);
+      const warn = spyWarn(svc);
+
+      // Конструктор уже отработал при compile() — пересоздаём через
+      // повторный вызов внутренней проверки.
+      (svc as any).warnIfPushDisabled();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      const msg = warn.mock.calls[0][0] as string;
+      expect(msg).toContain('OneSignal не настроен');
+      expect(msg).toContain('пуш отключён');
+      expect(msg).toContain('ONESIGNAL_APP_ID');
+      // Подсказка, где взять реальный ID.
+      expect(msg).toContain('Settings');
+    });
+
+    it('app_id="" (пусто) → WARN с причиной «не задан»', async () => {
+      const module = await buildWith('', 'real-key');
+      const svc = module.get<NotificationsService>(NotificationsService);
+      const warn = spyWarn(svc);
+      (svc as any).warnIfPushDisabled();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0] as string).toContain('не задан');
+    });
+
+    it('отсутствующий REST-ключ → WARN упоминает ключ', async () => {
+      const module = await buildWith(REAL_UUID, '');
+      const svc = module.get<NotificationsService>(NotificationsService);
+      const warn = spyWarn(svc);
+      (svc as any).warnIfPushDisabled();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0] as string).toContain(
+        'ONESIGNAL_REST_API_KEY не задан',
+      );
+    });
+
+    it('реальный UUID + ключ → НЕТ warning, push считается настроенным', async () => {
+      const module = await buildWith(REAL_UUID, 'real-key');
+      const svc = module.get<NotificationsService>(NotificationsService);
+      const warn = spyWarn(svc);
+      (svc as any).warnIfPushDisabled();
+
+      expect(warn).not.toHaveBeenCalled();
+      expect((svc as any).hasKeys).toBe(true);
+    });
+
+    it('не-UUID мусор → WARN (не пытаемся слать в OneSignal)', async () => {
+      const module = await buildWith('not-a-uuid', 'real-key');
+      const svc = module.get<NotificationsService>(NotificationsService);
+      const warn = spyWarn(svc);
+      (svc as any).warnIfPushDisabled();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0] as string).toContain('не похож на реальный');
+    });
+
+    it('hasKeys=false при заглушке → push не уходит в сеть', async () => {
+      const module = await buildWith('test', 'real-key');
+      const svc = module.get<NotificationsService>(NotificationsService);
+      spyWarn(svc);
+
+      const fetchSpy = jest.spyOn(global, 'fetch');
+      const result = await svc.sendToAll({ en: 't' }, { en: 'c' });
+
+      expect(result).toBeNull();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
+    });
+  });
 });

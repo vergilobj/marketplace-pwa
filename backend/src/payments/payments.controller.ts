@@ -10,9 +10,11 @@ import {
   HttpCode,
   Logger,
   Request,
+  Optional,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
+import { AlertsService } from '../common/alerts/alerts.service';
 import { Roles } from '../auth/roles.decorator';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.interface';
 import { PaymentsService } from './payments.service';
@@ -27,6 +29,9 @@ export class PaymentsController {
   constructor(
     private paymentsService: PaymentsService,
     private nowPayments: NowPaymentsProvider,
+    // G2: внешний канал алертов. @Optional — payments.controller.spec собирает
+    // контроллер через Test.createTestingModule без AlertsService.
+    @Optional() private readonly alerts?: AlertsService,
   ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -143,6 +148,14 @@ export class PaymentsController {
         this.logger.error(
           `ALERT legacy IPN: finished без order_id, body=${JSON.stringify(body)}`,
         );
+        // G2: деньги в сети есть, а к заказу не привязаны. Без внешнего
+        // алерта такое всплывает только при ручном разборе логов.
+        await this.alerts?.send({
+          code: 'legacy_ipn_no_order_id',
+          severity: 'error',
+          message: `Legacy IPN: платёж finished без order_id — деньги не привязаны к заказу`,
+          context: { body },
+        });
         return { status: 'ok' };
       }
 
@@ -160,6 +173,14 @@ export class PaymentsController {
         this.logger.error(
           `ALERT legacy IPN: order=${orderId} НЕ подтверждён — ${check.reason}`,
         );
+        // G2: IPN пришёл, но заказ НЕ подтверждён (сумма/провайдер/наличие).
+        // Это либо попытка подделки, либо расхождение оплаты.
+        await this.alerts?.send({
+          code: 'legacy_ipn_not_confirmed',
+          severity: 'error',
+          message: `Legacy IPN: заказ ${orderId} НЕ подтверждён — ${check.reason}`,
+          context: { orderId, reason: check.reason },
+        });
         return { status: 'ok', confirmed: false, reason: check.reason };
       }
 

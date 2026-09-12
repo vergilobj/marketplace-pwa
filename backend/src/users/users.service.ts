@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
@@ -11,6 +12,7 @@ import { SettingsService } from '../settings/settings.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PaymodService } from '../payments/paymod.service';
 import { LedgerService } from '../payments/ledger.service';
+import { AlertsService } from '../common/alerts/alerts.service';
 import { LedgerApplyResult } from '../payments/dto/ledger.dto';
 import { round2, toRaw } from '../payments/money.util';
 import { LedgerAccount, Prisma, UserRole } from '@prisma/client';
@@ -56,6 +58,8 @@ export class UsersService {
     private paymodService: PaymodService,
     private settings: SettingsService,
     private ledger: LedgerService,
+    // G2: внешний канал алертов (застрявшие выплаты).
+    @Optional() private readonly alerts?: AlertsService,
   ) {}
 
   async findById(id: string, select?: Prisma.UserSelect) {
@@ -475,6 +479,16 @@ export class UsersService {
         `ALERT withdrawal ${requestId} attempt ${attempt}: ledger debit not applied ` +
           `(duplicate refKey) — payout ABORTED, funds NOT sent`,
       );
+      // G2: выплата аварийно прервана, деньги не ушли, заявка откатана в
+      // pending — админ должен узнать об этом не только из БД.
+      await this.alerts?.send({
+        code: 'withdrawal_debit_not_applied',
+        severity: 'error',
+        message:
+          `Вывод ${requestId} (попытка ${attempt}): проводка не применилась ` +
+          `(дубль refKey) — выплата ПРЕРВАНА, средства НЕ отправлены`,
+        context: { requestId, attempt },
+      });
       await this.prisma.withdrawalRequest.update({
         where: { id: requestId },
         data: {
@@ -576,6 +590,17 @@ export class UsersService {
             `UNCONFIRMED (${recovered.reason}) — funds debited but payout ` +
             `outcome unknown, deferred to reconcilePayouts (no reversal)`,
         );
+        // G2: деньги списаны, а факт выплаты неизвестен. Это ровно тот случай,
+        // когда «админ когда-нибудь залогинится» — не стратегия.
+        await this.alerts?.send({
+          code: 'withdrawal_payout_unconfirmed',
+          severity: 'error',
+          message:
+            `Вывод ${requestId} (попытка ${attempt}): состояние выплаты ` +
+            `НЕ ПОДТВЕРЖДЕНО (${recovered.reason}) — средства списаны, ` +
+            `исход неизвестен, передано в reconcilePayouts (без отката)`,
+          context: { requestId, attempt, reason: recovered.reason },
+        });
         return this.prisma.withdrawalRequest.update({
           where: { id: requestId },
           data: {

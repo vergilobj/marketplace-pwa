@@ -16,6 +16,15 @@ lerna-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local
+# G2: без wildcard-строки ниже `.env.production` НЕ игнорировался —
+# паттерн `.env` матчит только файл с именем ровно `.env`, поэтому реальный
+# прод-файл с секретами уходил бы в коммит. `.example`-шаблоны остаются
+# отслеживаемыми (см. !-правила).
+.env.production
+.env.*.local
+# Шаблоны остаются отслеживаемыми (negation без `/` действует на любом уровне).
+!**/.env.example
+!**/.env.production.example
 
 # Сборка
 dist/

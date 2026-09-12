@@ -10,6 +10,33 @@ import {
 /** Тело запроса к OneSignal REST API — набор полей известен лишь провайдеру. */
 type OneSignalBody = Record<string, unknown>;
 
+/**
+ * Заглушки, которые НЕ являются валидным OneSignal App ID.
+ *
+ * `test` (текущее значение в backend/.env) и пустая строка раньше молча
+ * проходили в `hasKeys`: `Boolean('test' && key)` → true, сервис «думал», что
+ * настроен, и падал на каждом пуше уже внутри OneSignal API. Пуш при этом был
+ * мёртв, а в логе — ничего на старте.
+ */
+const ONESIGNAL_PLACEHOLDER_APP_IDS = new Set(['test', 'change_me', 'changeme']);
+
+/**
+ * Валиден ли OneSignal App ID.
+ *
+ * Реальный App ID — UUID вида `d1cb2724-f8e5-40c4-8dec-2db841c83cba`.
+ * Требуем UUID-форму: это отсекает и `test`, и случайно вставленный REST API
+ * ключ, и обрезанное значение.
+ */
+function isValidOneSignalAppId(appId: string | undefined): boolean {
+  if (!appId) return false;
+  const trimmed = appId.trim();
+  if (!trimmed) return false;
+  if (ONESIGNAL_PLACEHOLDER_APP_IDS.has(trimmed.toLowerCase())) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    trimmed,
+  );
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -23,10 +50,51 @@ export class NotificationsService {
   ) {
     this.appId = this.configService.get<string>('ONESIGNAL_APP_ID');
     this.apiKey = this.configService.get<string>('ONESIGNAL_REST_API_KEY');
+
+    // G2: явный warn при старте вместо тихого no-op.
+    //
+    // Было: при `ONESIGNAL_APP_ID=test` сервис уходил в ветку `hasKeys=false`
+    // и на каждый push молча возвращал null. Ни одной строки в логе на старте —
+    // деплой на прод с заглушкой ничем не отличался от корректного.
+    // Стало: невалидный/заглушечный app_id виден в логе сразу при бустрапе.
+    this.warnIfPushDisabled();
+  }
+
+  /**
+   * Один warn на старте, если пуши фактически выключены. Не бросает —
+   * отсутствие пушей не должно мешать приложению подняться.
+   */
+  private warnIfPushDisabled(): void {
+    if (this.isPushConfigured) return;
+
+    const reasons: string[] = [];
+    if (!this.appId || !this.appId.trim()) {
+      reasons.push('ONESIGNAL_APP_ID не задан');
+    } else if (!isValidOneSignalAppId(this.appId)) {
+      reasons.push(
+        `ONESIGNAL_APP_ID не похож на реальный App ID (получено: ` +
+          `"${this.appId.trim().slice(0, 32)}")`,
+      );
+    }
+    if (!this.apiKey || !this.apiKey.trim()) {
+      reasons.push('ONESIGNAL_REST_API_KEY не задан');
+    }
+
+    this.logger.warn(
+      `OneSignal не настроен — пуш отключён. ${reasons.join('; ')}. ` +
+        `Пропишите реальный ONESIGNAL_APP_ID (UUID) и ONESIGNAL_REST_API_KEY ` +
+        `в backend/.env; App ID — OneSignal Dashboard → Settings → Keys & IDs. ` +
+        `См. DEPLOY.md §4.1.`,
+    );
+  }
+
+  /** Готов ли сервис реально отправлять пуши. */
+  private get isPushConfigured(): boolean {
+    return isValidOneSignalAppId(this.appId) && Boolean(this.apiKey?.trim());
   }
 
   private get hasKeys(): boolean {
-    return Boolean(this.appId && this.apiKey);
+    return this.isPushConfigured;
   }
 
   // ================== Внутренние уведомления ==================
