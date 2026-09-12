@@ -40,21 +40,42 @@ from app import background  # noqa: E402
 from app.auth import hmac_sign_headers  # noqa: E402
 
 
-def main() -> int:
-    deposit = json.loads(sys.argv[1])
+async def _build(deposit: dict) -> dict:
+    """Собирает webhook ровно так, как это делает боевой sidecar.
+
+    ⚠️ J3: в проде paymod.db инициализируется в `main.py::lifespan`
+    (`paymod.db.init_db()`) ДО старта background-тасков. Без этого
+    `_resolve_to_address` не может достать выданный адрес и `to` уходит
+    пустым. Харнесс обязан воспроизводить прод-условия, иначе он проверяет
+    не то, что крутится в бою — поэтому init_db здесь обязателен.
+    """
+    import paymod.db as paymod_db
+
+    await paymod_db.init_db()
     sent: list[dict] = []
 
     async def fake_post(payload: dict) -> None:
         sent.append(payload)
 
     background._post_webhook = fake_post  # type: ignore[assignment]
-    asyncio.run(background._on_deposit(deposit))
+    try:
+        await background._on_deposit(deposit)
+    finally:
+        await paymod_db.close_db()
 
     if len(sent) != 1:
-        print(json.dumps({"error": f"expected 1 webhook, got {len(sent)}"}))
+        raise RuntimeError(f"expected 1 webhook, got {len(sent)}")
+    return sent[0]
+
+
+def main() -> int:
+    deposit = json.loads(sys.argv[1])
+    try:
+        payload = asyncio.run(_build(deposit))
+    except Exception as exc:  # noqa: BLE001
+        print(json.dumps({"error": str(exc)}))
         return 1
 
-    payload = sent[0]
     body = json.dumps(payload)
     headers = hmac_sign_headers(
         os.environ["PAYMOD_SHARED_SECRET"].encode("utf-8"), body.encode("utf-8")

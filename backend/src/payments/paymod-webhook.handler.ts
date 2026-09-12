@@ -98,13 +98,27 @@ export class PaymodWebhookHandler {
     }
 
     // §6.1(1): адрес получателя — депозит должен прийти на наш depositAddress.
-    if (
-      transaction.depositAddress &&
-      to &&
-      to.toLowerCase() !== transaction.depositAddress.toLowerCase()
-    ) {
-      await this.reject(transaction.id, 'address_mismatch', { to });
-      return;
+    //
+    // J3: проверка строгая, но НЕ безусловная. Sidecar теперь сам достаёт
+    // адрес выдачи по client_ref (`background._resolve_to_address`) и кладёт
+    // его в `to`, потому что вендоренный watcher `to` не отдаёт.
+    //
+    // Слепо требовать `to` нельзя: если sidecar адрес достать не смог
+    // (запись потеряна, лукап упал), `to` придёт пустым — и reject здесь
+    // отклонил бы РЕАЛЬНЫЙ депозит с деньгами. Деньги важнее сверки, поэтому
+    // пустой `to` — не reject, а громкий warn: сверка не сработала, это
+    // должно быть видно в логах и метриках, а не молчать.
+    if (transaction.depositAddress && to) {
+      if (to.toLowerCase() !== transaction.depositAddress.toLowerCase()) {
+        await this.reject(transaction.id, 'address_mismatch', { to });
+        return;
+      }
+    } else if (transaction.depositAddress && !to) {
+      this.logger.warn(
+        `deposit address NOT verified for ${transaction.id}: webhook has empty ` +
+          `'to' (sidecar could not resolve the issued address) — accepting, ` +
+          `проверка адреса получателя пропущена`,
+      );
     }
 
     // §6.1(2): chain / token — помечаем mismatchReason, не молча выходим.

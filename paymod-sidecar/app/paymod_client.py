@@ -52,6 +52,36 @@ async def get_or_create_wallet(client_ref: str, ttl_seconds: int | None = None) 
     return address
 
 
+async def lookup_wallet_address(client_ref: str) -> Optional[str]:
+    """Адрес, УЖЕ выданный этому client_ref'у, или None.
+
+    J3: watcher (вендоренный paymod) НЕ передаёт в callback поле `to` — значит
+    sidecar, который сам выдал адрес через `get_or_create_wallet`, обязан
+    достать его сам и положить в webhook, иначе сверка адреса получателя на
+    бэкенде мертва (пустой `to` короткозамыкает проверку).
+
+    ⚠️ ТОЛЬКО ЧТЕНИЕ. Никакого `create_deposit_wallet` здесь нет и быть не
+    должно: депозит уже пришёл, второй адрес выдан не будет — иначе на каждый
+    незнакомый client_ref плодились бы кошельки. Не нашли — None.
+
+    ⚠️ Сетевых запросов НЕТ: `wallet_directory()` — локальный SELECT по
+    paymod.db (SQLite). Отдельный кеш не нужен: инвалидация на каждый новый
+    wallet дороже самого запроса, а `get_or_create_wallet` и так ходит этим
+    путём на каждый /v1/address.
+
+    Ошибки НЕ глотаются здесь — их обрабатывает вызывающий (см. background),
+    чтобы депозит не терялся из-за падения лукапа.
+    """
+    paymod = _ensure_paymod()
+    directory = await paymod.db.wallet_directory()
+    needle = client_ref.strip().lower()
+    for row in directory:
+        if str(row["client_ref"]).strip().lower() == needle:
+            address = row["address"]
+            return str(address) if address else None
+    return None
+
+
 async def pay_erc20(
     network: str,
     token: str,

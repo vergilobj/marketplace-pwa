@@ -14,6 +14,7 @@ const WEI = 10n ** 18n;
 
 describe('PaymodWebhookHandler (§6)', () => {
   let handler: PaymodWebhookHandler;
+  let warnSpy!: jest.SpyInstance;
 
   const tx = {
     id: 'tx-1',
@@ -63,6 +64,14 @@ describe('PaymodWebhookHandler (§6)', () => {
       mockNotifications as unknown as NotificationsService,
       mockPayments as unknown as PaymentsService,
     );
+    // J3: пустой `to` — не reject, но громкий warn. Проверяем, что он есть.
+    warnSpy = jest
+      .spyOn(
+        (handler as unknown as { logger: { warn: (m: string) => void } })
+          .logger,
+        'warn',
+      )
+      .mockImplementation(() => undefined);
   });
 
   const deposit = (over: Record<string, unknown> = {}) => ({
@@ -160,6 +169,66 @@ describe('PaymodWebhookHandler (§6)', () => {
         }),
       }),
     );
+    expect(mockPayments.processSuccessfulPayment).not.toHaveBeenCalled();
+  });
+
+  // ── J3: сверка адреса получателя ────────────────────────────────────────
+  //
+  // До J3 sidecar слал `to: ""` (вендоренный watcher поле не отдаёт), и
+  // проверка выше короткозамыкалась на пустом `to` — то есть была МЕРТВА.
+  // Теперь sidecar достаёт адрес сам, а handler:
+  //   - при непустом `to` сверяет СТРОГО (несовпадение → reject);
+  //   - при пустом `to` — warn, но НЕ reject (иначе потеряли бы реальные деньги).
+
+  it('to совпадает с depositAddress (регистр не важен) → CONFIRMED', async () => {
+    await handler.handleDeposit(deposit({ to: '0xDEPOSIT' }));
+    expect(mockPayments.processSuccessfulPayment).toHaveBeenCalledWith(
+      'order-1',
+    );
+    const failCall = mockPrisma.transaction.update.mock.calls.find(
+      (c) => (c[0] as { data?: { status?: string } }).data?.status === 'FAILED',
+    );
+    expect(failCall).toBeUndefined();
+  });
+
+  it('пустой to → НЕ reject (обратная совместимость), заказ обрабатывается', async () => {
+    await handler.handleDeposit(deposit({ to: '' }));
+    expect(mockPayments.processSuccessfulPayment).toHaveBeenCalledWith(
+      'order-1',
+    );
+    const failCall = mockPrisma.transaction.update.mock.calls.find(
+      (c) => (c[0] as { data?: { status?: string } }).data?.status === 'FAILED',
+    );
+    expect(failCall).toBeUndefined();
+    // Сверка пропущена — это обязано быть видно в логах.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('deposit address NOT verified'),
+    );
+  });
+
+  it('to отсутствует в теле → НЕ reject, warn в логе', async () => {
+    const body = deposit();
+    delete (body as Record<string, unknown>).to;
+    await handler.handleDeposit(body);
+    expect(mockPayments.processSuccessfulPayment).toHaveBeenCalledWith(
+      'order-1',
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('deposit address NOT verified'),
+    );
+  });
+
+  it('token mismatch → FAILED (проверка токена жива)', async () => {
+    await handler.handleDeposit(deposit({ token: 'USDC' }));
+    expect(mockPrisma.transaction.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'FAILED',
+          mismatchReason: 'token_mismatch',
+        }),
+      }),
+    );
+    expect(mockPayments.processSuccessfulPayment).not.toHaveBeenCalled();
   });
 
   it('сиротский депозит (заказ CANCELLED) → на баланс покупателя + CONFIRMED', async () => {

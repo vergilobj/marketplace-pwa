@@ -60,6 +60,52 @@ function buildLiveWebhook(deposit: Record<string, unknown>): Envelope {
   return JSON.parse(res.stdout.trim()) as Envelope;
 }
 
+/** HMAC-подпись произвольного тела — тем же кодом, что и в бою. */
+function signBody(body: string): { timestamp: string; signature: string } {
+  const py = [
+    'import json,os,sys',
+    `sys.path.insert(0, ${JSON.stringify(SIDECAR)})`,
+    'from app.auth import hmac_sign_headers',
+    `body=${JSON.stringify(body)}`,
+    'print(json.dumps(hmac_sign_headers(os.environ["PAYMOD_SHARED_SECRET"].encode(), body.encode())))',
+  ].join('\n');
+  const res = spawnSync(PYTHON, ['-c', py], { cwd: SIDECAR, encoding: 'utf-8' });
+  if (res.status !== 0) {
+    throw new Error(`sign failed: ${res.stderr || res.stdout}`);
+  }
+  const headers = JSON.parse(res.stdout.trim()) as Record<string, string>;
+  return {
+    timestamp: headers['X-Paymod-Timestamp'],
+    signature: headers['X-Paymod-Signature'],
+  };
+}
+
+/**
+ * Живой кошелёк из paymod.db: client_ref + выданный адрес.
+ *
+ * Нужен, чтобы проверить, что sidecar РЕАЛЬНО достаёт `to` по client_ref
+ * из настоящей таблицы wallets, а не из мока.
+ */
+function walletFromPaymodDb(): { client_ref: string; address: string } | null {
+  const dbPath =
+    process.env.DB_PATH ||
+    path.join(SIDECAR, 'paymod.db');
+  const py = [
+    'import json,sqlite3,sys',
+    `con=sqlite3.connect(${JSON.stringify(dbPath)})`,
+    'con.row_factory=sqlite3.Row',
+    'row=con.execute("SELECT client_ref,address FROM wallets ORDER BY id DESC LIMIT 1").fetchone()',
+    'print(json.dumps(dict(row) if row else None))',
+  ].join('\n');
+  const res = spawnSync(PYTHON, ['-c', py], { encoding: 'utf-8' });
+  if (res.status !== 0) {
+    throw new Error(`paymod.db read failed: ${res.stderr || res.stdout}`);
+  }
+  return JSON.parse(res.stdout.trim()) as
+    | { client_ref: string; address: string }
+    | null;
+}
+
 async function post(body: string, timestamp: string, signature: string) {
   const res = await fetch(WEBHOOK_URL, {
     method: 'POST',
@@ -111,7 +157,7 @@ async function main(): Promise<void> {
       BigInt(Math.round(amount * 1_000_000)) * 10n ** 12n
     ).toString();
     const clientRef = `mp-txn-${order.id}`;
-    await prisma.transaction.create({
+    const tx = await prisma.transaction.create({
       data: {
         orderId: order.id,
         type: 'payment',
@@ -128,7 +174,7 @@ async function main(): Promise<void> {
         payload: {},
       },
     });
-    return { order, clientRef };
+    return { order, tx, clientRef };
   };
 
   const watcherDeposit = (clientRef: string, atomic: number, txHash: string) => ({
@@ -289,6 +335,154 @@ async function main(): Promise<void> {
           (res.json as { reason?: string })?.reason === 'invalid_signature' &&
           tx.status === 'PENDING',
         JSON.stringify(res),
+      );
+    }
+
+    // ══ J3: СВЕРКА АДРЕСА ПОЛУЧАТЕЛЯ ═══════════════════════════════════════
+    //
+    // До J3 sidecar слал `to: ""` (вендоренный watcher поле не отдаёт) и
+    // проверка адреса на бэкенде короткозамыкалась — была МЕРТВА.
+    // Теперь sidecar достаёт выданный адрес сам по client_ref.
+
+    // ── 5. sidecar РЕАЛЬНО достаёт адрес из paymod.db ──────────────────────
+    console.log('\n[5] sidecar достаёт `to` из paymod.db по client_ref');
+    {
+      // Живой кошелёк: берём существующий client_ref прямо из paymod.db.
+      const wallet = walletFromPaymodDb();
+      check(
+        'в paymod.db есть кошелёк для живой проверки',
+        !!wallet,
+        'таблица wallets пуста',
+      );
+
+      if (wallet) {
+        // deposit-словарь watcher'а — БЕЗ поля `to` (как в бою).
+        const env = buildLiveWebhook(
+          watcherDeposit(wallet.client_ref, 1_000_000, '0x' + 'd1'.repeat(32)),
+        );
+        check(
+          `payload.to заполнен выданным адресом (${wallet.address})`,
+          String(env.payload.to).toLowerCase() === wallet.address.toLowerCase(),
+          `got ${JSON.stringify(env.payload.to)}`,
+        );
+        check(
+          'payload.to не пустой — сверка адреса на бэкенде жива',
+          env.payload.to !== '',
+        );
+      }
+    }
+
+    // ── 6. `to` НЕ совпадает с depositAddress → REJECT ─────────────────────
+    console.log('\n[6] `to` ≠ depositAddress → FAILED address_mismatch');
+    {
+      const { tx, clientRef } = await mkOrder(1, '0xCorrectDepositAddressJ3');
+      const env = buildLiveWebhook(
+        watcherDeposit(clientRef, 1_000_000, '0x' + 'd2'.repeat(32)),
+      );
+      // Подменяем `to` на чужой адрес в СЫРОМ теле и переподписываем —
+      // так это выглядел бы, если бы деньги ушли на чужой кошелёк.
+      const tampered = { ...env.payload, to: '0xSomeoneElsesWalletJ3' };
+      const body = JSON.stringify(tampered);
+      const sig = signBody(body);
+
+      const res = await post(body, sig.timestamp, sig.signature);
+      const after = await prisma.transaction.findUniqueOrThrow({
+        where: { id: tx.id },
+      });
+      check('HTTP 200', res.status === 200, JSON.stringify(res));
+      check(
+        'Transaction FAILED + address_mismatch',
+        after.status === 'FAILED' && after.mismatchReason === 'address_mismatch',
+        `status=${after.status} reason=${after.mismatchReason}`,
+      );
+      check('Order НЕ оплачен', (await prisma.order.findUniqueOrThrow({
+        where: { id: tx.orderId },
+      })).status === 'PENDING');
+    }
+
+    // ── 7. `to` СОВПАДАЕТ с depositAddress → CONFIRMED ─────────────────────
+    console.log('\n[7] `to` = depositAddress → CONFIRMED');
+    {
+      const addr = '0xMatchingDepositAddrJ3';
+      const { order, tx, clientRef } = await mkOrder(1, addr);
+      const env = buildLiveWebhook(
+        watcherDeposit(clientRef, 1_000_000, '0x' + 'd3'.repeat(32)),
+      );
+      const body = JSON.stringify({ ...env.payload, to: addr });
+      const sig = signBody(body);
+
+      await post(body, sig.timestamp, sig.signature);
+      const after = await prisma.transaction.findUniqueOrThrow({
+        where: { id: tx.id },
+      });
+      const ord = await prisma.order.findUniqueOrThrow({
+        where: { id: order.id },
+      });
+      check('Transaction CONFIRMED', after.status === 'CONFIRMED', `status=${after.status}`);
+      check('Order PAID + escrow HELD', ord.status === 'PAID' && ord.escrowStatus === 'HELD',
+        `status=${ord.status} escrow=${ord.escrowStatus}`);
+    }
+
+    // ── 8. `to` ПУСТОЙ → обрабатывается, НЕ отклоняется ────────────────────
+    console.log('\n[8] пустой `to` → депозит НЕ теряется (обратная совместимость)');
+    {
+      const addr = '0xEmptyToAddrJ3';
+      const { order, tx, clientRef } = await mkOrder(1, addr);
+      const env = buildLiveWebhook(
+        watcherDeposit(clientRef, 1_000_000, '0x' + 'd4'.repeat(32)),
+      );
+      const body = JSON.stringify({ ...env.payload, to: '' });
+      const sig = signBody(body);
+
+      await post(body, sig.timestamp, sig.signature);
+      const after = await prisma.transaction.findUniqueOrThrow({
+        where: { id: tx.id },
+      });
+      const ord = await prisma.order.findUniqueOrThrow({
+        where: { id: order.id },
+      });
+      check(
+        'Transaction НЕ FAILED (пустой to не отклоняет реальный депозит)',
+        after.status !== 'FAILED',
+        `status=${after.status} reason=${after.mismatchReason}`,
+      );
+      check('Transaction CONFIRMED', after.status === 'CONFIRMED', `status=${after.status}`);
+      check('Order PAID', ord.status === 'PAID', `status=${ord.status}`);
+    }
+
+    // ── 9. chain / token проверки живы (H1 их оживил) ──────────────────────
+    console.log('\n[9] неверный chain → reject; неверный token → reject');
+    {
+      const { tx: txChain, clientRef: refChain } = await mkOrder(1, '0xChainJ3');
+      const envC = buildLiveWebhook(
+        watcherDeposit(refChain, 1_000_000, '0x' + 'd5'.repeat(32)),
+      );
+      const bodyC = JSON.stringify({ ...envC.payload, chain: 'eth' });
+      const sigC = signBody(bodyC);
+      await post(bodyC, sigC.timestamp, sigC.signature);
+      const afterChain = await prisma.transaction.findUniqueOrThrow({
+        where: { id: txChain.id },
+      });
+      check(
+        'chain=eth → FAILED chain_mismatch',
+        afterChain.status === 'FAILED' && afterChain.mismatchReason === 'chain_mismatch',
+        `status=${afterChain.status} reason=${afterChain.mismatchReason}`,
+      );
+
+      const { tx: txToken, clientRef: refToken } = await mkOrder(1, '0xTokenJ3');
+      const envT = buildLiveWebhook(
+        watcherDeposit(refToken, 1_000_000, '0x' + 'd6'.repeat(32)),
+      );
+      const bodyT = JSON.stringify({ ...envT.payload, token: 'USDC' });
+      const sigT = signBody(bodyT);
+      await post(bodyT, sigT.timestamp, sigT.signature);
+      const afterToken = await prisma.transaction.findUniqueOrThrow({
+        where: { id: txToken.id },
+      });
+      check(
+        'token=USDC → FAILED token_mismatch',
+        afterToken.status === 'FAILED' && afterToken.mismatchReason === 'token_mismatch',
+        `status=${afterToken.status} reason=${afterToken.mismatchReason}`,
       );
     }
   } finally {

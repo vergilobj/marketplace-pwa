@@ -14,7 +14,7 @@ from typing import Any, Awaitable, Callable
 import aiohttp
 
 from .auth import hmac_sign_headers
-from .paymod_client import _ensure_paymod
+from .paymod_client import _ensure_paymod, lookup_wallet_address
 
 logger = logging.getLogger("paymod-sidecar.background")
 
@@ -154,6 +154,44 @@ def _amount_raw(deposit: dict[str, Any], symbol: str) -> str:
     return to_chain_raw(deposit.get("amount_atomic"), token_decimals(network, symbol))
 
 
+async def _resolve_to_address(deposit: dict[str, Any], client_ref: str) -> str:
+    """Адрес получателя для webhook'а (J3).
+
+    watcher `to` не шлёт (вендоренный paymod править нельзя), поэтому:
+
+    1. если watcher когда-нибудь начнёт отдавать `to` — берём его (приоритет);
+    2. иначе достаём адрес сами по `client_ref` — sidecar это и есть тот, кто
+       выдал адрес через `create_deposit_wallet`;
+    3. не удалось (нет client_ref / нет записи / упал лукап) → `""`.
+
+    ⚠️ Никогда не бросает: падение лукапа НЕ должно терять депозит. Деньги
+    важнее сверки — webhook уходит с пустым `to`, бэкенд это переживёт
+    (см. `paymod-webhook.handler.ts`: пустой `to` → warn, не reject).
+    """
+    explicit = deposit.get("to")
+    if isinstance(explicit, str) and explicit:
+        return explicit
+    if not client_ref:
+        return ""
+    try:
+        found = await lookup_wallet_address(client_ref)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "to-address lookup failed for client_ref=%s: %s — webhook уйдёт без to",
+            client_ref,
+            exc,
+        )
+        return ""
+    if not found:
+        logger.warning(
+            "to-address not found for client_ref=%s — webhook уйдёт без to "
+            "(сверка адреса получателя не сработает)",
+            client_ref,
+        )
+        return ""
+    return found
+
+
 async def _on_deposit(deposit: dict[str, Any]) -> None:
     """Колбэк paymod.run_watcher: конвертирует депозит в webhook-событие deposit.
 
@@ -163,6 +201,8 @@ async def _on_deposit(deposit: dict[str, Any]) -> None:
     """
     client_ref = deposit.get("client_ref") or deposit.get("wallet_id") or ""
     symbol = str(deposit.get("symbol") or deposit.get("token") or "")
+    # J3: watcher `to` не отдаёт — достаём адрес выдачи сами по client_ref.
+    to_address = await _resolve_to_address(deposit, str(client_ref))
     payload = {
         "event": "deposit",
         "client_ref": client_ref,
@@ -171,17 +211,18 @@ async def _on_deposit(deposit: dict[str, Any]) -> None:
         "token_address": _token_address(deposit),
         "tx_hash": deposit.get("tx_hash", ""),
         "from": deposit.get("from", ""),
-        "to": deposit.get("to", ""),
+        "to": to_address,
         "amount": deposit.get("amount", ""),
         "amount_raw": _amount_raw(deposit, symbol),
         "is_new": deposit.get("is_new"),
         "block_number": deposit.get("block_number"),
     }
     logger.info(
-        "deposit detected: ref=%s tx=%s amount_raw=%s",
+        "deposit detected: ref=%s tx=%s amount_raw=%s to=%s",
         client_ref,
         payload["tx_hash"],
         payload["amount_raw"],
+        to_address or "<none>",
     )
     await _post_webhook(payload)
 
