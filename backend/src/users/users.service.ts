@@ -21,6 +21,30 @@ import {
   clampPage,
 } from '../common/dto/pagination.dto';
 
+/**
+ * F3: исход read-only проверки состояния выплаты по idempotency_key.
+ *
+ *   'recovered' — sidecar подтверждает запись выплаты (не failed/error):
+ *                 она инициирована, откат дебета ЗАПРЕЩЁН;
+ *   'absent'    — записи нет (404) либо статус failed/error: в сеть НЕ
+ *                 уходило, откат безопасен;
+ *   'unknown'   — sidecar недоступен (сеть/5xx/таймаут): состояние
+ *                 НЕИЗВЕСТНО. Откат дебета запрещён (выплата могла уйти),
+ *                 но и бросать нельзя — заявка помечается и передаётся
+ *                 в reconcilePayouts.
+ *
+ * Раньше 'unknown' выражался через throw BadRequestException внутри
+ * recoverPayout. Исключение вылетало из catch наружу, reverseWithdrawal
+ * оставался недостижим, и заявка застревала навсегда: status='approved',
+ * payoutStatus='PENDING', payoutTxHash=null. Повторный approve невозможен
+ * (требует status='pending'), а reconcilePayouts искал только
+ * payoutStatus='SUBMITTED' + payoutTxHash!=null → не находил.
+ */
+type PayoutRecovery =
+  | { outcome: 'recovered'; tx_hash: string | null; status: string }
+  | { outcome: 'absent' }
+  | { outcome: 'unknown'; reason: string };
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -514,7 +538,7 @@ export class UsersService {
       // (replayed=true). В этом случае НЕ откатываем — фиксируем SUBMITTED,
       // деньги списаны и отправлены.
       const recovered = await this.recoverPayout(idempotencyKey);
-      if (recovered) {
+      if (recovered.outcome === 'recovered') {
         this.logger.warn(
           `Withdrawal ${requestId} attempt ${attempt}: payout response was lost, ` +
             `but tx ${recovered.tx_hash} is on-chain — NOT reversing`,
@@ -528,6 +552,45 @@ export class UsersService {
           },
         });
       }
+
+      // F3: sidecar недоступен → состояние выплаты НЕИЗВЕСТНО. Слепой
+      // reversal запрещён: если выплата всё-таки ушла в сеть, откат дебета
+      // подарит пользователю деньги дважды (и в сеть, и обратно на баланс).
+      //
+      // Раньше здесь recoverPayout бросал BadRequestException, исключение
+      // вылетало из catch наружу, и заявка застревала навсегда в
+      // approved + payoutStatus='PENDING' + payoutTxHash=null: повторный
+      // approve невозможен (нужен 'pending'), а reconcilePayouts искал
+      // только SUBMITTED + непустой хэш → не находил. Средства заморожены.
+      //
+      // Теперь: НЕ бросаем (админ должен видеть состояние заявки, а не 500 —
+      // фронт на ошибку PATCH показывает toast и НЕ обновляет список),
+      // НЕ откатываем. Помечаем заявку так, чтобы её подобрал reconcilePayouts
+      // по фильтру «approved + payoutTxHash=null + payoutStatus IN
+      // (PENDING, SUBMITTED) + updatedAt старше N минут». Заявка остаётся
+      // approved с неоткаченным дебетом — деньги НЕ возвращены на баланс
+      // и НЕ потеряны, решение отложено до появления факта от sidecar.
+      if (recovered.outcome === 'unknown') {
+        this.logger.error(
+          `ALERT withdrawal ${requestId} attempt ${attempt}: payout state ` +
+            `UNCONFIRMED (${recovered.reason}) — funds debited but payout ` +
+            `outcome unknown, deferred to reconcilePayouts (no reversal)`,
+        );
+        return this.prisma.withdrawalRequest.update({
+          where: { id: requestId },
+          data: {
+            // status остаётся 'approved', payoutStatus — 'PENDING'
+            // (default), payoutTxHash — null. Ровно то состояние, которое
+            // ищет reconcilePayouts. updatedAt обновляется автоматически
+            // (@updatedAt) и даёт sidecar время очнуться.
+            payoutError:
+              `UNKNOWN: payout state unconfirmed (${recovered.reason}) — ` +
+              `deferred to reconcilePayouts`,
+          },
+        });
+      }
+
+      // recovered.outcome === 'absent': выплаты точно не было — откат безопасен.
 
       // 4b. ОШИБКА: компенсация + возврат заявки в pending (retryable).
       await this.reverseWithdrawal(requestId, request.userId, attempt, {
@@ -549,39 +612,48 @@ export class UsersService {
   /**
    * D3 (остаток): восстановление результата выплаты по idempotency_key.
    *
-   * Возвращает { tx_hash, status } если sidecar подтверждает, что выплата
-   * ушла в сеть (status submitted/confirmed/swept с непустым tx_hash).
-   * null — выплаты нет (ключ неизвестен или запись в failed) → откат безопасен.
+   * Возвращает:
+   *   'recovered' — sidecar подтверждает, что выплата ушла/инициирована
+   *                 (status submitted/confirmed/swept/pending с записью);
+   *   'absent'    — выплаты нет (ключ неизвестен/404 или запись в
+   *                 failed/error) → откат дебета безопасен;
+   *   'unknown'   — sidecar недоступен: состояние НЕИЗВЕСТНО.
+   *
+   * F3: 'unknown' больше НЕ бросает исключение. Раньше throw вылетал из
+   * catch наружу, из-за чего reverseWithdrawal был недостижим, а заявка
+   * оставалась навсегда в status='approved' + payoutStatus='PENDING' +
+   * payoutTxHash=null — состояние, которое не подбирал ни один крон и
+   * нельзя было повторить через approveWithdrawal (нужен status='pending').
+   * Теперь вызывающий код помечает заявку так, что её видит
+   * reconcilePayouts (см. ветку 'unknown' в approveWithdrawal).
    *
    * Использует READ-ONLY GET /v1/payout/{key}. Важно: POST /v1/payout для
    * НЕИЗВЕСТНОГО ключа реально инициирует перевод, поэтому «спрашивать»
    * им состояние нельзя — создашь вторую выплату с нулевой суммой.
-   *
-   * При недоступности sidecar (сеть/5xx) бросаем BadRequestException:
-   * откатывать вслепую нельзя — если выплата ушла, reversal вернёт деньги
-   * на баланс, а админ позже сделает второй перевод с новым ключом.
-   * Заявка останется approved/SUBMITTED-незавершённой, её разберёт
-   * reconcilePayouts по payoutTxHash.
    */
   private async recoverPayout(
     idempotencyKey: string,
-  ): Promise<{ tx_hash: string | null; status: string } | null> {
+  ): Promise<PayoutRecovery> {
     try {
       const existing = await this.paymodService.getPayout(idempotencyKey);
-      if (!existing) return null; // ключа нет — выплаты не было
+      if (!existing) return { outcome: 'absent' }; // ключа нет — выплаты не было
       const status = (existing.status || '').toLowerCase();
-      if (status === 'failed' || status === 'error') return null; // выплата не ушла
+      if (status === 'failed' || status === 'error') return { outcome: 'absent' };
       // submitted/confirmed/swept/pending — выплата инициирована.
-      return { tx_hash: existing.tx_hash ?? null, status };
+      return {
+        outcome: 'recovered',
+        tx_hash: existing.tx_hash ?? null,
+        status,
+      };
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       this.logger.error(
         `recoverPayout(${idempotencyKey}) failed: ${msg} — ` +
           `cannot confirm payout state, refusing blind reversal`,
       );
-      throw new BadRequestException(
-        `Не удалось подтвердить состояние выплаты: ${msg}`,
-      );
+      // F3: НЕ throw. Состояние неизвестно → не откатываем дебет и НЕ
+      // роняем запрос; помечаем заявку и отдаём её в reconcilePayouts.
+      return { outcome: 'unknown', reason: msg };
     }
   }
 

@@ -25,6 +25,15 @@ import { clampLimit, clampPage } from '../common/dto/pagination.dto';
 /** Финальные статусы оплаты, которые понимает фронт (CheckoutPage: isFinal). */
 const FINAL_PAYMENT_STATUSES = ['CONFIRMED', 'SWEPT'];
 
+/**
+ * F2: кто читает платёжные данные. `undefined` = системный вызов
+ * (webhook/cron/внутренний) — owner-чек не применяется.
+ */
+export interface PaymentViewer {
+  userId: string;
+  role: string;
+}
+
 /** Причины, по которым payout-транзакция в сети считается неуспешной. */
 const PAYOUT_FAILED_STATES = new Set([
   'failed',
@@ -35,6 +44,17 @@ const PAYOUT_FAILED_STATES = new Set([
   'cancelled',
   'canceled',
 ]);
+
+/**
+ * F3: сколько заявка должна провисеть в «незавершённом» состоянии
+ * (status='approved', payoutTxHash=null), прежде чем reconcile возьмёт её на
+ * разбор. Крон идёт каждые 10 минут (EVERY_10_MINUTES); в норме окно
+ * «approved → ответ payout» — секунды, поэтому 15 минут с запасом исключают
+ * гонку с живой выплатой, которая ещё в полёте (у fetch в paymod.service.ts
+ * нет таймаута, POST теоретически может висеть долго). Реальный подхват —
+ * на первом тике после истечения окна, т.е. максимум ~25 минут.
+ */
+const PAYOUT_STUCK_AFTER_MS = 15 * 60 * 1000;
 
 @Injectable()
 export class PaymentsService {
@@ -200,10 +220,15 @@ export class PaymentsService {
    * а состав корзины — в `payload.cart` (никаких новых колонок, схему делят
    * другие билдеры).
    *
-   * Идемпотентность двойная:
+   * Идемпотентность тройная (A3 + F1):
    *   1. `clientRef = mp-cart-<sha1(sorted ids)>` детерминирован, а sidecar
    *      выводит адрес из client_ref → повторный вызов даёт тот же адрес;
-   *   2. UNIQUE(clientRef) не даст завести вторую строку на ту же корзину.
+   *   2. UNIQUE(clientRef) не даст завести вторую строку на ту же корзину;
+   *   3. F1: если два вызова всё же прошли предварительную проверку
+   *      одновременно (двойной тап / retry), проигравший ловит P2002 и
+   *      возвращает уже созданную строку — наружу 500 НЕ летит.
+   *      Без этого CheckoutPage ловил 500 и деградировал к поштучной оплате
+   *      → покупатель видел N QR вместо одного.
    */
   async createPaymentForCart(orderIds: string[], userId: string) {
     const ids = Array.from(new Set((orderIds || []).filter(Boolean)));
@@ -274,11 +299,13 @@ export class PaymentsService {
     const chain = 'bsc';
     const token = 'USDT';
     const tokenDecimals = 18;
-    const result = await this.paymod.createPayment(total, anchorOrderId, {
+    const result = await this.deriveCartAddress(
+      cartKey,
       chain,
       token,
-      clientRef: cartKey,
-    });
+      total,
+      anchorOrderId,
+    );
     const depositAddress = result.raw?.deposit_address;
     const amountRaw = toRaw(total, tokenDecimals);
 
@@ -295,34 +322,166 @@ export class PaymentsService {
       },
     };
 
-    await this.prisma.transaction.create({
-      data: {
-        orderId: anchorOrderId,
-        type: 'payment',
-        amount: total,
-        status: 'PENDING',
-        payload: payload as Prisma.InputJsonValue,
-        provider: 'PAYMOD',
-        clientRef: cartKey,
-        depositAddress,
-        chain,
-        token,
-        amountRaw,
-        expectedAmountRaw: amountRaw,
-        tokenDecimals,
-      },
-    });
+    // F1 (гонка): create не должен вылетать наружу с P2002.
+    //
+    // Между предварительным `findUnique({clientRef})` выше и этой вставкой
+    // есть окно (внутри — HTTP-вызов sidecar). Два параллельных вызова
+    // (двойной тап, retry) оба видят `existing = null` и оба доходят сюда;
+    // второй падает на UNIQUE(clientRef) → HTTP 500 → CheckoutPage
+    // деградирует к поштучной оплате → N QR вместо одного.
+    //
+    // ⚠️ Именно try/catch, а НЕ upsert: `create` пишет `payload` с составом
+    // корзины (anchor/orderIds/perOrder/total), а update-ветка upsert
+    // перезатёрла бы уже записанную строку данными текущего вызова.
+    // Проигравший гонку просто возвращает победившую транзакцию.
+    try {
+      await this.prisma.transaction.create({
+        data: {
+          orderId: anchorOrderId,
+          type: 'payment',
+          amount: total,
+          status: 'PENDING',
+          payload: payload as Prisma.InputJsonValue,
+          provider: 'PAYMOD',
+          clientRef: cartKey,
+          depositAddress,
+          chain,
+          token,
+          amountRaw,
+          expectedAmountRaw: amountRaw,
+          tokenDecimals,
+        },
+      });
 
-    this.logger.log(
-      `Paymod CART payment created: anchor=${anchorOrderId} orders=${sortedIds.length} total=${total} addr=${depositAddress}`,
-    );
+      this.logger.log(
+        `Paymod CART payment created: anchor=${anchorOrderId} orders=${sortedIds.length} total=${total} addr=${depositAddress}`,
+      );
+    } catch (e) {
+      if (!this.isUniqueViolation(e)) throw e;
 
+      // Параллельный вызов успел вставить строку первым — она и есть истина
+      // (в ней уже лежит его payload.cart). Отдаём её, а не 500.
+      const raced = await this.prisma.transaction.findUnique({
+        where: { clientRef: cartKey },
+      });
+      if (!raced) throw e; // не гонка, а что-то другое (UNIQUE не по clientRef)
+
+      this.logger.log(
+        `cart payment reused (race): ${cartKey} addr=${raced.depositAddress}`,
+      );
+      return {
+        depositAddress: raced.depositAddress,
+        clientRef: raced.clientRef,
+        amount: raced.amount,
+        status: raced.status,
+      };
+    }
+
+    // Форма ответа — ровно та же, что у ветки переиспользования выше
+    // (CheckoutPage читает depositAddress / clientRef / amount / status).
+    // Значения берём из локальных переменных, а не из результата create:
+    // create может вернуть неполный объект (mock/select), а записали мы
+    // именно эти четыре значения.
     return {
       depositAddress,
       clientRef: cartKey,
       amount: total,
       status: 'PENDING',
     };
+  }
+
+  /**
+   * F1: вывод депозит-адреса корзины с ретраем на гонке в sidecar.
+   *
+   * Sidecar (`paymod_client.get_or_create_wallet`) делает ТОТ ЖЕ
+   * check-then-create: `wallet_directory()` → `create_deposit_wallet()`.
+   * Два параллельных вызова на один client_ref → второй получает
+   * SQLite `UNIQUE constraint failed: wallets.client_ref` → sidecar отдаёт
+   * HTTP 500 → PaymodService бросает → эндпоинт отвечает 500 → CheckoutPage
+   * деградирует к поштучной оплате → N QR.
+   *
+   * Сам вызов идемпотентен по client_ref (ТЗ, п.1: «повторный вызов даёт
+   * тот же адрес»), поэтому корректная реакция на 5xx — повторить, а не
+   * падать. Окно гонки — миллисекунды внутри одной транзакции вставки,
+   * поэтому второго прохода достаточно; лишние попытки ограничены.
+   *
+   * Ретраим ТОЛЬКО транспортные/серверные сбои (5xx, сеть): 4xx — это
+   * осмысленный отказ (неверный client_ref и т.п.), его пробрасываем сразу.
+   */
+  private async deriveCartAddress(
+    cartKey: string,
+    chain: string,
+    token: string,
+    total: number,
+    anchorOrderId: string,
+  ) {
+    const MAX_ATTEMPTS = 3;
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        return await this.paymod.createPayment(total, anchorOrderId, {
+          chain,
+          token,
+          clientRef: cartKey,
+        });
+      } catch (e) {
+        lastError = e;
+        if (!this.isRetryableProviderError(e) || attempt === MAX_ATTEMPTS) {
+          throw e;
+        }
+        this.logger.warn(
+          `cart address derive retry ${attempt}/${MAX_ATTEMPTS} for ${cartKey}: ${this.errText(e)}`,
+        );
+        await new Promise((r) => setTimeout(r, 50 * attempt));
+      }
+    }
+
+    throw lastError;
+  }
+
+  /**
+   * F1: сбой провайдера, который имеет смысл повторить.
+   *
+   * PaymodService бросает `new Error('paymod error: <status> <body>')`, где
+   * status — HTTP-код sidecar. 5xx (в т.ч. 500 от гонки в wallets) и сетевые
+   * ошибки ретраим; 4xx — нет.
+   */
+  private isRetryableProviderError(e: unknown): boolean {
+    const msg = this.errText(e);
+    const status = /paymod error:\s*(\d{3})/.exec(msg)?.[1];
+    if (status) {
+      const code = Number(status);
+      return code >= 500 && code <= 599;
+    }
+    // Нет кода → сетевой сбой (ECONNREFUSED/timeout/fetch failed) — ретраим.
+    return (
+      /fetch failed|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|network/i.test(
+        msg,
+      ) || e instanceof TypeError // fetch бросает TypeError на сетевых сбоях
+    );
+  }
+
+  private errText(e: unknown): string {
+    return e instanceof Error ? e.message : String(e);
+  }
+
+  /**
+   * F1: UNIQUE-нарушение Prisma (P2002).
+   *
+   * Проверяем и `instanceof` (штатный путь), и `code` (мок/иной рантайм):
+   * в юнит-тестах и при кросс-инстансной сборке ошибка может прийти
+   * структурно совместимым объектом без прототипа PrismaClientKnownRequestError.
+   */
+  private isUniqueViolation(e: unknown): boolean {
+    if (e instanceof Prisma.PrismaClientKnownRequestError) {
+      return e.code === 'P2002';
+    }
+    return (
+      typeof e === 'object' &&
+      e !== null &&
+      (e as { code?: unknown }).code === 'P2002'
+    );
   }
 
   /**
@@ -343,7 +502,9 @@ export class PaymentsService {
    * своей транзакции нет вовсе — поэтому сначала ищем cart-транзакцию.
    * Без этого фронт видел бы вечный PENDING и не закрывал корзину.
    */
-  async getOrderPaymentStatus(orderId: string) {
+  async getOrderPaymentStatus(orderId: string, viewer?: PaymentViewer) {
+    await this.assertOrderViewer(orderId, viewer);
+
     const cart = await this.findCartTransaction(orderId);
     const direct = await this.prisma.transaction.findFirst({
       where: { orderId, type: 'payment', provider: 'PAYMOD' },
@@ -700,8 +861,17 @@ export class PaymentsService {
     return { ok: true };
   }
 
-  /** Депозитный адрес для оплаты заказа (если создан через paymod). */
-  async getOrderPayAddress(orderId: string) {
+  /**
+   * Депозитный адрес для оплаты заказа (если создан через paymod).
+   *
+   * F2: viewer — тот, от чьего имени читаем. Раньше метод отдавал
+   * `depositAddress`/`clientRef` ЛЮБОМУ авторизованному по одному orderId
+   * (IDOR). Проверку владельца делает `assertOrderViewer` по политике
+   * `OrdersService.findById`.
+   */
+  async getOrderPayAddress(orderId: string, viewer?: PaymentViewer) {
+    await this.assertOrderViewer(orderId, viewer);
+
     const tx = await this.prisma.transaction.findFirst({
       where: { orderId, type: 'payment', provider: 'PAYMOD' },
       orderBy: { createdAt: 'desc' },
@@ -710,6 +880,44 @@ export class PaymentsService {
       throw new Error('Payment address not found');
     }
     return { depositAddress: tx.depositAddress, clientRef: tx.clientRef };
+  }
+
+  /**
+   * F2: владелец заказа из URL — buyer или seller, ADMIN проходит всегда.
+   * Политика скопирована ОДИН-В-ОДИН с `OrdersService.findById`
+   * (`orders.service.ts:232-244`), включая тип исключения 403: своя политика
+   * здесь означала бы, что продавец видит заказ в /orders/:id, но не видит
+   * статус его оплаты.
+   *
+   * ⚠️ Владелец берётся у ЗАКАЗА ИЗ URL, а не у транзакции. Для корзины это
+   * принципиально: у не-якорного заказа нет своей Transaction, а общая
+   * cart-транзакция лежит на другом (якорном) заказе, возможно другого
+   * покупателя (корзина всегда одного buyerId, но проверка идёт по факту, а
+   * не по допущению). Если проверять владельца якоря — чужой человек,
+   * угадавший id заказа из корзины, получил бы данные платежа.
+   *
+   * `viewer` необязателен: системные вызовы (webhook/cron/внутренние) прав
+   * не имеют и не должны их предъявлять. Сейчас таких вызовов у этих двух
+   * методов нет (единственные — контроллер), поэтому отсутствие viewer
+   * возможностями не пользуется никто, кроме тестов. Это шов на будущее:
+   * когда появится внутренний вызов, он не должен получить 403.
+   */
+  private async assertOrderViewer(orderId: string, viewer?: PaymentViewer) {
+    if (!viewer) return;
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { buyerId: true, sellerId: true },
+    });
+    if (!order) throw new NotFoundException('Заказ не найден');
+
+    if (
+      viewer.role !== 'ADMIN' &&
+      order.buyerId !== viewer.userId &&
+      order.sellerId !== viewer.userId
+    ) {
+      throw new ForbiddenException('Нет доступа к этому заказу');
+    }
   }
 
   /**
@@ -836,9 +1044,117 @@ export class PaymentsService {
       }
     }
 
-    if (confirmed || failed) {
+    // F3: второй проход — «зависшие» заявки, которых не видит запрос выше.
+    //
+    // approveWithdrawal при недоступности sidecar (recoverPayout → 'unknown')
+    // оставляет заявку в status='approved', payoutTxHash=null. Раньше это
+    // состояние не подбирал НИКТО: фильтр по SUBMITTED требует непустой хэш,
+    // а повторный approve требует status='pending'. Средства замораживались
+    // навсегда. Здесь такие заявки доводятся до конца по своему
+    // idempotencyKey (read-only).
+    //
+    // Сюда же попадает success-путь, где sidecar ответил 'submitted' БЕЗ
+    // tx_hash (payoutTxHash: result.tx_hash ?? undefined) — тот же класс
+    // тупика, лечится тем же проходом.
+    const stuck = await this.prisma.withdrawalRequest.findMany({
+      where: {
+        status: 'approved',
+        payoutTxHash: null,
+        // 'SUBMITTED' с пустым хэшем — тоже незавершённое состояние.
+        payoutStatus: { in: ['PENDING', 'SUBMITTED'] },
+        updatedAt: { lt: new Date(Date.now() - PAYOUT_STUCK_AFTER_MS) },
+      },
+      take: 50,
+    });
+
+    let stuckReversed = 0;
+
+    // Страховка: в одном прогоне заявку обрабатываем РОВНО ОДИН РАЗ.
+    // Фильтры двух выборок непересекающиеся (payoutTxHash: not null vs null),
+    // но повторная обработка той же заявки = риск задвоить reversal, поэтому
+    // защищаемся явно, а не полагаемся на дизъюнктность условий.
+    const processedIds = new Set(submitted.map((r) => r.id));
+
+    for (const request of stuck) {
+      if (processedIds.has(request.id)) continue;
+      processedIds.add(request.id);
+      try {
+        if (!request.idempotencyKey) {
+          // Ключ пишется в ТОЙ ЖЕ транзакции, что и дебет, ДО вызова payout().
+          // Его отсутствие при непустом дебете означает, что выплату в сеть
+          // позвать было нечем — откат безопасен. ALERT: такого быть не должно.
+          this.logger.error(
+            `ALERT stuck withdrawal ${request.id} has no idempotencyKey — ` +
+              `payout could never be sent, reversing debit`,
+          );
+          await this.settleFailedPayout(
+            request.id,
+            request.userId,
+            'no-idempotency-key',
+            'stuck withdrawal has no idempotencyKey, payout never sent',
+          );
+          stuckReversed++;
+          failed++;
+          continue;
+        }
+
+        const recovered = await this.paymodService.getPayout(
+          request.idempotencyKey,
+        );
+        const status = (recovered?.status || '').toLowerCase();
+
+        if (recovered && !PAYOUT_FAILED_STATES.has(status)) {
+          // Выплата существует (submitted/pending/confirmed) — НЕ откатываем.
+          // Переводим в SUBMITTED, чтобы её подхватил основной проход по хэшу
+          // (если хэш есть) или следующий тик этого прохода.
+          await this.prisma.withdrawalRequest.update({
+            where: { id: request.id },
+            data: {
+              payoutStatus: 'SUBMITTED',
+              payoutTxHash: recovered.tx_hash ?? undefined,
+              payoutError: null,
+            },
+          });
+          if (recovered.tx_hash) {
+            // С непустым хэшем заявку теперь подберёт основной проход (уже
+            // на следующем тике) и переведёт в paid/CONFIRMED. Здесь НЕ
+            // считаем её confirmed, чтобы не задваивать метрику.
+            this.logger.log(
+              `reconcile stuck ${request.id}: recovered tx ${recovered.tx_hash}, ` +
+                `promoted to SUBMITTED for on-chain confirmation`,
+            );
+          }
+          this.logger.warn(
+            `reconcile stuck ${request.id}: payout exists (status=${status}, ` +
+              `tx=${recovered.tx_hash ?? 'none'}) — not reversing`,
+          );
+        } else {
+          // 404 / failed / error — выплата точно не ушла. Возврат средств
+          // и заявка обратно в pending (админ одобрит заново).
+          await this.settleFailedPayout(
+            request.id,
+            request.userId,
+            recovered?.tx_hash ?? 'none',
+            recovered
+              ? `stuck payout confirmed ${status}, funds reversed`
+              : 'stuck payout not found in sidecar (404), funds reversed',
+          );
+          stuckReversed++;
+          failed++;
+        }
+      } catch (err) {
+        // Sidecar недоступен — состояние по-прежнему неизвестно. НЕ трогаем
+        // (никакого слепого reversal), ретраим через 10 минут.
+        this.logger.warn(
+          `reconcile stuck payout ${request.id} failed: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    if (confirmed || failed || stuck.length) {
       this.logger.log(
-        `reconcilePayouts: checked=${submitted.length} confirmed=${confirmed} failed=${failed}`,
+        `reconcilePayouts: checked=${submitted.length} confirmed=${confirmed} ` +
+          `failed=${failed} stuck=${stuck.length} stuckReversed=${stuckReversed}`,
       );
     }
     return { checked: submitted.length, confirmed, failed };
@@ -856,6 +1172,7 @@ export class PaymentsService {
     requestId: string,
     userId: string,
     txHash: string,
+    reason?: string,
   ): Promise<void> {
     const request = await this.prisma.withdrawalRequest.findUniqueOrThrow({
       where: { id: requestId },
@@ -870,6 +1187,9 @@ export class PaymentsService {
     // косвенно. Теперь namespace withdrawal_reversal:<id>:<n>:<account>
     // нумеруется ровно тем же n, что и withdrawal_debit.
     const attempt = parts.attempt ?? request.payoutAttempts ?? 1;
+    // F3: причина попадает в payoutError. По умолчанию — прежний текст
+    // on-chain-фейла (обратная совместимость с SUBMITTED-путём).
+    const failureReason = reason ?? `payout ${txHash} failed on-chain`;
     if (parts.fromAvailable <= 0 && parts.fromReferral <= 0) {
       // Уже откатывали (или списания не было) — только статус.
       await this.prisma.withdrawalRequest.update({
@@ -877,7 +1197,7 @@ export class PaymentsService {
         data: {
           status: 'pending',
           payoutStatus: 'FAILED',
-          payoutError: `payout ${txHash} failed on-chain`,
+          payoutError: failureReason,
         },
       });
       return;
@@ -907,7 +1227,9 @@ export class PaymentsService {
         data: {
           status: 'pending',
           payoutStatus: 'FAILED',
-          payoutError: `payout ${txHash} failed on-chain, funds reversed`,
+          payoutError: reason
+            ? `${failureReason}, funds reversed`
+            : `payout ${txHash} failed on-chain, funds reversed`,
         },
       });
     });

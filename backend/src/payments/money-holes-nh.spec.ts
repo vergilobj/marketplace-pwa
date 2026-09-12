@@ -988,15 +988,62 @@ describe('D3: потерянный ответ payout не приводит к д
     expect(mockLedger.credit).toHaveBeenCalled();
   });
 
-  it('sidecar недоступен → слепого отката НЕТ (риск двойной выплаты)', async () => {
+  it('sidecar недоступен → слепого отката НЕТ, заявка помечена для reconcile', async () => {
     mockPaymod.payout.mockRejectedValue(new Error('timeout'));
     mockPaymod.getPayout.mockRejectedValue(new Error('paymod error: 503'));
 
-    await expect(service.approveWithdrawal('wr-1')).rejects.toThrow(
-      BadRequestException,
-    );
+    // F3: РАНЬШЕ здесь ожидался rejects.toThrow(BadRequestException) — это
+    // пинило сам баг. Исключение вылетало из catch наружу, reverseWithdrawal
+    // был недостижим, а заявка оставалась навсегда в тупике
+    // approved + payoutStatus='PENDING' + payoutTxHash=null: повторный
+    // approve невозможен (нужен pending), reconcile искал только SUBMITTED
+    // с непустым хэшем → не находил. Средства заморожены.
+    //
+    // Теперь исключения НЕТ: заявка помечается и уходит в reconcilePayouts.
+    await expect(service.approveWithdrawal('wr-1')).resolves.toBeDefined();
 
+    // Главный инвариант сохранён: слепого отката по-прежнему НЕТ.
     expect(mockLedger.credit).not.toHaveBeenCalled();
+
+    // Заявка помечена как UNKNOWN и НЕ переведена ни в pending, ни в SUBMITTED
+    // — состояние остаётся ровно тем, которое подбирает новый проход
+    // reconcilePayouts (approved + PENDING + null hash + updatedAt старее N).
+    const lastUpdate =
+      mockPrisma.withdrawalRequest.update.mock.calls.at(-1)?.[0];
+    expect(lastUpdate.data.status).toBeUndefined(); // status НЕ понижен в pending
+    expect(lastUpdate.data.payoutStatus).toBeUndefined(); // остаётся PENDING
+    expect(lastUpdate.data.payoutError).toContain('UNKNOWN');
+    expect(lastUpdate.data.payoutError).toContain('reconcilePayouts');
+  });
+
+  it('F3: тупик закрыт сквозняком — состояние после unknown матчит фильтр reconcile', async () => {
+    mockPaymod.payout.mockRejectedValue(new Error('timeout'));
+    mockPaymod.getPayout.mockRejectedValue(new Error('paymod error: 503'));
+
+    await service.approveWithdrawal('wr-1');
+
+    const lastUpdate =
+      mockPrisma.withdrawalRequest.update.mock.calls.at(-1)?.[0];
+    // Симулируем применение апдейта к строке БД и проверяем, что итоговая
+    // строка попадает под where из reconcilePayouts.
+    const row = {
+      status: 'approved',
+      payoutStatus: 'PENDING',
+      payoutTxHash: null,
+      ...lastUpdate.data,
+    };
+    const stuckFilter = {
+      status: 'approved',
+      payoutTxHash: null,
+      payoutStatus: { in: ['PENDING', 'SUBMITTED'] },
+      updatedAt: { lt: new Date(Date.now() - 15 * 60 * 1000) },
+    };
+    expect(row.status).toBe(stuckFilter.status);
+    expect(row.payoutTxHash).toBeNull();
+    expect(stuckFilter.payoutStatus.in).toContain(row.payoutStatus);
+    // updatedAt проставляется автоматически (@updatedAt) — значит фильтр
+    // по «старше 15 минут» со временем станет истинным. Заявка НЕ вечна.
+    expect(lastUpdate.data.updatedAt).toBeUndefined();
   });
 
   it('используется READ-ONLY getPayout, а не повторный payout (иначе 2-й перевод)', async () => {
@@ -1009,5 +1056,215 @@ describe('D3: потерянный ответ payout не приводит к д
     // payout вызван ровно один раз — исходная попытка. Повторный вызов
     // создал бы реальную вторую выплату.
     expect(mockPaymod.payout).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ============================================================
+// F3 — reconcilePayouts подхватывает ЗАВИСШИЕ заявки
+// (approved + payoutTxHash=null), которые раньше не видел никто
+// ============================================================
+describe('F3: reconcile подбирает замороженные заявки', () => {
+  let service: PaymentsService;
+
+  const mockPrisma = {
+    withdrawalRequest: {
+      findMany: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    ledgerEntry: { findMany: jest.fn() },
+    $transaction: jest.fn(),
+  };
+  const mockLedger = {
+    credit: jest.fn().mockResolvedValue({ applied: [], skipped: [] }),
+    debit: jest.fn(),
+  };
+  const paymodSvc = { getTxStatus: jest.fn(), getPayout: jest.fn() };
+
+  /** Первый findMany (SUBMITTED+hash) и второй (зависшие) — разные выборки. */
+  const routeFindMany = (submitted: any[], stuck: any[]) => {
+    mockPrisma.withdrawalRequest.findMany
+      .mockResolvedValueOnce(submitted)
+      .mockResolvedValueOnce(stuck);
+  };
+
+  const routeLedger = (debits: any[], reversals: any[] = []) => {
+    mockPrisma.ledgerEntry.findMany.mockImplementation((args: any) => {
+      const prefix = args?.where?.refKey?.startsWith ?? '';
+      if (prefix.startsWith('withdrawal_reversal:'))
+        return Promise.resolve(reversals);
+      if (prefix.startsWith('withdrawal_debit:'))
+        return Promise.resolve(debits);
+      return Promise.resolve([]);
+    });
+  };
+
+  /** Зависшая заявка: то самое тупиковое состояние из ТЗ. */
+  const stuckRequest = (over: Record<string, any> = {}) => ({
+    id: 'wr-stuck',
+    userId: 'user-stuck',
+    amount: 100,
+    status: 'approved',
+    payoutStatus: 'PENDING',
+    payoutTxHash: null,
+    payoutAttempts: 1,
+    idempotencyKey: 'idem-key-1',
+    updatedAt: new Date(Date.now() - 20 * 60 * 1000),
+    ...over,
+  });
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation((cb: any) => cb(mockPrisma));
+    mockPrisma.withdrawalRequest.update.mockResolvedValue({});
+    mockPrisma.withdrawalRequest.findUniqueOrThrow.mockResolvedValue({
+      id: 'wr-stuck',
+      status: 'approved',
+      payoutAttempts: 1,
+    });
+    mockLedger.credit.mockResolvedValue({ applied: [], skipped: [] });
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        PaymentsService,
+        { provide: PrismaService, useValue: mockPrisma },
+        {
+          provide: SettingsService,
+          useValue: { get: jest.fn(), getFloat: jest.fn() },
+        },
+        { provide: NowPaymentsProvider, useValue: {} },
+        { provide: PaymodProvider, useValue: {} },
+        { provide: PaymodService, useValue: paymodSvc },
+        { provide: LedgerService, useValue: mockLedger },
+        {
+          provide: NotificationsService,
+          useValue: { createNotification: jest.fn() },
+        },
+        { provide: EscrowService, useValue: { holdForOrder: jest.fn() } },
+      ],
+    }).compile();
+    service = module.get(PaymentsService);
+  });
+
+  it('sidecar 404 (выплаты нет) → reversal + заявка обратно в pending, НЕ зависла', async () => {
+    routeFindMany([], [stuckRequest()]);
+    routeLedger([
+      {
+        account: 'AVAILABLE',
+        amount: -100,
+        refKey: 'withdrawal_debit:wr-stuck:1:AVAILABLE',
+      },
+    ]);
+    // Read-only проверка: записи по ключу нет → в сеть не уходило.
+    paymodSvc.getPayout.mockResolvedValue(null);
+
+    const result = await service.reconcilePayouts();
+
+    // Деньги возвращены — заявка вышла из тупика.
+    expect(mockLedger.credit).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        account: 'AVAILABLE',
+        amount: 100,
+        type: 'withdrawal_reversal',
+        refKey: 'withdrawal_reversal:wr-stuck:1:AVAILABLE',
+      }),
+    );
+    expect(result.failed).toBe(1);
+    // Заявка снова pending → админ может одобрить повторно.
+    expect(mockPrisma.withdrawalRequest.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'pending',
+          payoutStatus: 'FAILED',
+        }),
+      }),
+    );
+    // Спросили READ-ONLY getPayout, а НЕ getTxStatus (хэша-то нет).
+    expect(paymodSvc.getPayout).toHaveBeenCalledWith('idem-key-1');
+  });
+
+  it('выплата реально существует (submitted) → НЕ откатываем, переводим в SUBMITTED', async () => {
+    routeFindMany([], [stuckRequest()]);
+    routeLedger([]);
+    paymodSvc.getPayout.mockResolvedValue({
+      tx_hash: '0xonchain',
+      status: 'submitted',
+    });
+
+    await service.reconcilePayouts();
+
+    // Ключевое: деньги НЕ вернулись на баланс (выплата ушла в сеть).
+    expect(mockLedger.credit).not.toHaveBeenCalled();
+    expect(mockPrisma.withdrawalRequest.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          payoutStatus: 'SUBMITTED',
+          payoutTxHash: '0xonchain',
+        }),
+      }),
+    );
+  });
+
+  it('sidecar недоступен → заявку НЕ трогаем (состояние по-прежнему неизвестно)', async () => {
+    routeFindMany([], [stuckRequest()]);
+    routeLedger([]);
+    paymodSvc.getPayout.mockRejectedValue(new Error('paymod error: 503'));
+
+    await expect(service.reconcilePayouts()).resolves.toBeDefined();
+
+    // Никакого слепого reversal и никакой смены статуса.
+    expect(mockLedger.credit).not.toHaveBeenCalled();
+    expect(mockPrisma.withdrawalRequest.update).not.toHaveBeenCalled();
+  });
+
+  it('idempotencyKey отсутствует → выплату позвать было нечем, reversal', async () => {
+    routeFindMany([], [stuckRequest({ idempotencyKey: null })]);
+    routeLedger([
+      {
+        account: 'AVAILABLE',
+        amount: -100,
+        refKey: 'withdrawal_debit:wr-stuck:1:AVAILABLE',
+      },
+    ]);
+
+    await service.reconcilePayouts();
+
+    expect(paymodSvc.getPayout).not.toHaveBeenCalled();
+    expect(mockLedger.credit).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ amount: 100, type: 'withdrawal_reversal' }),
+    );
+  });
+
+  it('SUBMITTED с непустым хэшем НЕ попадает в новый проход (старый путь не сломан)', async () => {
+    routeFindMany(
+      [
+        {
+          id: 'wr-old',
+          userId: 'user-old',
+          status: 'approved',
+          payoutStatus: 'SUBMITTED',
+          payoutTxHash: '0xtxold',
+          payoutAttempts: 1,
+        },
+      ],
+      [],
+    );
+    paymodSvc.getTxStatus.mockResolvedValue({
+      tx_hash: '0xtxold',
+      status: 'CONFIRMED',
+      confirmations: 12,
+    });
+
+    const result = await service.reconcilePayouts();
+
+    expect(result.confirmed).toBe(1);
+    expect(result.checked).toBe(1);
+    // Новый проход получил пустой список — старую логику не задели.
+    expect(mockPrisma.withdrawalRequest.update).toHaveBeenCalledWith({
+      where: { id: 'wr-old' },
+      data: { status: 'paid', payoutStatus: 'CONFIRMED' },
+    });
   });
 });

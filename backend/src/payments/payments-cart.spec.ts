@@ -10,7 +10,7 @@
  *  - не-якорный заказ видит статус общей транзакции.
  */
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
@@ -150,6 +150,248 @@ describe('PaymentsService — cart-aware (A3/B1)', () => {
       expect(res.depositAddress).toBe('0xexisting');
       expect(mockPrisma.transaction.create).not.toHaveBeenCalled();
       expect(mockPaymod.createPayment).not.toHaveBeenCalled();
+    });
+
+    /**
+     * F1: гонка на createPaymentForCart.
+     *
+     * Аудит AUD3 (flow4-race.json) воспроизвёл: два параллельных
+     * POST /payments/cart/pay → 201 + 500 (P2002 по clientRef), фронт ловил
+     * ошибку и деградировал к поштучной оплате → N QR вместо одного.
+     */
+    describe('F1: гонка create (P2002 по clientRef)', () => {
+      const racedTx = {
+        depositAddress: '0xwinner',
+        clientRef: cartClientRef(['ord-a', 'ord-b']),
+        amount: 300,
+        status: 'PENDING',
+      };
+
+      it('проигравший гонку ловит P2002 и возвращает существующую транзакцию, а не падает', async () => {
+        mockPrisma.order.findMany.mockResolvedValue(orders.slice(0, 2));
+
+        // Прогрев: pre-check находит победителя.
+        mockPrisma.transaction.findUnique.mockResolvedValueOnce(racedTx);
+        const winner = await service.createPaymentForCart(
+          ['ord-a', 'ord-b'],
+          'buyer-1',
+        );
+
+        expect(winner.depositAddress).toBe('0xwinner');
+        expect(winner.clientRef).toBe(cartClientRef(['ord-a', 'ord-b']));
+        expect(winner.amount).toBe(300);
+        expect(winner.status).toBe('PENDING');
+        expect(mockPrisma.transaction.create).not.toHaveBeenCalled();
+
+        // Гонка: pre-check пуст → create падает P2002 → ищем строку снова.
+        mockPrisma.transaction.findUnique
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(racedTx);
+        const p2002 = Object.assign(new Error('Unique constraint failed'), {
+          code: 'P2002',
+          clientVersion: 'test',
+          meta: { target: ['clientRef'] },
+        });
+        mockPrisma.transaction.create.mockRejectedValueOnce(p2002);
+
+        const loser = await service.createPaymentForCart(
+          ['ord-a', 'ord-b'],
+          'buyer-1',
+        );
+
+        // Никакого исключения наружу (было 500).
+        expect(loser).toEqual({
+          depositAddress: '0xwinner',
+          clientRef: cartClientRef(['ord-a', 'ord-b']),
+          amount: 300,
+          status: 'PENDING',
+        });
+        // Форма ответа идентична успешному пути — CheckoutPage читает те же поля.
+        expect(Object.keys(loser).sort()).toEqual(Object.keys(winner).sort());
+      });
+
+      it('два ПАРАЛЛЕЛЬНЫХ вызова: оба разрешаются, адрес один, в БД одна строка', async () => {
+        const twoOrders = orders.slice(0, 2);
+        mockPrisma.order.findMany.mockResolvedValue(twoOrders);
+
+        const cartKey = cartClientRef(['ord-a', 'ord-b']);
+        const stored: any[] = [];
+        const p2002 = Object.assign(new Error('Unique constraint failed'), {
+          code: 'P2002',
+          clientVersion: 'test',
+          meta: { target: ['clientRef'] },
+        });
+
+        // Гонка «по-настоящему»: барьер внутри create — оба вызова обязаны
+        // дойти до вставки ДО того, как хоть один из них её выполнит.
+        // Именно так ведёт себя UNIQUE(clientRef) в Postgres: второй insert
+        // получает P2002 (pre-check к этому моменту уже пройден обоими).
+        let arrived = 0;
+        let releaseInsert!: () => void;
+        const insertGate = new Promise<void>((r) => (releaseInsert = r));
+
+        mockPrisma.transaction.create.mockImplementation(async (args: any) => {
+          arrived++;
+          if (arrived === 2) releaseInsert();
+          await insertGate;
+
+          if (stored.some((t) => t.clientRef === args.data.clientRef)) {
+            throw p2002;
+          }
+          const row = {
+            // Sidecar идемпотентен по client_ref → адрес детерминирован и
+            // одинаков у обоих вызовов. Пишем ровно то, что записала бы БД.
+            depositAddress: args.data.depositAddress,
+            clientRef: args.data.clientRef,
+            amount: args.data.amount,
+            status: args.data.status,
+            payload: args.data.payload,
+          };
+          stored.push(row);
+          return row;
+        });
+
+        mockPrisma.transaction.findUnique.mockImplementation(async (args: any) => {
+          return stored.find((t) => t.clientRef === args.where.clientRef) ?? null;
+        });
+
+        // Барьер: оба вызова гарантированно проходят pre-check ДО любого insert.
+        let ready = 0;
+        let releaseOrders!: () => void;
+        const ordersGate = new Promise<void>((r) => (releaseOrders = r));
+        mockPrisma.order.findMany.mockImplementation(async () => {
+          ready++;
+          if (ready === 2) releaseOrders();
+          await ordersGate;
+          return twoOrders;
+        });
+
+        const [r1, r2] = await Promise.all([
+          service.createPaymentForCart(['ord-a', 'ord-b'], 'buyer-1'),
+          service.createPaymentForCart(['ord-b', 'ord-a'], 'buyer-1'),
+        ]);
+
+        // Оба успешны, адрес и clientRef совпадают (адрес sidecar'а — '0xcart').
+        expect(r1.depositAddress).toBe('0xcart');
+        expect(r2.depositAddress).toBe('0xcart');
+        expect(r1.clientRef).toBe(cartKey);
+        expect(r2.clientRef).toBe(cartKey);
+        // Ровно ОДНА строка на корзину.
+        expect(stored).toHaveLength(1);
+        expect(stored[0].payload.cart.orderIds).toEqual(['ord-a', 'ord-b']);
+
+        // Снять барьер-реализацию, чтобы она не протекла в следующие тесты
+        // (clearAllMocks чистит вызовы, но НЕ реализации).
+        mockPrisma.order.findMany.mockResolvedValue(twoOrders);
+      });
+
+      it('P2002 не по clientRef (нет строки) → ошибка пробрасывается, а не глушится', async () => {
+        mockPrisma.order.findMany.mockResolvedValue(orders.slice(0, 2));
+        mockPrisma.transaction.findUnique.mockResolvedValue(null);
+        mockPrisma.transaction.create.mockRejectedValue(
+          Object.assign(new Error('Unique constraint failed'), {
+            code: 'P2002',
+            meta: { target: ['txHash'] },
+          }),
+        );
+        await expect(
+          service.createPaymentForCart(['ord-a', 'ord-b'], 'buyer-1'),
+        ).rejects.toThrow('Unique constraint failed');
+      });
+
+      it('не-P2002 ошибка create → пробрасывается без изменений', async () => {
+        mockPrisma.order.findMany.mockResolvedValue(orders.slice(0, 2));
+        mockPrisma.transaction.findUnique.mockResolvedValue(null);
+        mockPrisma.transaction.create.mockRejectedValue(new Error('db down'));
+        await expect(
+          service.createPaymentForCart(['ord-a', 'ord-b'], 'buyer-1'),
+        ).rejects.toThrow('db down');
+      });
+    });
+
+    /**
+     * F1 (вторая гонка): сам sidecar тоже делает check-then-create
+     * (`wallet_directory()` → `create_deposit_wallet()`), и его
+     * `UNIQUE constraint failed: wallets.client_ref` прилетает как HTTP 500
+     * → `paymod error: 500 ...`. Без ретрая это снова 500 на эндпоинте.
+     */
+    describe('F1: гонка в sidecar (paymod 500) → ретрай', () => {
+      it('paymod 500 один раз → повтор даёт тот же адрес, вызов успешен', async () => {
+        mockPrisma.order.findMany.mockResolvedValue(orders.slice(0, 2));
+        mockPrisma.transaction.findUnique.mockResolvedValue(null);
+        mockPrisma.transaction.create.mockResolvedValue({});
+
+        mockPaymod.createPayment
+          .mockRejectedValueOnce(
+            new Error(
+              'paymod error: 500 {"detail":"wallet creation failed: UNIQUE constraint failed: wallets.client_ref"}',
+            ),
+          )
+          .mockResolvedValueOnce({
+            success: true,
+            transactionId: 'mp-cart-x',
+            status: 'pending',
+            raw: { deposit_address: '0xafterretry' },
+          });
+
+        const res = await service.createPaymentForCart(
+          ['ord-a', 'ord-b'],
+          'buyer-1',
+        );
+
+        expect(mockPaymod.createPayment).toHaveBeenCalledTimes(2);
+        expect(res.depositAddress).toBe('0xafterretry');
+        expect(mockPrisma.transaction.create).toHaveBeenCalledTimes(1);
+      });
+
+      it('paymod 500 все попытки → ошибка наружу (не глотаем бесконечно)', async () => {
+        mockPrisma.order.findMany.mockResolvedValue(orders.slice(0, 2));
+        mockPrisma.transaction.findUnique.mockResolvedValue(null);
+        mockPaymod.createPayment.mockRejectedValue(
+          new Error('paymod error: 500 boom'),
+        );
+
+        await expect(
+          service.createPaymentForCart(['ord-a', 'ord-b'], 'buyer-1'),
+        ).rejects.toThrow('paymod error: 500');
+        expect(mockPaymod.createPayment).toHaveBeenCalledTimes(3);
+        expect(mockPrisma.transaction.create).not.toHaveBeenCalled();
+      });
+
+      it('paymod 400 (осмысленный отказ) → НЕ ретраим', async () => {
+        mockPrisma.order.findMany.mockResolvedValue(orders.slice(0, 2));
+        mockPrisma.transaction.findUnique.mockResolvedValue(null);
+        mockPaymod.createPayment.mockRejectedValue(
+          new Error('paymod error: 400 bad client_ref'),
+        );
+
+        await expect(
+          service.createPaymentForCart(['ord-a', 'ord-b'], 'buyer-1'),
+        ).rejects.toThrow('paymod error: 400');
+        expect(mockPaymod.createPayment).toHaveBeenCalledTimes(1);
+      });
+
+      it('сетевой сбой (fetch failed) → ретраим и восстанавливаемся', async () => {
+        mockPrisma.order.findMany.mockResolvedValue(orders.slice(0, 2));
+        mockPrisma.transaction.findUnique.mockResolvedValue(null);
+        mockPrisma.transaction.create.mockResolvedValue({});
+
+        mockPaymod.createPayment
+          .mockRejectedValueOnce(new TypeError('fetch failed'))
+          .mockResolvedValueOnce({
+            success: true,
+            transactionId: 'mp-cart-x',
+            status: 'pending',
+            raw: { deposit_address: '0xnet' },
+          });
+
+        const res = await service.createPaymentForCart(
+          ['ord-a', 'ord-b'],
+          'buyer-1',
+        );
+        expect(res.depositAddress).toBe('0xnet');
+        expect(mockPaymod.createPayment).toHaveBeenCalledTimes(2);
+      });
     });
 
     it('чужой заказ → 403', async () => {
@@ -392,6 +634,116 @@ describe('PaymentsService — cart-aware (A3/B1)', () => {
       const res = await service.payOrderAsBuyer('ord-b', 'buyer-1');
       expect(res.depositAddress).toBe('0xcart');
       expect((res as any).cart).toBe(true);
+    });
+  });
+
+  /**
+   * F2: IDOR на платёжных GET-эндпоинтах. До фикса оба метода отдавали
+   * depositAddress/clientRef/статус по одному orderId любому авторизованному.
+   * Политика — как в OrdersService.findById: buyer/seller/ADMIN.
+   */
+  describe('F2: owner-чек (viewer) на платежных данных', () => {
+    const VIEWER = { userId: 'buyer-1', role: 'BUYER' };
+    const STRANGER = { userId: 'buyer-2', role: 'BUYER' };
+    const SELLER = { userId: 'seller-1', role: 'SELLER' };
+    const ADMIN = { userId: 'admin-1', role: 'ADMIN' };
+
+    beforeEach(() => {
+      // Заказ из URL: buyer-1 покупатель, seller-1 продавец.
+      mockPrisma.order.findUnique.mockResolvedValue({
+        buyerId: 'buyer-1',
+        sellerId: 'seller-1',
+      });
+      mockPrisma.transaction.findFirst.mockResolvedValue({
+        status: 'CONFIRMED',
+        depositAddress: '0xcart',
+        txHash: '0xtx',
+      });
+    });
+
+    it('status: чужой заказ → 403, транзакции не читаются', async () => {
+      await expect(
+        service.getOrderPaymentStatus('ord-a', STRANGER),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockPrisma.transaction.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('pay: чужой заказ → 403, depositAddress не отдаётся', async () => {
+      await expect(
+        service.getOrderPayAddress('ord-a', STRANGER),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockPrisma.transaction.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('status: владелец-покупатель → 200 c прежней формой ответа', async () => {
+      const res = await service.getOrderPaymentStatus('ord-a', VIEWER);
+      expect(res).toEqual({
+        status: 'CONFIRMED',
+        depositAddress: '0xcart',
+        txHash: '0xtx',
+      });
+    });
+
+    it('pay: владелец-покупатель → 200, поля depositAddress/clientRef', async () => {
+      const res = await service.getOrderPayAddress('ord-a', VIEWER);
+      expect(res).toEqual({ depositAddress: '0xcart', clientRef: undefined });
+    });
+
+    it('продавец заказа → 200 (та же политика, что /orders/:id)', async () => {
+      const res = await service.getOrderPayAddress('ord-a', SELLER);
+      expect(res.depositAddress).toBe('0xcart');
+    });
+
+    it('ADMIN → 200 на чужом заказе (обход, как в OrdersService.findById)', async () => {
+      const res = await service.getOrderPayAddress('ord-a', ADMIN);
+      expect(res.depositAddress).toBe('0xcart');
+    });
+
+    it('несуществующий заказ → 404', async () => {
+      mockPrisma.order.findUnique.mockResolvedValue(null);
+      await expect(
+        service.getOrderPayAddress('ord-ghost', VIEWER),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('системный вызов без viewer → проверка не применяется', async () => {
+      const res = await service.getOrderPaymentStatus('ord-a');
+      expect(res.status).toBe('CONFIRMED');
+      expect(mockPrisma.order.findUnique).not.toHaveBeenCalled();
+    });
+
+    /**
+     * КРИТИЧНО (F1): заказ — НЕ-якорный участник корзины. Своей Transaction у
+     * него нет, данные лежат в общей cart-транзакции. Владелец — buyerId
+     * ЗАКАЗА ИЗ URL, поэтому чужой не должен получить данные корзины даже
+     * если cart-транзакция на него «не похожа».
+     */
+    it('cart, не-якорный заказ: buyer видит общую транзакцию корзины', async () => {
+      // findCartTransaction бьёт первым, потом personal-запрос.
+      mockPrisma.transaction.findFirst
+        .mockResolvedValueOnce({
+          status: 'CONFIRMED',
+          depositAddress: '0xcart',
+          txHash: '0xtx',
+        })
+        .mockResolvedValueOnce(null);
+
+      const res = await service.getOrderPaymentStatus('ord-b', VIEWER);
+      expect(res.status).toBe('CONFIRMED');
+      expect(res.depositAddress).toBe('0xcart');
+    });
+
+    it('cart, не-якорный заказ: чужой → 403 (cart-транзакция не ищется)', async () => {
+      await expect(
+        service.getOrderPaymentStatus('ord-b', STRANGER),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockPrisma.transaction.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('cart: чужой не получает адрес и через /pay', async () => {
+      await expect(
+        service.getOrderPayAddress('ord-b', STRANGER),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

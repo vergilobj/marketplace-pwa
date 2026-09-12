@@ -23,6 +23,21 @@ const VIDEO_MIMES = new Set([
 
 const VIDEO_EXTS = new Set(['.mp4', '.webm', '.mov', '.mkv']);
 
+// Изображения: whitelist MIME + расширений.
+// ⚠️ Проверяем ОБА признака — mimetype подделывается клиентом,
+// а имя файла задаёт расширение, по которому статика отдаёт Content-Type.
+const IMAGE_MIMES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
+
+const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
+
+const IMAGE_ERROR =
+  'Поддерживаются только изображения jpg, jpeg, png, webp или gif';
+
 function ensureDir(dir: string) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
@@ -33,7 +48,7 @@ const imageStorage = diskStorage({
     cb(null, './uploads');
   },
   filename: (req, file, cb) => {
-    const uniqueName = uuidv4() + extname(file.originalname);
+    const uniqueName = uuidv4() + extname(file.originalname).toLowerCase();
     cb(null, uniqueName);
   },
 });
@@ -60,6 +75,16 @@ export class UploadController {
     FileInterceptor('file', {
       storage: imageStorage,
       limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+      fileFilter: (req, file, cb) => {
+        const ext = extname(file.originalname).toLowerCase();
+        const isImageMime = IMAGE_MIMES.has(file.mimetype);
+        const isImageExt = IMAGE_EXTS.has(ext);
+        if (isImageMime && isImageExt) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException(IMAGE_ERROR), false);
+        }
+      },
     }),
   )
   uploadFile(@UploadedFile() file: Express.Multer.File) {

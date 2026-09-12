@@ -16,6 +16,8 @@ describe('PaymentsController', () => {
     processSuccessfulPayment: jest.fn(),
     verifyLegacyIpnPayment: jest.fn(),
     getAllTransactions: jest.fn(),
+    getOrderPaymentStatus: jest.fn(),
+    getOrderPayAddress: jest.fn(),
   };
 
   const mockNowPayments = {
@@ -72,6 +74,30 @@ describe('PaymentsController', () => {
         orderSearch: undefined,
         page: 1,
         limit: 20,
+      });
+    });
+  });
+
+  // F2: контроллер обязан передать личность читателя в сервис — иначе
+  // owner-чек не включится и IDOR вернётся.
+  describe('F2: owner-чек прокидывается в сервис', () => {
+    const req: any = { user: { userId: 'u-1', role: 'BUYER' } };
+
+    it('getOrderStatus передаёт viewer', async () => {
+      service.getOrderPaymentStatus.mockResolvedValue({ status: 'PENDING' });
+      await controller.getOrderStatus('order-1', req);
+      expect(service.getOrderPaymentStatus).toHaveBeenCalledWith('order-1', {
+        userId: 'u-1',
+        role: 'BUYER',
+      });
+    });
+
+    it('getOrderPay передаёт viewer', async () => {
+      service.getOrderPayAddress.mockResolvedValue({ depositAddress: '0x' });
+      await controller.getOrderPay('order-1', req);
+      expect(service.getOrderPayAddress).toHaveBeenCalledWith('order-1', {
+        userId: 'u-1',
+        role: 'BUYER',
       });
     });
   });

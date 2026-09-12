@@ -38,17 +38,31 @@ export class PaymentsController {
   }
 
   // Статус оплаты заказа — фронт поллит для отображения PENDING/CONFIRMED/SWEPT.
+  // F2: owner-чек — читать может только участник заказа (buyer/seller) или ADMIN.
   @UseGuards(JwtAuthGuard)
   @Get('order/:orderId/status')
-  async getOrderStatus(@Param('orderId') orderId: string) {
-    return this.paymentsService.getOrderPaymentStatus(orderId);
+  async getOrderStatus(
+    @Param('orderId') orderId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.paymentsService.getOrderPaymentStatus(orderId, {
+      userId: req.user.userId,
+      role: req.user.role,
+    });
   }
 
   // Депозитный адрес для оплаты (BSC/USDT).
+  // F2: owner-чек — тот же, что у status (чужой заказ → 403).
   @UseGuards(JwtAuthGuard)
   @Get('order/:orderId/pay')
-  async getOrderPay(@Param('orderId') orderId: string) {
-    return this.paymentsService.getOrderPayAddress(orderId);
+  async getOrderPay(
+    @Param('orderId') orderId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.paymentsService.getOrderPayAddress(orderId, {
+      userId: req.user.userId,
+      role: req.user.role,
+    });
   }
 
   // Публичный эндпоинт: покупатель инициирует оплату заказа.
