@@ -19,6 +19,7 @@ import { CreateAdDto } from './dto/create-ad.dto';
 import { ModerationService } from '../moderation/moderation.service';
 import { AdActivationHook } from '../payments/ad-activation.hook';
 import { addDays } from '../payments/money.util';
+import { publicAdVisibility } from './posts.visibility';
 
 @Injectable()
 export class PostsService implements OnModuleInit {
@@ -201,13 +202,7 @@ export class PostsService implements OnModuleInit {
     }
 
     const search = params.search?.trim();
-    const visibility = {
-      isHidden: false,
-      OR: [
-        { isAd: false },
-        { isAd: true, isPinned: true, adExpireDate: { gte: now } },
-      ],
-    };
+    const visibility = publicAdVisibility(now);
     const where: Prisma.PostWhereInput = search
       ? {
           AND: [
@@ -447,13 +442,7 @@ export class PostsService implements OnModuleInit {
     // R10: серверный поиск. Условие видимости (isHidden/реклама) должно
     // сохраняться вместе с поиском — объединяем через AND.
     const search = params.search?.trim();
-    const visibility = {
-      isHidden: false,
-      OR: [
-        { isAd: false },
-        { isAd: true, isPinned: true, adExpireDate: { gte: now } },
-      ],
-    };
+    const visibility = publicAdVisibility(now);
     const where: Prisma.PostWhereInput = search
       ? {
           AND: [

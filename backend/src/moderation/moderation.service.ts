@@ -59,18 +59,66 @@ export class ModerationService {
   private readonly urlRe =
     /(?:https?:\/\/|www\.|t\.me\/|vk\.com\/|wa\.me\/|instagram\.com\/|whatsapp\.)/i;
 
-  // Разрешённые видеоссылки для не-админов: только внешние видеохостинги.
-  // Внутренние /uploads/videos/* ссылки НЕ имеют протокола/домена, поэтому urlRe
-  // на них не срабатывает и они не попадают в ветку внешних ссылок вообще.
-  private readonly allowedVideoRe =
-    /(?:(?<![a-z0-9])youtube\.com\/watch|(?<![a-z0-9])youtu\.be\/|(?<![a-z0-9])disk\.yandex\.ru\/|(?<![a-z0-9])drive\.google\.com\/|(?<![a-z0-9])rutube\.ru\/|(?<![a-z0-9])vkvideo\.ru\/|(?<![a-z0-9])vk\.com\/video|(?<![a-z0-9])t\.me\/)/i;
+  // Ссылка без протокола: «youtube.com/watch?v=x», «disk.yandex.ru/x».
+  // Расширения файлов (photo.jpg, video.mp4) доменом не считаем.
+  private readonly bareDomainRe =
+    /(?<![\w@.-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?:\/[^\s]*)?/gi;
 
-  // Тот же whitelist, но с флагом g — для вырезания разрешённых ссылок из текста
-  // ПЕРЕД проверкой offPlatformRe и ПЕРЕД отправкой в LLM. Поедает URL целиком
-  // (протокол + домен + путь + query), иначе остаётся обрывок «https://» или «?v=x»,
-  // который LLM всё равно флагает как увод с площадки.
-  private readonly allowedVideoStripRe =
-    /(?<![\w@.-])(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch|youtu\.be\/|disk\.yandex\.ru\/|drive\.google\.com\/|rutube\.ru\/|vkvideo\.ru\/|vk\.com\/video|t\.me\/)\S*/gi;
+  private readonly fileExtRe =
+    /\.(?:jpe?g|png|gif|webp|avif|bmp|svg|mp4|webm|mov|avi|mkv|mp3|wav|ogg|pdf|docx?|xlsx?|pptx?|zip|rar|7z|txt|csv|json)$/i;
+
+  // Внутренние ссылки площадки — загруженные файлы и API. Внешними не считаются:
+  // это единственный разрешённый тип ссылок для обычного пользователя.
+  private readonly internalLinkRe =
+    /^(?:https?:\/\/[^/\s]+)?\/?(?:uploads|api\/upload)\//i;
+
+  // Ссылки, вырезаемые из текста перед проверкой увода с площадки.
+  private readonly linkStripRe =
+    /(?<![\w@.-])(?:https?:\/\/|www\.)\S+|(?<![\w@.-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?:\/[^\s]*)?/gi;
+
+  /**
+   * Роли, которым разрешено выставлять любые ссылки (A5.6).
+   *
+   * В схеме НЕТ флага `isPartner` / `isTrusted` (User), поэтому «партнёр, кому
+   * доверяют админы» выражается существующей ролью MODERATOR — она и есть
+   * доверенный уровень между BUYER/SELLER и ADMIN.
+   */
+  private static readonly TRUSTED_ROLES: readonly string[] = ['ADMIN', 'MODERATOR'];
+
+  /** Доверенная роль → любые ссылки разрешены. */
+  private isTrustedRole(role?: string | null): boolean {
+    return !!role && ModerationService.TRUSTED_ROLES.includes(role);
+  }
+
+  /**
+   * Вырезает ЛЮБЫЕ ссылки из текста. Нужно, чтобы сам факт ссылки не считался
+   * уводом с площадки (для доверенных ролей), а призывы «пиши в телегу» и
+   * обмен телефонами по-прежнему ловились.
+   */
+  private stripLinks(text: string): string {
+    return text.replace(this.linkStripRe, ' ');
+  }
+
+  /** Есть ли в тексте внешняя (не внутренняя) ссылка. */
+  private hasExternalLink(text: string): boolean {
+    const collect = (re: RegExp): string[] => {
+      const flags = re.flags.includes('g') ? re.flags : re.flags + 'g';
+      const rx = new RegExp(re.source, flags);
+      const out: string[] = [];
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(text)) !== null) out.push(m[0]);
+      return out;
+    };
+
+    const candidates = [...collect(this.urlRe), ...collect(this.bareDomainRe)];
+    return candidates.some((raw) => {
+      const link = raw.trim();
+      if (!link) return false;
+      if (this.internalLinkRe.test(link)) return false; // /uploads/* — своё
+      if (this.fileExtRe.test(link.split(/[?#]/)[0])) return false; // имя файла
+      return true;
+    });
+  }
 
   // Маркеры мессенджеров/соцсетей сами по себе — попытка увода с площадки
   private readonly offPlatformRe =
@@ -80,13 +128,15 @@ export class ModerationService {
     const violations: string[] = [];
     const text = input.text || '';
 
-    // ADMIN обходит модерацию полностью.
+    // A5.6: ссылки выставляют только доверенные роли (ADMIN и партнёры=MODERATOR).
+    // ADMIN/партнёр обходят модерацию полностью. Обычный юзер (BUYER/SELLER)
+    // ссылок не ставит вообще — кроме внутренних /uploads/* (загруженный файл).
     if (input.userId) {
       const user = await this.prisma.user.findUnique({
         where: { id: input.userId },
         select: { role: true },
       });
-      if (user?.role === 'ADMIN') {
+      if (this.isTrustedRole(user?.role)) {
         return { verdict: 'allow', reason: '', violations: [] };
       }
     }
@@ -94,23 +144,17 @@ export class ModerationService {
     if (this.phoneRe.test(text)) violations.push('phone');
     if (this.emailRe.test(text)) violations.push('email');
 
-    // Внешние ссылки для не-админов: разрешены только видеохостинги.
-    // Внутренние /uploads/* ссылки площадки не содержат протокола/домена,
-    // поэтому urlRe их не матчит — они никогда не попадают сюда.
-    // Разрешённая видеоссылка (whitelist) не считается ни внешней ссылкой,
-    // ни попыткой увода с площадки — иначе whitelist бессмысленен (напр. vk.com/video).
-    const isAllowedVideo = this.allowedVideoRe.test(text);
-
-    if (this.urlRe.test(text)) {
-      if (!isAllowedVideo) {
-        violations.push('external_link');
-      }
+    // Ссылки обычного пользователя: запрещены ЛЮБЫЕ внешние, whitelist
+    // видеохостингов убран (A5.5) — видео живёт только через загрузку файла
+    // (внутренняя /uploads/videos/*), а не ссылкой на хостинг.
+    if (this.hasExternalLink(text)) {
+      violations.push('external_link');
     }
 
-    // Проверяем увод с площадки на тексте БЕЗ разрешённых ссылок (whitelist).
-    // Так «пиши в телегу» и «мой номер» по-прежнему блокируются, а сам факт
-    // вставки ссылки t.me / vk.com/video — нет.
-    const offPlatformProbe = text.replace(this.allowedVideoStripRe, ' ');
+    // Увод с площадки проверяем на тексте БЕЗ ссылок: сам факт ссылки уже
+    // наказан выше, а призывы «пиши в телегу» и обмен контактами должны
+    // ловиться независимо от того, приложена ссылка или нет.
+    const offPlatformProbe = this.stripLinks(text);
     if (this.offPlatformRe.test(offPlatformProbe)) {
       violations.push('off_platform');
     }
@@ -128,16 +172,14 @@ export class ModerationService {
   }
 
   private async moderateWithLlm(text: string): Promise<ModerationVerdict> {
-    // Whitelist-ссылки уже провалидированы regExp-слоем выше. Модель склонна
-    // флагать их как off_platform даже при явном промпте, поэтому вырезаем их
-    // из текста перед отправкой — LLM судит только остаток (контакты, призывы).
-    const stripped = text
-      .replace(this.allowedVideoStripRe, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    // Ссылки уже провалидированы regExp-слоем выше (у обычного юзера внешних
+    // ссылок быть не может — иначе он бы сюда не дошёл). Модель склонна
+    // флагать остатки URL как off_platform, поэтому вырезаем ссылки из текста
+    // перед отправкой — LLM судит только остаток (контакты, призывы).
+    const stripped = this.stripLinks(text).replace(/\s+/g, ' ').trim();
     const trimmed = stripped.slice(0, LLM_MAX_CHARS);
 
-    // После вырезания whitelist-ссылок модерировать нечего — regExp уже пропустил.
+    // После вырезания ссылок модерировать нечего — regExp уже пропустил.
     if (!trimmed) {
       return { verdict: 'allow', reason: '', violations: [] };
     }
@@ -145,10 +187,9 @@ export class ModerationService {
     const prompt =
       'Ты — модератор площадки. Проверь текст на нарушения. Ответь СТРОГО JSON без пояснений: ' +
       '{"verdict":"allow"|"block"|"warn","reason":"...","violations":["spam"|"insult"|"off_platform"|"contact_sharing"]}. ' +
-      'ВАЖНО: ссылки на видеохостинги и облака разрешены и НЕ являются уводом с площадки: ' +
-      'youtube.com, youtu.be, rutube.ru, vk.com/video, vkvideo.ru, disk.yandex.ru, drive.google.com, t.me. ' +
-      'Если текст содержит ТОЛЬКО такие ссылки (без номера телефона, email, призыва «пиши в телегу/ватсап», без попытки созвона) — verdict=allow. ' +
-      'Блокируй (off_platform) только: призывы уйти в мессенджер БЕЗ ссылки, обмен телефоном/email, ссылки на ЛЮБЫЕ другие домены. ' +
+      'ВАЖНО: ссылки вырезаны из текста ДО тебя — их отсутствие нормально, не выдумывай нарушение по этому поводу. ' +
+      'Блокируй (off_platform) только: призывы уйти в мессенджер, обмен телефоном/email, попытку созвона. ' +
+      'Ссылки на домены в тексте (если остались) — нарушение external_link. ' +
       `Текст: ${trimmed}`;
 
     const controller = new AbortController();

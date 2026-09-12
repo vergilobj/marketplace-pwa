@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { parseBazarContent } from './bazar-response.parser';
 
 export interface BazarMessagePayload {
   role: 'user' | 'assistant';
@@ -83,38 +84,12 @@ export class BazarApiClient {
     return this.parseContent(content);
   }
 
-  /** Из текста ответа достаём ```refs и ```action JSON-блоки. */
+  /**
+   * Из текста ответа достаём ```refs и ```action JSON-блоки.
+   * Устойчивый разбор (B2): закрытые/незакрытые фенсы, голые маркеры, битый JSON —
+   * см. bazar-response.parser.ts (зеркало фронтового parseBazarResponse).
+   */
   private parseContent(content: string): BazarResponse {
-    const refsM = content.match(/```refs\n([\s\S]*?)```/);
-    const actionM = content.match(/```action\n([\s\S]*?)```/);
-
-    let text = content;
-    if (refsM) text = text.replace(/```refs\n[\s\S]*?```/g, '');
-    if (actionM) text = text.replace(/```action\n[\s\S]*?```/g, '');
-    text = text.trim();
-
-    const out: BazarResponse = { text };
-
-    if (refsM) {
-      try {
-        const refs: unknown = JSON.parse(refsM[1]);
-        out.refs = Array.isArray(refs) ? (refs as BazarRef[]) : [];
-      } catch {
-        /* broken refs — ignore */
-      }
-    }
-
-    if (actionM) {
-      try {
-        const action = JSON.parse(actionM[1]) as BazarAction | null;
-        if (action && typeof action === 'object' && action.intent) {
-          out.action = action;
-        }
-      } catch {
-        /* broken action — ignore */
-      }
-    }
-
-    return out;
+    return parseBazarContent(content);
   }
 }

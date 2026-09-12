@@ -65,6 +65,8 @@ export default function FeedPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [sort, setSort] = useState<SortType>('newest');
+  // Чистый рендер: момент монтирования читаем один раз (см. adIsLive ниже).
+  const [mountedAt] = useState(() => Date.now());
   const [search, setSearch] = useState(() => sp.get('search') || '');
   // R10: поиск уходит на сервер с дебаунсом, а не фильтрует 20 загруженных записей
   const debouncedSearch = useDebounced(search, 300);
@@ -187,7 +189,25 @@ export default function FeedPage() {
   // Сервер уже отфильтровал выдачу по поисковому запросу (R10)
   const fp = posts;
   const fpr = products;
-  const ads = fp.filter(p => p.isAd);
+  /**
+   * A5.7: реклама видна в ленте только оплаченной.
+   *
+   * Бэкенд отдаёт рекламу лишь при `isPinned && adExpireDate >= now` и
+   * подтверждённом заказе (PAID + escrow HELD), но на клиенте повторяем
+   * условие по сроку — страховка от закешированной выдачи и от бэкенда,
+   * который ещё не перезапущен со свежей сборкой. Неоплаченная реклама
+   * (нет adExpireDate / срок вышел) в таб «Реклама» не попадает.
+   *
+   * Момент времени берём из ленивого инициализатора useState, а не из
+   * Date.now() в теле рендера: рендер обязан быть чистым (react-hooks/purity),
+   * иначе результат фильтра меняется от прогона к прогону. Свежесть даёт
+   * сервер — он пересчитывает видимость на каждом запросе ленты.
+   */
+  const adIsLive = (p: ApiPost) =>
+    p.isAd === true &&
+    !!p.adExpireDate &&
+    new Date(p.adExpireDate).getTime() > mountedAt;
+  const ads = fp.filter(adIsLive);
   const regular = fp.filter(p => !p.isAd);
 
   // Смешанная лента с живым ритмом

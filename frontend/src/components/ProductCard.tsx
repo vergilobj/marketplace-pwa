@@ -1,7 +1,9 @@
-import { Heart, ShoppingCart, Plus, Minus } from 'lucide-react';
+import { Heart, ShoppingCart, Plus, Minus, Play } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { formatPrice } from "../utils/format";
+import { resolveMedia } from '../utils/media';
+import { buildGallery } from '../utils/video';
 import type { ApiProduct } from '../api/types';
 
 export default function ProductCard({ product }: { product: ApiProduct }) {
@@ -12,6 +14,8 @@ export default function ProductCard({ product }: { product: ApiProduct }) {
   const inCart = !!cartItem;
   const quantity = cartItem?.quantity || 1;
   const price = formatPrice(product.price);
+  const gallery = buildGallery(product.media, product.videoUrl);
+  const first = gallery[0] || null;
 
   return (
     <div
@@ -19,10 +23,32 @@ export default function ProductCard({ product }: { product: ApiProduct }) {
       className="group overflow-hidden cursor-pointer flex flex-col h-full bg-[var(--color-card)] rounded-xl border border-[var(--color-border)] hover:border-[#22c55e] transition-colors"
     >
       <div className="relative overflow-hidden h-44 bg-[var(--bg-3)] shrink-0">
-        {product.media?.[0] ? (
-          <img src={product.media[0]} alt={product.title} className="w-full h-full object-cover" loading="lazy" />
+        {/* Единая галерея: видео первым, фото после. */}
+        {gallery.length > 0 ? (
+          first?.type === 'video' ? (
+            <video
+              src={resolveMedia(first.src)}
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full h-full object-cover bg-black"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : first?.type === 'embed' ? (
+            <div className="w-full h-full flex items-center justify-center bg-black">
+              <Play size={28} className="text-white/70" />
+            </div>
+          ) : (
+            <img src={resolveMedia(first!.src)} alt={product.title} className="w-full h-full object-cover" loading="eager" decoding="async" />
+          )
         ) : (
           <div className="w-full h-full flex items-center justify-center"><ShoppingCart size={28} className="text-[var(--color-faint)]" /></div>
+        )}
+
+        {gallery.length > 1 && (
+          <span className="absolute bottom-1.5 left-1.5 text-[10px] font-semibold text-white bg-black/60 rounded-full px-1.5 py-0.5">
+            {gallery.length} медиа
+          </span>
         )}
 
         {/* R15: на тач-устройствах hover нет — кнопка видна всегда (CSS .fav-btn) */}

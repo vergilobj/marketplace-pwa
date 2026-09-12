@@ -18,7 +18,7 @@ import {
 import type { BazarMessage, BazarDealThread } from '../../api/bazar';
 import { getProductById } from '../../api/products';
 import { BazarAvatar, BazarDots, BazarRefRow } from './bazar-ui';
-import { MINT, formatPrice } from './bazar-ui.utils';
+import { MINT, formatPrice, parseBazarResponse } from './bazar-ui.utils';
 import { bazarStore } from '../../state/bazarStore';
 import {
   isSpeechSupported,
@@ -35,18 +35,19 @@ interface BazarChatProps {
  * Реагирует на реальный уровень громкости (level: 0..1).
  * Каждая полоса имеет свою фазовую вариацию, чтобы играли не синхронно.
  * Плавные пружинные переходы высоты через framer-motion.
+ *
+ * Полос 28 (а не 160): контейнер записи — flex-1 в ряду с двумя кнопками по
+ * 48px, на 390px ему достаётся ~230px. 160 полос по 2px + 159 гэпов давали
+ * ~480px и саундбар уезжал за вьюпорт. Ширина полосы здесь в процентах
+ * (flex-basis 0 + flex-grow), поэтому ряд всегда вписывается в родителя.
  */
 function DictationBars({ level }: { level: number }) {
   const bars = useMemo(
     () =>
-      Array.from({ length: 160 }, (_, i) => {
+      Array.from({ length: 28 }, (_, i) => {
         // Фазовая вариация: каждая полоса чуть иначе реагирует на голос.
         const phase = 0.3 + 0.7 * Math.abs(Math.sin(i * 0.35 + 0.6));
-        return {
-          id: i,
-          phase,
-          spring: { stiffness: 420, damping: 22, mass: 0.4 },
-        };
+        return { id: i, phase };
       }),
     [],
   );
@@ -55,15 +56,19 @@ function DictationBars({ level }: { level: number }) {
 
   return (
     <div
-      className="flex-1 flex items-center justify-between w-full"
-      style={{ height: 48, gap: 1 }}
+      className="flex-1 min-w-0 max-w-full flex items-center justify-between overflow-hidden"
+      style={{ height: 48, gap: 2 }}
       aria-hidden="true"
     >
       {bars.map((b) => (
         <motion.span
           key={b.id}
-          className="rounded-full shrink-0"
-          style={{ width: 2, background: 'linear-gradient(to top, #22c55e, #34d399)' }}
+          className="rounded-full shrink min-w-0"
+          style={{
+            flex: '1 1 0',
+            maxWidth: 3,
+            background: 'linear-gradient(to top, #22c55e, #34d399)',
+          }}
           initial={false}
           animate={{ height: height(b.phase) }}
           transition={{ type: 'spring', stiffness: 420, damping: 22, mass: 0.4 }}
@@ -87,6 +92,11 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [resetting, setResetting] = useState(false);
+  // Есть ли что сбрасывать: true только если в диалоге уже была реплика
+  // пользователя ПОСЛЕ последнего сброса. Пока false — кнопку «Начать сначала»
+  // не показываем; после успешного сброса она снова false и не «висит» на
+  // главной, пока юзер не начнёт новый диалог.
+  const [resetReady, setResetReady] = useState(false);
   const [acting, setActing] = useState(false);
   const [input, setInput] = useState('');
 
@@ -134,15 +144,17 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
     // Синхронный setState в теле эффекта даёт каскадный рендер
     // (react-hooks/set-state-in-effect) — начальный снапшот стора читаем
     // асинхронно. Подписка ниже обновляет состояние уже из колбэка, это ок.
+    const sync = () => {
+      const msgs = bazarStore.getMessages() ?? [];
+      setMessages(msgs);
+      setLoading(!bazarStore.isLoaded());
+      setResetReady(msgs.some((m) => m.role === 'USER'));
+    };
     (async () => {
       if (cancelled) return;
-      setMessages(bazarStore.getMessages() ?? []);
-      setLoading(!bazarStore.isLoaded());
+      sync();
     })();
-    const unsubscribe = bazarStore.subscribe(() => {
-      setMessages(bazarStore.getMessages() ?? []);
-      setLoading(!bazarStore.isLoaded());
-    });
+    const unsubscribe = bazarStore.subscribe(sync);
     return () => {
       cancelled = true;
       unsubscribe();
@@ -215,9 +227,12 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
   }, [messages, sending]);
 
   // ── Toast по meta.action.intent ответа Базара ──
+  // Если бэкенд не разобрал action (модель отдала блок не в том формате),
+  // достаём intent из текста — в самом пузыре блок всё равно не показываем.
   const notifyForAction = (msg: BazarMessage | undefined | null) => {
     if (!msg) return;
-    const intent = msg.meta?.action?.intent;
+    const intent =
+      msg.meta?.action?.intent ?? parseBazarResponse(msg.text).action?.intent;
     if (!intent || intent === 'none') return;
 
     switch (intent) {
@@ -365,15 +380,23 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
   const handleReset = async () => {
     if (resetting) return;
     setResetting(true);
+    // Кнопка должна исчезнуть сразу после клика, а история — очиститься не
+    // дожидаясь сети: backend.reset() синхронно зовёт LLM за новым приветствием
+    // и легко занимает 5-8 секунд. Показывать в это время старый диалог —
+    // ровно тот баг, на который жаловался владелец.
+    setResetReady(false);
+    bazarStore.clearMessages();
     try {
       await bazarReset();
-      bazarStore.clearMessages();
-      await load();
     } catch (e) {
       console.error('bazar reset failed', e);
-    } finally {
-      setResetting(false);
+      toast.error('Не получилось сбросить, попробуй ещё');
     }
+    // В любом случае перечитываем историю: после успеха это новое приветствие,
+    // после ошибки — восстановленный с сервера старый диалог.
+    bazarStore.clearMessages();
+    await load();
+    setResetting(false);
   };
 
   // ── Действия по сделке: accept / cancel, затем перечитываем тред ──
@@ -517,8 +540,8 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
         </div>
       )}
 
-      {!dealMode && messages.length > 0 && !loading && (
-        <div className="flex justify-end mb-2 shrink-0">
+      {!dealMode && resetReady && !loading && (
+        <div className="flex justify-end mb-2 shrink-0 min-w-0 max-w-full">
           <button
             onClick={handleReset}
             disabled={resetting}
@@ -558,7 +581,17 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
           </motion.div>
         ) : (
           <AnimatePresence initial={false}>
-            {messages.map((m) => (
+            {messages.map((m) => {
+              // Служебные блоки (```refs / ```action) вырезаем из текста и
+              // показываем только чистую реплику. У ASSISTANT refs из meta/поля
+              // сливаем с распарсенными: бэкенд обычно отдаёт refs отдельно,
+              // но у части старых сообщений блок остался внутри text.
+              const parsed = m.role === 'USER' ? null : parseBazarResponse(m.text);
+              const refs =
+                parsed && parsed.refs.length > 0 ? parsed.refs : (m.refs ?? []);
+              const text = parsed ? parsed.cleanText : (m.text ?? '');
+
+              return (
               <motion.div
                 key={m.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -587,11 +620,12 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
                   }
                 >
                   {m.role !== 'USER' && renderRelayBadge(m)}
-                  <div className="whitespace-pre-wrap">{m.text}</div>
-                  <BazarRefRow refs={m.refs ?? []} large={!compact} />
+                  <div className="whitespace-pre-wrap">{text}</div>
+                  <BazarRefRow refs={refs} large={!compact} />
                 </div>
               </motion.div>
-            ))}
+              );
+            })}
           </AnimatePresence>
         )}
         {sending && (
@@ -618,7 +652,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex items-center gap-2.5 mt-4 shrink-0">
+      <div className="flex items-center gap-2.5 mt-4 shrink-0 w-full min-w-0 max-w-full">
         <AnimatePresence mode="wait" initial={false}>
           {isRecording ? (
             <motion.div
@@ -627,7 +661,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="flex items-center gap-2.5 w-full"
+              className="flex items-center gap-2.5 w-full min-w-0 max-w-full"
             >
               <motion.button
                 onClick={cancelDictation}
@@ -645,7 +679,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
               </motion.button>
 
               <div
-                className="flex-1 h-12 px-4 rounded-xl flex items-center"
+                className="flex-1 min-w-0 max-w-full h-12 px-4 rounded-xl flex items-center overflow-hidden"
                 style={{ background: '#0d1210', border: '1px solid rgba(34,197,94,0.18)' }}
               >
                 <DictationBars level={audioLevel} />

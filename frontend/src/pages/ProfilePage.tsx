@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { getProfile, updateProfile, getStats, becomeSeller, getBalance, type BalanceResponse } from '../api/users';
+import { getProfile, updateProfile, getStats, becomeSeller, getMySellerRequest, createSellerRequest, getBalance, type BalanceResponse } from '../api/users';
 import { IMaskInput } from 'react-imask';
 import { formatPhone, unformatPhone } from '../utils/phone';
 import { formatPrice } from '../utils/format';
-import { User, Settings, TrendingUp, Gift, LogOut, Save, ShieldCheck, Store, Megaphone, ShoppingBag } from 'lucide-react';
+import { User, Settings, TrendingUp, Gift, LogOut, Save, ShieldCheck, Store, Megaphone, ShoppingBag, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { CreateMenu } from '../components/CreateMenu';
-import type { ApiUser, ApiUserStats } from '../api/types';
+import type { ApiUser, ApiUserStats, SellerRequestStatus } from '../api/types';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
@@ -19,24 +19,40 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '' });
   const [becoming, setBecoming] = useState(false);
+  const [sellerRequest, setSellerRequest] = useState<SellerRequestStatus | null>(null);
 
   useEffect(() => {
-    Promise.all([getProfile(), getStats(), getBalance().catch(() => null)]).then(([p, s, b]) => { setProfile(p); setStats(s); setBalances(b); setForm({ name: p.name || '', phone: p.phone || '' }); }).finally(() => setLoading(false));
+    Promise.all([getProfile(), getStats(), getBalance().catch(() => null), getMySellerRequest().catch(() => null)]).then(([p, s, b, sr]) => { setProfile(p); setStats(s); setBalances(b); setSellerRequest(sr?.status ?? null); setForm({ name: p.name || '', phone: p.phone || '' }); }).finally(() => setLoading(false));
   }, []);
 
   const handleSave = async () => { try { await updateProfile({ ...form, phone: unformatPhone(form.phone) }); const p = await getProfile(); setProfile(p); setEditing(false); toast.success('Профиль обновлён'); } catch { toast.error('Ошибка'); } };
   const handleLogout = () => { window.OneSignal?.logout()?.catch(() => {}); localStorage.clear(); navigate('/login'); };
 
+  /** A4: подать заявку на продавца — роль меняет админ после модерации. */
   const handleBecomeSeller = async () => {
     if (becoming) return;
     setBecoming(true);
     try {
-      const res = await becomeSeller();
-      if (res?.accessToken) localStorage.setItem('accessToken', res.accessToken);
-      setProfile((p) => ({ ...p, ...res?.user, role: res?.user?.role || 'SELLER' }) as ApiUser);
-      toast.success('Теперь ты можешь продавать');
-    } catch {
-      toast.error('Не удалось стать продавцом');
+      const res = await createSellerRequest();
+      if (res?.alreadySeller) {
+        // Уже продавец: роль на бэке есть, подтягиваем профиль и обновляем токен.
+        const refreshed = await becomeSeller();
+        if (refreshed?.accessToken) localStorage.setItem('accessToken', refreshed.accessToken);
+        setProfile((p) => ({ ...p, ...refreshed?.user, role: refreshed?.user?.role || 'SELLER' }) as ApiUser);
+        toast.success('Ты уже продавец');
+      } else {
+        setSellerRequest(res?.status || 'PENDING');
+        toast.success('Заявка отправлена — ждём решения админа');
+      }
+    } catch (e) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      const message = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      if (status === 400) {
+        setSellerRequest('PENDING');
+        toast(message || 'Заявка уже на рассмотрении', { icon: '⏳' });
+      } else {
+        toast.error('Не удалось отправить заявку');
+      }
     } finally {
       setBecoming(false);
     }
@@ -44,6 +60,8 @@ export default function ProfilePage() {
 
   const role: string = profile?.role || 'BUYER';
   const isSeller = role === 'SELLER' || role === 'ADMIN';
+  const sellerRequestPending = sellerRequest === 'PENDING';
+  const sellerRequestRejected = sellerRequest === 'REJECTED';
 
   const menuItems: { label: string; to: string; icon: React.ReactNode }[] = [
     { label: 'Мои заказы', to: '/orders', icon: <ShoppingBag size={16} /> },
@@ -54,7 +72,15 @@ export default function ProfilePage() {
       { label: 'Создать рекламу', to: '/posts/ad/new', icon: <Megaphone size={16} /> },
     ] : []),
     ...(role === 'BUYER' ? [
-      { label: 'Стать продавцом', to: '#become-seller', icon: <Store size={16} /> },
+      {
+        label: sellerRequestPending
+          ? 'Заявка на рассмотрении'
+          : sellerRequestRejected
+            ? 'Заявка отклонена — подать снова'
+            : 'Стать продавцом',
+        to: '#become-seller',
+        icon: sellerRequestPending ? <Clock size={16} /> : <Store size={16} />,
+      },
     ] : []),
     ...(role === 'ADMIN' ? [
       { label: 'Админ-панель', to: '/admin', icon: <ShieldCheck size={16} /> },
@@ -170,7 +196,7 @@ export default function ProfilePage() {
             <button
               key={i}
               disabled={becoming && item.to === '#become-seller'}
-              onClick={() => item.to === '#become-seller' ? handleBecomeSeller() : navigate(item.to)}
+              onClick={() => item.to === '#become-seller' ? (sellerRequestPending ? toast('Заявка уже отправлена — ждём решения админа', { icon: '⏳' }) : handleBecomeSeller()) : navigate(item.to)}
               className="w-full rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 text-left transition-all flex items-center justify-between hover:border-[#22c55e]/40 disabled:opacity-60"
             >
               <span className="text-sm font-bold text-[var(--color-text)] flex items-center gap-2">{item.icon}{item.label}</span>

@@ -28,7 +28,51 @@ export class UsersController {
   ) {}
 
   /**
+   * A4: подать заявку «Стать продавцом». Роль НЕ меняется — ждёт модерации.
+   * Возвращает заявку со статусом PENDING.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('BUYER', 'SELLER', 'ADMIN')
+  @Post('seller-request')
+  async createSellerRequest(@Request() req: AuthenticatedRequest) {
+    return this.usersService.createSellerRequest(req.user.userId);
+  }
+
+  /** A4: своя заявка — для отображения статуса в профиле. */
+  @UseGuards(JwtAuthGuard)
+  @Get('seller-request/me')
+  async getMySellerRequest(@Request() req: AuthenticatedRequest) {
+    return this.usersService.getMySellerRequest(req.user.userId);
+  }
+
+  /** A4: список заявок для админки. */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Get('seller-requests')
+  async getSellerRequests(@Query('status') status?: string) {
+    return this.usersService.getSellerRequests(status);
+  }
+
+  /** A4: одобрить/отклонить заявку. approve=false → роль не меняется. */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Patch('seller-requests/:id')
+  async reviewSellerRequest(
+    @Param('id') id: string,
+    @Body() body: { approve: boolean; note?: string },
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.usersService.reviewSellerRequest(
+      id,
+      req.user.userId,
+      Boolean(body?.approve),
+      body?.note,
+    );
+  }
+
+  /**
    * Стать продавцом: BUYER → SELLER.
+   * A4: теперь только после одобрения заявки админом (иначе 400).
    * Возвращает обновлённого юзера + свежий accessToken с новой ролью.
    */
   @UseGuards(JwtAuthGuard, RolesGuard)

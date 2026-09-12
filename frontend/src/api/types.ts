@@ -203,6 +203,26 @@ export interface BecomeSellerResponse {
   accessToken: string;
 }
 
+/** A4: заявка «Стать продавцом». status=null — заявки не было. */
+export type SellerRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface ApiSellerRequest {
+  id?: string;
+  userId?: string;
+  status: SellerRequestStatus | null;
+  note?: string | null;
+  createdAt?: string;
+  reviewedAt?: string | null;
+  alreadySeller?: boolean;
+}
+
+/** A4: заявка в списке админки — с вложенным юзером. */
+export interface ApiSellerRequestAdmin extends ApiSellerRequest {
+  id: string;
+  userId: string;
+  user?: { id: string; name?: string | null; phone?: string; role?: string };
+}
+
 /** Пара токенов от /auth/login и /auth/register. */
 export interface AuthTokens {
   accessToken: string;

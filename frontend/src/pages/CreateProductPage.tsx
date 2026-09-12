@@ -1,12 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, PackagePlus, ImagePlus, Video, X, Link2 } from 'lucide-react';
+import { ArrowLeft, PackagePlus, ImagePlus, Video, X } from 'lucide-react';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import { createProduct } from '../api/products';
 import { uploadImage, uploadVideo } from '../api/upload';
-import { getVideoEmbed } from '../utils/video';
 import { formatPrice } from '../utils/format';
 import DictateButton from '../components/DictateButton';
 import { errorMessage } from '../utils/error';
@@ -18,7 +17,6 @@ export default function CreateProductPage() {
   const [previews, setPreviews] = useState<string[]>([]);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState('');
-  const [externalVideoUrl, setExternalVideoUrl] = useState('');
   const [videoPreview, setVideoPreview] = useState('');
   const [videoUploading, setVideoUploading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -26,7 +24,6 @@ export default function CreateProductPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
-  const externalEmbed = getVideoEmbed(externalVideoUrl);
   const priceNumber = parseFloat(form.price);
   const pricePreview = Number.isFinite(priceNumber) ? formatPrice(priceNumber) : '';
 
@@ -85,15 +82,13 @@ export default function CreateProductPage() {
         uploadedUrls.push(url);
       }
 
-      // Приоритет: внешняя ссылка важнее загруженного файла.
-      const finalVideoUrl = externalVideoUrl.trim() || videoUrl || undefined;
-
       await createProduct({
         title: form.title,
         description: form.description,
         price: parseFloat(form.price),
         media: uploadedUrls,
-        videoUrl: finalVideoUrl,
+        // Видео — только загрузкой файла. Ссылок на внешние хостинги нет.
+        videoUrl: videoUrl || undefined,
       });
 
       navigate('/products');
@@ -134,29 +129,74 @@ export default function CreateProductPage() {
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-muted)] mb-1">Фотографии</label>
-            <div className="flex flex-wrap gap-2 mb-2">
+          {/* ЕДИНЫЙ БЛОК МЕДИА: видео первым, фото после. Поля ссылки на видео нет. */}
+          <div className="rounded-2xl border border-[var(--color-border)] p-4">
+            <label className="block text-sm font-medium text-[var(--color-muted)] mb-1">Медиа</label>
+            <p className="text-[11px] text-[var(--color-faint)] mb-3">Видео встанет первым в галерею товара, фотографии — после него.</p>
+
+            <div className="flex flex-wrap gap-2 mb-3">
+              {videoFile || videoUrl ? (
+                <div className="relative w-24 h-24 rounded-xl overflow-hidden border border-[var(--color-border)] bg-black">
+                  {videoPreview ? (
+                    <video src={videoPreview} muted playsInline className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-[10px] text-[var(--color-muted)] text-center px-1">
+                      {videoUploading ? 'Загружаем…' : 'Видео'}
+                    </div>
+                  )}
+                  <span className="absolute bottom-0 left-0 right-0 text-[9px] font-bold uppercase text-center text-white bg-black/60 py-0.5">Видео · 1-е</span>
+                  <button
+                    type="button"
+                    onClick={removeVideo}
+                    aria-label="Убрать видео"
+                    className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-black/80"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => videoInputRef.current?.click()}
+                  disabled={videoUploading}
+                  className="w-24 h-24 rounded-xl border border-dashed border-[var(--color-border)] text-[#22c55e] text-[11px] font-medium hover:border-[#22c55e]/50 transition-colors disabled:opacity-50 flex flex-col items-center justify-center gap-1"
+                >
+                  <Video size={18} />
+                  {videoUploading ? 'Загружаем…' : 'Видео'}
+                </button>
+              )}
+
               {previews.map((src, idx) => (
-                <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-[var(--color-border)]">
-                  <img src={src} alt={`preview ${idx}`} className="w-full h-full object-cover" />
+                <div key={idx} className="relative w-24 h-24 rounded-xl overflow-hidden border border-[var(--color-border)]">
+                  <img src={src} alt={`preview ${idx}`} className="w-full h-full object-cover" loading="eager" decoding="async" />
                   <button
                     type="button"
                     onClick={() => removeFile(idx)}
-                    className="absolute top-0 right-0 bg-black/60 text-[var(--color-text)] rounded-full w-5 h-5 flex items-center justify-center"
+                    aria-label={`Убрать фото ${idx + 1}`}
+                    className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-black/80"
                   >
                     <X size={12} />
                   </button>
                 </div>
               ))}
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-24 h-24 rounded-xl border border-dashed border-[var(--color-border)] text-[#22c55e] text-[11px] font-medium hover:border-[#22c55e]/50 transition-colors flex flex-col items-center justify-center gap-1"
+              >
+                <ImagePlus size={18} />
+                Фото
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="tap-link gap-1 text-sm text-[#22c55e] hover:text-[#16a34a] transition-colors"
-            >
-              <ImagePlus size={16} /> Добавить фото
-            </button>
+
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
+              onChange={handleVideoChange}
+              className="hidden"
+            />
             <input
               ref={fileInputRef}
               type="file"
@@ -165,99 +205,7 @@ export default function CreateProductPage() {
               onChange={handleFileChange}
               className="hidden"
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-muted)] mb-1">Видео</label>
-
-            {/* Способ 1 — внешняя ссылка (приоритетнее файла) */}
-            <div className="mb-3">
-              <label className="block text-xs font-medium text-[var(--color-muted)] mb-1">Ссылка на видео</label>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Link2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-faint)]" />
-                  <input
-                    type="url"
-                    value={externalVideoUrl}
-                    onChange={e => setExternalVideoUrl(e.target.value)}
-                    placeholder="YouTube, RuTube, VK Video, Яндекс.Диск, Google Диск, Telegram…"
-                    className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-[var(--color-surface)] text-[var(--color-text)] text-sm outline-none border border-[var(--color-border)] focus:border-[#22c55e] transition-colors"
-                  />
-                  {externalVideoUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setExternalVideoUrl('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-faint)] hover:text-[var(--color-text)] transition-colors"
-                      title="Очистить ссылку"
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {externalVideoUrl && (
-                <div className="mt-2">
-                  {externalEmbed?.type === 'iframe' ? (
-                    <div className="rounded-xl overflow-hidden border border-[var(--color-border)] aspect-video">
-                      <iframe src={externalEmbed.src} className="w-full h-full" allowFullScreen title="Превью видео" />
-                    </div>
-                  ) : externalEmbed?.type === 'video' ? (
-                    <video src={externalEmbed.src} controls playsInline className="w-full max-h-56 rounded-xl bg-black" />
-                  ) : (
-                    <a
-                      href={externalEmbed?.src || externalVideoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm text-[#22c55e] hover:text-[#34d399] break-all transition-colors"
-                    >
-                      <Video size={15} /> {externalEmbed?.label || 'Открыть видео'}
-                    </a>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Способ 2 — загрузка файла (перекрывается ссылкой) */}
-            <label className="block text-xs font-medium text-[var(--color-muted)] mb-1">…или загрузить файл</label>
-            {videoFile || videoUrl ? (
-              <div className="relative rounded-lg overflow-hidden mb-2 border border-[var(--color-border)]">
-                {videoPreview ? (
-                  <video src={videoPreview} controls playsInline className="w-full max-h-56 bg-black" />
-                ) : (
-                  <div className="w-full h-32 flex items-center justify-center bg-[var(--bg-3)] text-sm text-[var(--color-muted)]">
-                    {videoUploading ? 'Загружаем...' : 'Видео загружено'}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={removeVideo}
-                  className="absolute top-2 right-2 bg-black/60 text-[var(--color-text)] rounded-full w-6 h-6 flex items-center justify-center"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => videoInputRef.current?.click()}
-                disabled={videoUploading}
-                className="tap-link gap-1 text-sm text-[#22c55e] hover:text-[#16a34a] disabled:opacity-50 transition-colors"
-              >
-                <Video size={16} /> {videoUploading ? 'Загружаем видео...' : 'Загрузить видео'}
-              </button>
-            )}
-            <input
-              ref={videoInputRef}
-              type="file"
-              accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
-              onChange={handleVideoChange}
-              className="hidden"
-            />
-            <p className="text-[11px] text-[var(--color-faint)] mt-1">mp4, webm, mov или mkv, до 100 МБ</p>
-            {externalVideoUrl.trim() && (videoFile || videoUrl) && (
-              <p className="text-[11px] text-[#22c55e] mt-1">Ссылка на видео приоритетнее загруженного файла — будет использована она.</p>
-            )}
+            <p className="text-[11px] text-[var(--color-faint)]">Видео: mp4, webm, mov, mkv, до 100 МБ. Фото: до 5 МБ каждое.</p>
           </div>
 
           {error && <p className="text-red-500 text-sm">{error}</p>}

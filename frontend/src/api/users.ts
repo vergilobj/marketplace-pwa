@@ -1,5 +1,5 @@
 import api from './axios';
-import type { ApiUser, ApiUserStats, AuthTokens, BecomeSellerResponse } from './types';
+import type { ApiUser, ApiUserStats, AuthTokens, BecomeSellerResponse, ApiSellerRequest } from './types';
 
 export const getProfile = () =>
   api.get<ApiUser>('/users/me').then(r => r.data);
@@ -12,6 +12,17 @@ export const getStats = () =>
 
 export const becomeSeller = () =>
   api.post<BecomeSellerResponse>('/users/become-seller').then(r => r.data);
+
+/**
+ * A4: подать заявку «Стать продавцом». Роль НЕ меняется — ждёт модерации админом.
+ * Бросит 400, если заявка уже на рассмотрении или юзер уже продавец.
+ */
+export const createSellerRequest = () =>
+  api.post<ApiSellerRequest>('/users/seller-request').then(r => r.data);
+
+/** A4: своя заявка — статус для профиля. */
+export const getMySellerRequest = () =>
+  api.get<ApiSellerRequest>('/users/seller-request/me').then(r => r.data);
 
 /** §4.6: раздельные балансы. */
 export type BalanceResponse = {

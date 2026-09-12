@@ -50,6 +50,22 @@ model User {
   trustScore         Float          @default(0.5)
   trustScoreAt       DateTime?
   ledgerEntries      LedgerEntry[]
+  sellerRequest      SellerRequest?
+}
+
+/// A4: заявка «Стать продавцом». Роль меняется ТОЛЬКО после одобрения админом.
+model SellerRequest {
+  id         String    @id @default(uuid())
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id])
+  status     String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  note       String? // причина отказа / комментарий модератора
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  reviewedAt DateTime?
+  reviewedBy String?
+
+  @@index([status, createdAt])
 }
 
 enum UserRole {

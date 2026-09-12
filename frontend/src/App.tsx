@@ -30,6 +30,7 @@ const EditPostPage = lazy(() => import('./pages/EditPostPage'));
 const MyProductsPage = lazy(() => import('./pages/MyProductsPage'));
 const ProductsPage = lazy(() => import('./pages/ProductsPage'));
 const BazarChatPage = lazy(() => import('./pages/BazarChatPage'));
+const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 function Lazy({ children }: { children: React.ReactNode }) {
@@ -74,6 +75,8 @@ export default function App() {
           <Route path="/posts/:id/edit" element={<ProtectedRoute requiredRole="ADMIN"><Lazy><EditPostPage /></Lazy></ProtectedRoute>} />
           <Route path="/my-products" element={<ProtectedRoute requiredRole="SELLER"><Lazy><MyProductsPage /></Lazy></ProtectedRoute>} />
           <Route path="/bazar" element={<Lazy><BazarChatPage /></Lazy>} />
+          {/* A5.8: публичный профиль пользователя (без телефона и баланса) */}
+          <Route path="/users/:id" element={<Lazy><PublicProfilePage /></Lazy>} />
           <Route path="/leads" element={<ProtectedRoute requiredRole="SELLER"><Lazy><LeadsPage /></Lazy></ProtectedRoute>} />
           {/* 404 — обязательно последним в блоке роутов */}
           <Route path="*" element={<Lazy><NotFoundPage /></Lazy>} />

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ShoppingBag, ShieldCheck, ArrowLeft, Copy, Check, Loader2, ArrowRight, Clock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { createOrder, getOrderPaymentStatus } from '../api/orders';
+import api from '../api/axios';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatPrice } from '../utils/format';
 import toast from 'react-hot-toast';
@@ -23,8 +24,45 @@ type Invoice = {
   status: string;
 };
 
+/**
+ * A3: ОДНА общая оплата на всю корзину.
+ *
+ * Раньше чекаут создавал N заказов и показывал N QR-адресов — платить надо
+ * было по каждому отдельно. Теперь при наличии бэкенд-эндпоинта
+ * `POST /payments/cart/pay` фронт показывает ОДИН QR и ОДНУ сумму на всю
+ * корзину; заказы распределяются на бэкенде.
+ *
+ * Бэкенд-контракт (описан в отчёте, реализуется отдельно):
+ *   POST /payments/cart/pay  { orderIds: string[] }
+ *     → { depositAddress, clientRef, amount, status }
+ *   - создаёт ОДИН платёж (paymod sidecar, client_ref = mp-cart-<hash>) на
+ *     общую сумму корзины и НЕ заводит персональных платежей на заказы;
+ *   - webhook распределяет входящий депозит по заказам: каждый переходит в
+ *     PAID + escrow HELD, остаток/недоплата считаются на уровне корзины.
+ *
+ * Пока эндпоинта нет — чекаут не ломается, а деградирует к прежней
+ * поштучной оплате (N адресов). Это осознанный fallback: фронт не может
+ * «нарисовать» один адрес на всю корзину без серверной сверки суммы —
+ * депозит ушёл бы на адрес одного заказа, а webhook зачёл бы его как
+ * переплату по этому заказу и не закрыл остальные.
+ */
+type CartPayment = {
+  depositAddress: string;
+  clientRef: string | null;
+  amount: number;
+  status: string;
+};
+
 const PAYMENT_WINDOW_MS = 15 * 60 * 1000;
 const FINAL_STATUSES = ['CONFIRMED', 'SWEPT'];
+
+/**
+ * Дедлайн окна оплаты. Живёт на уровне модуля, а не в теле компонента:
+ * react-hooks/purity запрещает вызов impure-функций (Date.now) в области
+ * рендера, и обёртка в модульный хелпер — единственный способ оставить
+ * вычисление времени в обработчике события без disable-комментария.
+ */
+const paymentDeadline = () => Date.now() + PAYMENT_WINDOW_MS;
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Ожидание оплаты',
@@ -40,6 +78,7 @@ export default function CheckoutPage() {
   const { cart, clearCart } = useApp();
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [cartPayment, setCartPayment] = useState<CartPayment | null>(null);
   const [copiedAddr, setCopiedAddr] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
@@ -61,6 +100,7 @@ export default function CheckoutPage() {
       if (left <= 0) {
         // счёт истёк — сбрасываем, возвращаем кнопку
         setInvoices([]);
+        setCartPayment(null);
         setExpiresAt(null);
         toast.error('Время оплаты истекло. Создайте новый счёт.');
       }
@@ -70,15 +110,22 @@ export default function CheckoutPage() {
     return () => clearInterval(timer);
   }, [expiresAt]);
 
-  const payable = invoices.filter((i) => !!i.depositAddress);
+  const hasCartPayment = !!cartPayment;
+  // A3: при общей оплате адрес один на всю корзину, поэтому «платёжеспособность»
+  // позиции определяется не персональным адресом, а привязкой к заказу.
+  const payable = hasCartPayment
+    ? invoices.filter((i) => !!i.orderId)
+    : invoices.filter((i) => !!i.depositAddress);
   const paidCount = payable.filter((i) => isFinal(i.status)).length;
   const allPaid = payable.length > 0 && payable.every((i) => isFinal(i.status));
 
-  // Поллинг статуса ВСЕХ счётов корзины
+  // Поллинг статуса ВСЕХ заказов корзины
   useEffect(() => {
     if (payable.length === 0 || allPaid) return;
     const poll = async () => {
-      const targets = invoicesRef.current.filter((i) => i.depositAddress && i.orderId);
+      const targets = invoicesRef.current.filter(
+        (i) => i.orderId && (i.depositAddress || hasCartPayment),
+      );
       if (targets.length === 0) return;
       const results = await Promise.all(
         targets.map(async (inv) => {
@@ -100,7 +147,7 @@ export default function CheckoutPage() {
     poll();
     pollRef.current = setInterval(poll, 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [payable.length, allPaid]);
+  }, [payable.length, allPaid, hasCartPayment]);
 
   // Все позиции оплачены → закрываем корзину
   useEffect(() => {
@@ -112,9 +159,41 @@ export default function CheckoutPage() {
     navigate('/orders');
   }, [allPaid, clearCart, navigate]);
 
+  /**
+   * A3: запрос ОДНОЙ общей оплаты на корзину.
+   * null — эндпоинт недоступен/не отдал адрес → деградируем к поштучной оплате.
+   */
+  const requestCartPayment = async (
+    orderIds: string[],
+  ): Promise<CartPayment | null> => {
+    try {
+      const res = await api.post<{
+        depositAddress?: string | null;
+        clientRef?: string | null;
+        amount?: number | null;
+        status?: string | null;
+      }>('/payments/cart/pay', { orderIds });
+
+      const depositAddress = res.data?.depositAddress;
+      if (!depositAddress) return null;
+
+      return {
+        depositAddress,
+        clientRef: res.data.clientRef ?? null,
+        amount: res.data.amount ?? total,
+        status: res.data.status || 'PENDING',
+      };
+    } catch {
+      // 404/405 (эндпоинт ещё не реализован) или любая иная ошибка —
+      // не роняем чекаут: заказы уже созданы, показываем поштучную оплату.
+      return null;
+    }
+  };
+
   const handleOrder = async () => {
     setLoading(true);
     successRef.current = false;
+    setCartPayment(null);
     const created: Invoice[] = [];
     const failed: string[] = [];
     for (const item of cart) {
@@ -137,9 +216,30 @@ export default function CheckoutPage() {
     }
     setInvoices(created);
 
+    // A3: корзина из 2+ позиций → пробуем общую оплату (один QR на всё).
+    const orderIds = created
+      .map((i) => i.orderId)
+      .filter((id): id is string => !!id);
+
+    if (orderIds.length > 1) {
+      const batch = await requestCartPayment(orderIds);
+      if (batch) {
+        setCartPayment(batch);
+        setExpiresAt(paymentDeadline());
+        toast.success(
+          `Счёт на ${formatPrice(batch.amount)} создан. Оплатите USDT (BSC) одним переводом.`,
+        );
+        if (failed.length > 0) {
+          toast.error(`Не оформлено: ${failed.join('; ')}`);
+        }
+        setLoading(false);
+        return;
+      }
+    }
+
     const withAddress = created.filter((i) => i.depositAddress);
     if (withAddress.length > 0) {
-      setExpiresAt(Date.now() + PAYMENT_WINDOW_MS);
+      setExpiresAt(paymentDeadline());
       toast.success(
         created.length === 1
           ? 'Счёт создан. Оплатите USDT (BSC).'
@@ -221,13 +321,73 @@ export default function CheckoutPage() {
               {/* Кнопка — только пока не созданы счета */}
               {invoices.length === 0 && (
                 <button onClick={handleOrder} disabled={loading} className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#22c55e] text-[#0d1512] font-extrabold text-base hover:bg-[#16a34a] transition-colors shadow-[0_12px_32px_-8px_rgba(34,197,94,0.5)] disabled:opacity-50">
-                  <span>{loading ? 'Оформление...' : `Создать счёт${cart.length > 1 ? ` на ${cart.length} позиции` : ''}`}</span><ArrowRight size={18} />
+                  <span>{loading ? 'Оформление...' : cart.length > 1 ? 'Оплатить корзину' : 'Создать счёт'}</span><ArrowRight size={18} />
                 </button>
               )}
             </>
           )}
 
-          {payable.length > 0 && (
+          {/* A3: ОДИН QR на всю корзину */}
+          {cartPayment && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-bold text-[var(--color-text)]">
+                  Оплатите USDT (BSC) — один счёт на всю корзину ({payable.length} {payable.length === 1 ? 'позиция' : 'позиции'}):
+                </p>
+                {timeLeft > 0 && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#22c55e]">
+                    <Clock size={14} /> {formatTime(timeLeft)}
+                  </span>
+                )}
+              </div>
+
+              <div className="rounded-2xl bg-[var(--bg-3)] border border-[#22c55e]/20 p-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-[var(--color-text)]">Общая сумма заказа</div>
+                    <div className="text-lg text-[#22c55e] font-extrabold mt-0.5">{formatPrice(cartPayment.amount)}</div>
+                  </div>
+                  <span className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full border ${allPaid ? 'text-[#0d1512] bg-[#22c55e] border-[#22c55e]' : 'text-[var(--color-muted)] border-[var(--color-border)] bg-[var(--color-surface)]'}`}>
+                    {allPaid ? STATUS_LABEL.CONFIRMED : `${paidCount}/${payable.length} оплачено`}
+                  </span>
+                </div>
+
+                <div className="mb-3 flex justify-center">
+                  <div className="w-full max-w-[220px] bg-white rounded-2xl p-3">
+                    <QRCodeSVG value={cartPayment.depositAddress} className="w-full h-auto" />
+                  </div>
+                </div>
+                <div className="relative">
+                  <code className="block w-full pl-3 pr-12 py-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-[#34d399] break-all font-mono">{cartPayment.depositAddress}</code>
+                  <button onClick={() => copyAddress(cartPayment.depositAddress)} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-muted)] hover:text-[#22c55e] hover:bg-[var(--bg-3)] transition-colors" title="Копировать адрес">
+                    {copiedAddr === cartPayment.depositAddress ? <Check size={16} className="text-[#22c55e]" /> : <Copy size={16} />}
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-1.5">
+                  {invoices.map((inv) => (
+                    <div key={inv.orderId || inv.productId} className="flex items-center justify-between gap-3 text-xs">
+                      <span className="text-[var(--color-muted)] truncate">{inv.title} × {inv.quantity}</span>
+                      <span className={`shrink-0 font-bold ${isFinal(inv.status) ? 'text-[#22c55e]' : 'text-[var(--color-faint)]'}`}>
+                        {STATUS_LABEL[inv.status] || inv.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 mt-4 text-xs text-[var(--color-muted)]">
+                <Loader2 size={14} className={`animate-spin text-[#22c55e] ${allPaid ? 'opacity-0' : ''}`} />
+                {allPaid ? 'Всё оплачено — переходим к заказам...' : 'Ожидание подтверждения транзакции (BSC)...'}
+              </div>
+              <p className="mt-2 text-[11px] text-[var(--color-faint)]">
+                Один перевод на общую сумму закрывает все позиции корзины. Заказ считается оплаченным только после подтверждения сети. Счёт автоматически отменяется через 15 минут.
+              </p>
+            </div>
+          )}
+
+          {/* Fallback: бэкенд без общей оплаты — поштучные адреса */}
+          {!cartPayment && payable.length > 0 && (
             <div className="mt-6">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-sm font-bold text-[var(--color-text)]">

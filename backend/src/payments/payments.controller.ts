@@ -17,6 +17,7 @@ import { Roles } from '../auth/roles.decorator';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.interface';
 import { PaymentsService } from './payments.service';
 import { NowPaymentsProvider } from './nowpayments.provider';
+import { CartPayDto } from './dto/cart-pay.dto';
 
 @Controller('payments')
 export class PaymentsController {
@@ -58,6 +59,28 @@ export class PaymentsController {
     @Request() req: AuthenticatedRequest,
   ) {
     return this.paymentsService.payOrderAsBuyer(orderId, req.user.userId);
+  }
+
+  // A3: ОБЩАЯ оплата корзины — один QR/адрес на все позиции.
+  //
+  // Корзина из N товаров создаёт N заказов; здесь на них создаётся ОДНА
+  // paymod-транзакция (clientRef = mp-cart-<hash>), а webhook раскладывает
+  // депозит по заказам (каждый холдится на свой amount). Без этого эндпоинта
+  // фронт деградирует к поштучным адресам.
+  //
+  // Роль BUYER не требуется: покупатель — обычный пользователь, а RolesGuard
+  // при @Roles('BUYER') отклонил бы продавца, покупающего у другого продавца.
+  // Владение заказами проверяет сервис (403 на чужой заказ).
+  @UseGuards(JwtAuthGuard)
+  @Post('cart/pay')
+  async payCart(
+    @Body() dto: CartPayDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.paymentsService.createPaymentForCart(
+      dto.orderIds,
+      req.user.userId,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

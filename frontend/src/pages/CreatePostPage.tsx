@@ -75,6 +75,7 @@ export default function CreatePostPage() {
         title: form.title,
         content: form.content,
         link: form.link || undefined,
+        // Видео — только загрузкой файла (ссылок нет).
         videoUrl: videoUrl || undefined,
         media: uploadedUrls.length > 0 ? uploadedUrls : undefined,
       });
@@ -133,37 +134,68 @@ export default function CreatePostPage() {
           />
         </div>
 
-        {/* Видео */}
-        <div>
-          <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Видео</label>
-          {videoFile || videoUrl ? (
-            <div className="rounded-xl overflow-hidden border border-[var(--color-border)] mb-2 relative">
-              {videoPreview ? (
-                <video src={videoPreview} controls playsInline className="w-full max-h-64 bg-black" />
-              ) : (
-                <div className="w-full h-40 flex items-center justify-center bg-[var(--bg-3)] text-sm text-[var(--color-muted)]">
-                  {videoUploading ? 'Загружаем...' : 'Видео загружено'}
-                </div>
-              )}
+        {/* ЕДИНЫЙ БЛОК МЕДИА: видео первым, фото после. Не отдельные блоки. */}
+        <div className="rounded-2xl border border-[var(--color-border)] p-4">
+          <label className="block text-sm font-medium text-[var(--color-muted)] mb-1">Медиа</label>
+          <p className="text-[11px] text-[var(--color-faint)] mb-3">Видео встанет первым, фотографии — после него.</p>
+
+          <div className="flex flex-wrap gap-2 mb-3">
+            {/* Видео — первый элемент общего ряда */}
+            {videoFile || videoUrl ? (
+              <div className="relative w-24 h-24 rounded-xl overflow-hidden border border-[var(--color-border)] bg-black">
+                {videoPreview ? (
+                  <video src={videoPreview} muted playsInline className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[10px] text-[var(--color-muted)] text-center px-1">
+                    {videoUploading ? 'Загружаем…' : 'Видео'}
+                  </div>
+                )}
+                <span className="absolute bottom-0 left-0 right-0 text-[9px] font-bold uppercase text-center text-white bg-black/60 py-0.5">Видео · 1-е</span>
+                <button
+                  type="button"
+                  onClick={removeVideo}
+                  aria-label="Убрать видео"
+                  className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-black/80"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
-                onClick={removeVideo}
-                className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-black/80"
+                onClick={() => videoInputRef.current?.click()}
+                disabled={videoUploading}
+                className="w-24 h-24 rounded-xl border border-dashed border-[var(--color-border)] text-[#22c55e] text-[11px] font-medium hover:border-[#22c55e]/50 transition-colors disabled:opacity-50 flex flex-col items-center justify-center gap-1"
               >
-                <X size={14} />
+                <Video size={18} />
+                {videoUploading ? 'Загружаем…' : 'Видео'}
               </button>
-            </div>
-          ) : (
+            )}
+
+            {previews.map((src, idx) => (
+              <div key={idx} className="relative w-24 h-24 rounded-xl overflow-hidden border border-[var(--color-border)]">
+                <img src={src} alt={`preview ${idx}`} className="w-full h-full object-cover" loading="eager" decoding="async" />
+                <button
+                  type="button"
+                  onClick={() => removeFile(idx)}
+                  aria-label={`Убрать фото ${idx + 1}`}
+                  className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-black/80"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+
             <button
               type="button"
-              onClick={() => videoInputRef.current?.click()}
-              disabled={videoUploading}
-              className="tap-link items-center gap-2 px-4 rounded-xl border border-dashed border-[var(--color-border)] text-[#22c55e] text-sm font-medium hover:border-[#22c55e]/50 transition-colors disabled:opacity-50"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-24 h-24 rounded-xl border border-dashed border-[var(--color-border)] text-[#22c55e] text-[11px] font-medium hover:border-[#22c55e]/50 transition-colors flex flex-col items-center justify-center gap-1"
             >
-              <Video size={16} />
-              {videoUploading ? 'Загружаем видео...' : 'Загрузить видео'}
+              <ImagePlus size={18} />
+              Фото
             </button>
-          )}
+          </div>
+
           <input
             ref={videoInputRef}
             type="file"
@@ -171,26 +203,8 @@ export default function CreatePostPage() {
             onChange={handleVideoChange}
             className="hidden"
           />
-          <p className="text-[11px] text-[var(--color-faint)] mt-1">mp4, webm, mov или mkv, до 100 МБ</p>
-        </div>
-
-        {/* Фото */}
-        <div>
-          <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Изображения</label>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {previews.map((src, idx) => (
-              <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-[var(--color-border)]">
-                <img src={src} alt={`preview ${idx}`} className="w-full h-full object-cover" />
-                <button type="button" onClick={() => removeFile(idx)} className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-black/80">
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="tap-link items-center gap-2 px-4 rounded-xl border border-dashed border-[var(--color-border)] text-[#22c55e] text-sm font-medium hover:border-[#22c55e]/50 transition-colors">
-            <ImagePlus size={16} /> Добавить фото
-          </button>
           <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileChange} className="hidden" />
+          <p className="text-[11px] text-[var(--color-faint)]">Видео: mp4, webm, mov, mkv, до 100 МБ. Фото: до 5 МБ каждое.</p>
         </div>
 
         {error && <p className="text-sm text-red-400 bg-red-400/5 rounded-xl px-4 py-2.5">{error}</p>}

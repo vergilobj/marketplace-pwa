@@ -6,6 +6,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { LedgerService } from './ledger.service';
 import { PaymentsService } from './payments.service';
 import { fromRaw } from './money.util';
+import { readCartPayload } from './cart.util';
 
 /**
  * Обработчик события deposit от paymod sidecar (§6 ТЗ, этап 5).
@@ -127,6 +128,12 @@ export class PaymodWebhookHandler {
     const prev = this.prevReceived(transaction.payload);
     const totalReceived = prev + received;
 
+    // A3: корзина ли это? (один депозит на N заказов). null — обычный заказ.
+    // Читается ДО сверки суммы: при недоплате уведомление и алерт должны
+    // показывать сумму ВСЕЙ корзины, а не якорного заказа. Чистая функция
+    // (cart.util) — моки PaymentsService в юнит-тестах остаются валидными.
+    const cart = readCartPayload(transaction.payload);
+
     const tolerancePct = await this.tolerancePercent();
     // Допуск = max(relative%, 0.01 USDT) — на дешёвых товарах 1% был бы
     // «сойдёт и половина суммы» (§6.4).
@@ -167,12 +174,18 @@ export class PaymodWebhookHandler {
         await this.notifySafely(
           transaction.order.buyerId,
           'order',
-          `Недоплата: пришло ${fromRaw(totalReceived, decimals)}, нужно ${transaction.amount} USDT. Дошлите остаток.`,
+          `Недоплата: пришло ${fromRaw(totalReceived, decimals)}, нужно ${
+            cart ? cart.total : transaction.amount
+          } USDT. Дошлите остаток.`,
           transaction.orderId,
         );
       }
       this.logger.error(
-        `ALERT UNDERPAID: заказ ${transaction.orderId}, ждали ${transaction.amount}, пришло ${fromRaw(totalReceived, decimals)}`,
+        `ALERT UNDERPAID: ${
+          cart ? 'корзина' : 'заказ'
+        } ${transaction.orderId}, ждали ${
+          cart ? cart.total : transaction.amount
+        }, пришло ${fromRaw(totalReceived, decimals)}`,
       );
       return;
     }
@@ -180,6 +193,51 @@ export class PaymodWebhookHandler {
     // ---- ПЕРЕПЛАТА / ТОЧНАЯ ОПЛАТА ----
     const overpay = totalReceived - expected;
     const isOverpaid = overpay > 0n;
+
+    // ===== A3: КОРЗИНА — один депозит раскладывается по N заказам =====
+    //
+    // Каждый заказ холдится отдельно на свой amount (инвариант
+    // platformFee+referral+net===amount не трогается). Здесь только фиксируем
+    // факт подтверждения Transaction — деньги уже разнесены.
+    if (cart) {
+      await this.paymentsService.processSuccessfulCartPayment(
+        cart.orderIds,
+        totalReceived,
+        decimals,
+      );
+
+      await this.prisma.transaction.update({
+        where: { id: transaction.id },
+        data: {
+          status: isOverpaid
+            ? TransactionStatus.OVERPAID
+            : TransactionStatus.CONFIRMED,
+          txHash,
+          amountRaw: totalReceived.toString(),
+          expectedAmountRaw: expected.toString(),
+          receivedAmountRaw: totalReceived.toString(),
+          confirmations: this.readConfirmations(body),
+          confirmedAt: new Date(),
+          mismatchReason: null,
+          payload: this.mergePayload(transaction.payload, {
+            underpaid: false,
+            overpaid: isOverpaid,
+            expectedRaw: expected.toString(),
+            receivedRaw: totalReceived.toString(),
+            lastTxHash: txHash,
+            checkedAt: new Date().toISOString(),
+            hashes: this.appendHash(transaction.payload, txHash),
+          }),
+        },
+      });
+
+      this.logger.log(
+        `CART deposit processed: client_ref=${clientRef} tx=${txHash} ` +
+          `orders=${cart.orderIds.length}` +
+          (isOverpaid ? ' (OVERPAID)' : ''),
+      );
+      return;
+    }
 
     // §5.4: заказ в терминальном статусе (CANCELLED/REFUNDED) — депозит
     // пришёл после отмены. Молча терять чужие деньги нельзя.

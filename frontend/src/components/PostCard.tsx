@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, MoreHorizontal, Megaphone, ExternalLink, Trash2, Edit3 } from 'lucide-react';
+import { Heart, MessageCircle, MoreHorizontal, Megaphone, ExternalLink, Trash2, Edit3, Play } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useAuth } from '../hooks/useAuth';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { isInternalVideo } from '../api/upload';
 import { resolveMedia } from '../utils/media';
+import { buildGallery } from '../utils/video';
 import Badge from './ui/Badge';
 import type { ApiPost } from '../api/types';
 
@@ -33,7 +33,13 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
     } catch { toast.error('Не удалось'); }
   };
 
-  const media = Array.isArray(post.media) ? post.media : typeof post.media === 'string' ? [post.media] : [];
+  // Единая галерея: видео первым слайдом, фото после.
+  const gallery = useMemo(
+    () => buildGallery(post.media as string[] | string | null, post.videoUrl),
+    [post.media, post.videoUrl],
+  );
+  const first = gallery[0] || null;
+  const extraCount = gallery.length - 1;
   const time = post.createdAt ? format(new Date(post.createdAt), 'd MMM, HH:mm', { locale: ru }) : '';
 
   return (
@@ -73,22 +79,38 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
       <div className="px-3.5 pb-3.5">
         <h2 className="text-[15px] font-semibold mb-1.5 line-clamp-2 text-[var(--color-text)]">{post.title}</h2>
         {post.content && <p className="text-[13px] text-[var(--color-muted)] line-clamp-3 mb-2.5 leading-relaxed">{post.content}</p>}
-        {isInternalVideo(post.videoUrl) && (
-          <div className="rounded-lg overflow-hidden mb-2.5 bg-black">
-            <video
-              src={resolveMedia(post.videoUrl)}
-              controls
-              playsInline
-              preload="metadata"
-              className="w-full h-48 object-contain"
-            />
+
+        {first && (
+          <div className="relative rounded-lg overflow-hidden mb-2.5 bg-black">
+            {first.type === 'video' ? (
+              <video
+                src={resolveMedia(first.src)}
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full h-48 object-contain bg-black"
+              />
+            ) : first.type === 'embed' ? (
+              <div className="relative w-full h-48 bg-black flex items-center justify-center">
+                <Play size={32} className="text-white/70" />
+              </div>
+            ) : (
+              <img
+                src={resolveMedia(first.src)}
+                alt={post.title}
+                className="w-full h-48 object-cover"
+                loading="eager"
+                decoding="async"
+              />
+            )}
+            {extraCount > 0 && (
+              <span className="absolute bottom-2 right-2 text-[11px] font-semibold text-white bg-black/60 rounded-full px-2 py-0.5">
+                +{extraCount}
+              </span>
+            )}
           </div>
         )}
-        {media.length > 0 && (
-          <div className="rounded-lg overflow-hidden mb-2.5">
-            <img src={media[0]} alt={post.title} className="w-full h-48 object-cover" loading="lazy" />
-          </div>
-        )}
+
         {post.link && (
           <a href={post.link} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-1 text-xs text-[#22c55e] font-medium">
             <ExternalLink size={12} /> Ссылка

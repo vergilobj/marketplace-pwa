@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -63,7 +68,10 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, dto: UpdateUserDto) {
-    const updated = await this.prisma.user.update({ where: { id: userId }, data: dto });
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: dto,
+    });
     await this.auditService.log({
       userId,
       action: 'profile_updated',
@@ -131,9 +139,7 @@ export class UsersService {
         { screen: 'balance' },
       );
     } catch (err) {
-      this.logger.warn(
-        `Referral push for ${userId} failed: ${err.message}`,
-      );
+      this.logger.warn(`Referral push for ${userId} failed: ${err.message}`);
     }
   }
 
@@ -185,7 +191,7 @@ export class UsersService {
     const user = await this.findById(userId, {
       availableBalance: true,
       bonusBalance: true,
-    } as Prisma.UserSelect);
+    });
     return {
       availableBalance: balances.availableBalance,
       bonusBalance: balances.bonusBalance,
@@ -232,9 +238,7 @@ export class UsersService {
     const minAmount = await this.settings.getFloat('withdrawal_min_amount');
     const min = minAmount > 0 ? minAmount : 10;
     if (amount < min) {
-      throw new BadRequestException(
-        `Минимальная сумма вывода — ${min} USDT`,
-      );
+      throw new BadRequestException(`Минимальная сумма вывода — ${min} USDT`);
     }
 
     // Валидация BSC-адреса: 0x + 40 hex.
@@ -410,7 +414,8 @@ export class UsersService {
         data: {
           status: 'pending',
           payoutStatus: 'FAILED',
-          payoutError: 'ledger debit not applied (duplicate refKey), payout aborted',
+          payoutError:
+            'ledger debit not applied (duplicate refKey), payout aborted',
         },
       });
       throw new BadRequestException(
@@ -579,12 +584,18 @@ export class UsersService {
     });
   }
 
-  private async notifySafely(userId: string, type: string, message: string) {
+  private async notifySafely(
+    userId: string,
+    type: string,
+    message: string,
+    relatedId?: string,
+  ) {
     try {
       await this.notificationsService.createNotification(
         userId,
         type,
         message,
+        relatedId,
       );
     } catch (err) {
       this.logger.warn(`Notification to ${userId} failed: ${err.message}`);
@@ -603,8 +614,165 @@ export class UsersService {
     });
   }
 
+  // ================== A4: заявка «Стать продавцом» ==================
+
+  /** Уведомить всех админов (внутреннее уведомление в БД). Ошибки не валят флоу. */
+  private async notifyAdmins(
+    type: string,
+    message: string,
+    relatedId?: string,
+  ) {
+    try {
+      const admins = await this.prisma.user.findMany({
+        where: { role: UserRole.ADMIN },
+        select: { id: true },
+      });
+      await Promise.all(
+        admins.map((a) =>
+          this.notificationsService.createNotification(
+            a.id,
+            type,
+            message,
+            relatedId,
+          ),
+        ),
+      );
+    } catch (err) {
+      this.logger.warn(`notifyAdmins failed: ${err.message}`);
+    }
+  }
+
   /**
-   * Самостоятельная смена роли BUYER → SELLER.
+   * A4: создать заявку на продавца. Роль НЕ меняется — ждёт модерации админа.
+   * Повторная подача после REJECTED разрешена (заявка переоткрывается).
+   */
+  async createSellerRequest(userId: string) {
+    const user = await this.findById(userId);
+    if (!user) throw new NotFoundException('Пользователь не найден');
+
+    if (user.role !== UserRole.BUYER) {
+      // Уже продавец/админ — заявка не нужна, роль не понижаем.
+      return { status: 'APPROVED', alreadySeller: true };
+    }
+
+    const existing = await this.prisma.sellerRequest.findUnique({
+      where: { userId },
+    });
+    if (existing?.status === 'PENDING') {
+      throw new BadRequestException('Заявка уже на рассмотрении');
+    }
+
+    const request = existing
+      ? await this.prisma.sellerRequest.update({
+          where: { userId },
+          data: {
+            status: 'PENDING',
+            note: null,
+            reviewedAt: null,
+            reviewedBy: null,
+            createdAt: new Date(),
+          },
+        })
+      : await this.prisma.sellerRequest.create({ data: { userId } });
+
+    await this.auditService.log({
+      userId,
+      action: 'seller_request_created',
+      entity: 'seller_request',
+      entityId: request.id,
+    });
+
+    await this.notifyAdmins(
+      'seller_request',
+      `Новая заявка на продавца: ${user.name || user.phone}`,
+      request.id,
+    );
+
+    return request;
+  }
+
+  /** A4: своя заявка (для профиля). null — заявки не было. */
+  async getMySellerRequest(userId: string) {
+    const request = await this.prisma.sellerRequest.findUnique({
+      where: { userId },
+    });
+    if (!request) return { status: null };
+    return request;
+  }
+
+  /** A4: список заявок для админки (опционально фильтр по статусу). */
+  async getSellerRequests(status?: string) {
+    return this.prisma.sellerRequest.findMany({
+      where: status ? { status } : undefined,
+      include: {
+        user: {
+          select: { id: true, name: true, phone: true, role: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * A4: решение админа по заявке.
+   * APPROVED → роль BUYER становится SELLER + уведомление юзеру.
+   * REJECTED → роль не меняется, юзер может подать заново.
+   */
+  async reviewSellerRequest(
+    id: string,
+    adminId: string,
+    approve: boolean,
+    note?: string,
+  ) {
+    const request = await this.prisma.sellerRequest.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+    if (!request) throw new NotFoundException('Заявка не найдена');
+    if (request.status !== 'PENDING') {
+      throw new BadRequestException('Заявка уже рассмотрена');
+    }
+
+    const status = approve ? 'APPROVED' : 'REJECTED';
+    const updated = await this.prisma.sellerRequest.update({
+      where: { id },
+      data: {
+        status,
+        note: note || null,
+        reviewedAt: new Date(),
+        reviewedBy: adminId,
+      },
+    });
+
+    if (approve && request.user.role === UserRole.BUYER) {
+      await this.prisma.user.update({
+        where: { id: request.userId },
+        data: { role: UserRole.SELLER },
+      });
+    }
+
+    await this.auditService.log({
+      userId: adminId,
+      action: approve ? 'seller_request_approved' : 'seller_request_rejected',
+      entity: 'seller_request',
+      entityId: id,
+      metadata: { applicantId: request.userId, note: note || null },
+    });
+
+    await this.notifySafely(
+      request.userId,
+      'seller_request',
+      approve
+        ? 'Заявка на продавца одобрена — теперь вы можете продавать'
+        : `Заявка на продавца отклонена${note ? `: ${note}` : ''}`,
+      id,
+    );
+
+    return updated;
+  }
+
+  /**
+   * Смена роли BUYER → SELLER. A4: только если заявка одобрена админом.
    * SELLER/ADMIN не понижаем — возвращаем как есть (идемпотентно).
    */
   async becomeSeller(userId: string) {
@@ -614,6 +782,15 @@ export class UsersService {
     if (user.role !== UserRole.BUYER) {
       const { passwordHash: _ph, ...rest } = user;
       return rest;
+    }
+
+    const request = await this.prisma.sellerRequest.findUnique({
+      where: { userId },
+    });
+    if (!request || request.status !== 'APPROVED') {
+      throw new BadRequestException(
+        'Сначала подайте заявку и дождитесь одобрения админа',
+      );
     }
 
     const updated = await this.prisma.user.update({
