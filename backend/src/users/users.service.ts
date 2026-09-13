@@ -24,6 +24,24 @@ import {
 } from '../common/dto/pagination.dto';
 
 /**
+ * FIX-CRIT: публичный набор полей User — то, что МОЖНО отдавать клиенту.
+ *
+ * Сознательно НЕ входит: `passwordHash` (bcrypt-хеш), `walletAddress`,
+ * `cometChatUid`, `bazarSessionKey`, `invitedById`, `bonusBalance`,
+ * `referralCode`, `trustScore`.
+ *
+ * Ранее `GET /api/users/search` отдавал объект User целиком.
+ * Страховка второго уровня — глобальный `omit` в `PrismaService`.
+ */
+export const PUBLIC_USER_SELECT = {
+  id: true,
+  phone: true,
+  name: true,
+  role: true,
+  avatar: true,
+} satisfies Prisma.UserSelect;
+
+/**
  * F3: исход read-only проверки состояния выплаты по idempotency_key.
  *
  *   'recovered' — sidecar подтверждает запись выплаты (не failed/error):
@@ -64,10 +82,6 @@ export class UsersService {
 
   async findById(id: string, select?: Prisma.UserSelect) {
     return this.prisma.user.findUnique({ where: { id }, select });
-  }
-
-  async findByPhone(phone: string) {
-    return this.prisma.user.findUnique({ where: { phone } });
   }
 
   async findAll(params: { page?: number; limit?: number; search?: string }) {

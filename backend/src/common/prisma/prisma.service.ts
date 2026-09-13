@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { resolveTestDatabaseUrl } from './test-db-env';
 
 /**
@@ -9,6 +9,23 @@ import { resolveTestDatabaseUrl } from './test-db-env';
  * URL передаётся явным `datasources.db.url` — `process.env.DATABASE_URL`
  * НЕ перезаписывается, поэтому боевой бут и ad-hoc скрипты работают как
  * раньше. См. `test-db-env.ts` (правила и предупреждения).
+ *
+ * SECURITY (FIX-CRIT): глобальный `omit` для `User.passwordHash`.
+ *
+ * Раньше `prisma.user.findUnique({ where: { phone } })` без `select`
+ * возвращал ВСЮ строку, и `GET /api/users/search` отдавал bcrypt-хеш
+ * любого пользователя (включая ADMIN) любому авторизованному — утечка
+ * подтверждена живьём на проде.
+ *
+ * Теперь `passwordHash` вырезается на уровне клиента: он не может утечь
+ * из НИ ОДНОГО запроса, даже если кто-то забудет `select`. Явные
+ * `select` без `passwordHash` работают как раньше (omit + select
+ * взаимно дополняются: omit применяется к результату select).
+ *
+ * Места, которым хеш РЕАЛЬНО нужен (проверка пароля в `AuthService`),
+ * запрашивают его обратно через `omit: { passwordHash: false }`.
+ *
+ * Требует Prisma >= 5.16 (здесь 6.19.3).
  */
 @Injectable()
 export class PrismaService
@@ -17,11 +34,16 @@ export class PrismaService
 {
   constructor() {
     const resolved = resolveTestDatabaseUrl();
-    super(
-      resolved.mode === 'test-db' && resolved.url
-        ? { datasources: { db: { url: resolved.url } } }
-        : undefined,
-    );
+
+    const options: Prisma.PrismaClientOptions = {
+      omit: { user: { passwordHash: true } },
+    };
+
+    if (resolved.mode === 'test-db' && resolved.url) {
+      options.datasources = { db: { url: resolved.url } };
+    }
+
+    super(options);
   }
 
   async onModuleInit() {

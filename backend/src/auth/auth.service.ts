@@ -80,8 +80,11 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    // FIX-CRIT: глобальный `omit` в PrismaService по умолчанию вырезает
+    // `passwordHash`. Здесь он НУЖЕН для bcrypt.compare → запрашиваем явно.
     const user = await this.prisma.user.findUnique({
       where: { phone: dto.phone },
+      omit: { passwordHash: false },
     });
 
     // Constant-time check to prevent user enumeration

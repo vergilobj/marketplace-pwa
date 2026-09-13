@@ -108,30 +108,21 @@ export class UsersController {
   }
 
   /**
-   * @deprecated B13: отдаёт phone по номеру — оставлено как есть (вне скоупа L1).
+   * @deprecated B13 — УДАЛЁН в рамках FIX-CRIT (2026-09-13).
    *
-   * PD-FIX-2: читаем ОБА параметра — `phone` и `q`.
+   * `GET /users/search` возвращал объект User целиком (`findByPhone` без
+   * `select`) — включая `passwordHash`, `walletAddress`, `referralCode`,
+   * `bonusBalance`, `cometChatUid`. Подтверждено живьём на проде: любой
+   * авторизованный BUYER перебором телефонов выкачивал bcrypt-хеши всех
+   * пользователей, включая ADMIN.
    *
-   * Раньше контроллер брал только `phone`. Запрос фронта/мониторинга вида
-   * `GET /api/users/search?q=test` давал `phone === undefined`, и Prisma падала
-   * с PrismaClientValidationError → 500 (`where { phone: undefined }`).
-   * Теперь: нет ни `phone`, ни `q` → 400 (а не 500), иначе ищем по номеру.
+   * Потребителей не было: `grep -rn "users/search" frontend/src` пусто,
+   * e2e-спек на роут нет. Роут был доступен любому авторизованному и не
+   * использовался ни фронтом, ни мониторингом → удалён целиком, а не
+   * закрыт ADMIN-гардом (меньше поверхности атаки, нет «мёртвого» кода).
    *
-   * ⚠️ Публичный контракт не расширяем: по-прежнему принимаем номер телефона
-   * (этот эндпоинт и был «поиск по номеру»), `q` — алиас для совместимости.
+   * См. /tmp/forge/20260913_audit/FIX-CRIT/report.md
    */
-  @UseGuards(JwtAuthGuard)
-  @Get('search')
-  async searchByPhone(
-    @Query('phone') phone?: string,
-    @Query('q') q?: string,
-  ) {
-    const value = phone ?? q;
-    if (!value || !String(value).trim()) {
-      throw new BadRequestException('Укажите phone или q');
-    }
-    return this.usersService.findByPhone(String(value).trim());
-  }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')

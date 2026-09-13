@@ -69,6 +69,7 @@ export const ALL_TEST_PHONE_PREFIXES = [
   'l1-cancel-', // l1-cancel-expired.integration.spec.ts
   'e2e-', // scripts/money-e2e.ts
   'alert-', // scripts/verify-money-alerts.js
+  'fixcrit-', // users-search-leak.integration.spec.ts (FIX-CRIT regression)
 ];
 
 /**
