@@ -46,7 +46,7 @@ export default function ReferralsPage() {
           </div>
           <div className="flex items-center gap-2 max-w-xs mx-auto">
             <div className="flex-1 rounded-xl px-4 py-3 text-center font-mono text-lg font-bold text-[#22c55e] bg-[var(--bg-3)] border border-[var(--color-border)]">{profile?.referralCode||'—'}</div>
-            <button onClick={copyCode} className={`inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-3 rounded-full transition-all ${copied ? 'bg-[#22c55e] text-[#0d1512]' : 'bg-[#22c55e] text-[#0d1512] hover:bg-[#16a34a]'} shadow-[0_8px_24px_rgba(34,197,94,0.4)]`}>
+            <button onClick={copyCode} aria-label="Скопировать реферальный код" title="Скопировать реферальный код" className={`inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-3 rounded-full transition-all ${copied ? 'bg-[#22c55e] text-[#0d1512]' : 'bg-[#22c55e] text-[#0d1512] hover:bg-[#16a34a]'} shadow-[0_8px_24px_rgba(34,197,94,0.4)]`}>
               {copied ? <Check size={16}/> : <Copy size={16}/>}
             </button>
           </div>

@@ -6,6 +6,7 @@ import { bazarDeals, DEAL_STATUS_RU } from '../api/bazar';
 import type { BazarDeal } from '../api/bazar';
 import { resolveMedia } from '../utils/media';
 import { formatPrice } from '../utils/format';
+import ErrorState from '../components/ui/ErrorState';
 
 const fmt = (s?: string | null) => {
   if (!s) return '';
@@ -36,6 +37,8 @@ export default function LeadsPage() {
     hasMore,
     loadMore,
     loaderRef,
+    error,
+    reload,
   } = usePaginatedList<BazarDeal>(
     ({ page, limit }) => bazarDeals('seller', { page, limit }),
     LEADS_PAGE_SIZE,
@@ -57,7 +60,14 @@ export default function LeadsPage() {
       <h1 className="text-2xl font-bold text-white mb-1">Лиды</h1>
       <p className="text-sm text-[var(--color-muted)] mb-6">Входящие заявки покупателей по вашим товарам</p>
 
-      {!loading && deals.length === 0 ? (
+      {!loading && deals.length === 0 && error ? (
+        /* HIGH-1: сбой загрузки — это НЕ «нет лидов». */
+        <ErrorState
+          message={error}
+          description="Не получилось загрузить заявки. Проверь связь и попробуй ещё раз."
+          onRetry={reload}
+        />
+      ) : !loading && deals.length === 0 ? (
         <div
           className="rounded-3xl py-16 text-center"
           style={{ background: '#0d1210', border: '1px solid rgba(34,197,94,0.12)' }}

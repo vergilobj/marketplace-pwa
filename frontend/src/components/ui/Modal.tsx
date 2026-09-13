@@ -15,7 +15,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md', s
   return (
     <div className="modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={closeOnOverlay ? onClose : undefined}>
       <div className={`modal-content ${sizes[size]} w-full glass-strong rounded-3xl shadow-2xl shadow-black/10 overflow-hidden`} onClick={e => e.stopPropagation()}>
-        {(title || showClose) && <div className="flex items-center justify-between px-6 pt-6 pb-2">{title && <h2 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h2>}{showClose && <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 ml-auto"><X size={18} /></button>}</div>}
+        {(title || showClose) && <div className="flex items-center justify-between px-6 pt-6 pb-2">{title && <h2 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h2>}{showClose && <button onClick={onClose} aria-label="Закрыть" title="Закрыть" className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 ml-auto"><X size={18} /></button>}</div>}
         <div className="p-6 pt-2">{children}</div>
       </div>
     </div>

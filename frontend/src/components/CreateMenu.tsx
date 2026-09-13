@@ -43,6 +43,7 @@ export function CreateMenu({ variant = 'icon', className = '', label = 'Созд
       <button
         type="button"
         title="Создать"
+        aria-label="Создать"
         onClick={() => setOpen(true)}
         data-create-menu="nav"
         className={`flex flex-col items-center justify-center shrink-0 min-h-[44px] text-[#0b0e0d] ${className}`}
@@ -68,6 +69,7 @@ export function CreateMenu({ variant = 'icon', className = '', label = 'Созд
       <button
         type="button"
         title="Создать"
+        aria-label="Создать"
         onClick={() => setOpen(true)}
         data-create-menu="icon"
         className={`w-11 h-11 rounded-full bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.08)] text-[var(--color-muted)] hover:text-[#22c55e] transition-colors flex items-center justify-center ${className}`}

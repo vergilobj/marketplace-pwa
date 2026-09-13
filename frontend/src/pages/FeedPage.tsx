@@ -18,6 +18,9 @@ import { mergeUniqueById } from '../utils/mergeUnique';
 import { readFeedCache, writeFeedCache } from './feedCache';
 import type { ApiPost, ApiProduct } from '../api/types';
 import { FeedSkeleton } from '../components/ui/Skeleton';
+import ErrorState from '../components/ui/ErrorState';
+import { useListError } from '../hooks/useListError';
+import { errorMessage } from '../utils/error';
 import { consumeAccessDenied, showAccessDeniedToast } from '../components/accessDeniedNotice';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
@@ -82,6 +85,8 @@ export default function FeedPage() {
     if (denied) showAccessDeniedToast(denied);
   }, []);
   const [search, setSearch] = useState(() => sp.get('search') || '');
+  // HIGH-1: сетевой сбой → ErrorState с «Повторить», а не «Пока тихо».
+  const { error, setError, retryKey, errorProps } = useListError();
   // R10: поиск уходит на сервер с дебаунсом, а не фильтрует 20 загруженных записей
   const debouncedSearch = useDebounced(search, 300);
   const loaderRef = useRef<HTMLDivElement>(null);
@@ -109,9 +114,14 @@ export default function FeedPage() {
         setHasMoreProducts(prodRes.page < prodRes.pages);
         setPostsPage(2);
         setProductsPage(2);
+        setError('');
       })
       .catch((e) => {
-        console.error('Failed to load feed', e);
+        if (cancelled) return;
+        // HIGH-1: было только console.error — лента выглядела пустой.
+        setPosts([]);
+        setProducts([]);
+        setError(errorMessage(e, 'Не удалось загрузить ленту'));
       })
       .finally(() => {
         // Набор помечается обработанным даже при ошибке — иначе скелетон зависнет.
@@ -120,7 +130,7 @@ export default function FeedPage() {
     return () => {
       cancelled = true;
     };
-  }, [sort, debouncedSearch]);
+  }, [sort, debouncedSearch, retryKey, setError]);
 
   // Восстановление скролла после рендера
   useEffect(() => {
@@ -162,11 +172,11 @@ export default function FeedPage() {
         setProductsPage(p => p + 1);
       }
     } catch (e) {
-      console.error('Failed to load more', e);
+      setError(errorMessage(e, 'Не удалось догрузить ленту'));
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, activeTab, sort, postsPage, productsPage, hasMorePosts, hasMoreProducts, debouncedSearch]);
+  }, [loadingMore, activeTab, sort, postsPage, productsPage, hasMorePosts, hasMoreProducts, debouncedSearch, setError]);
 
   useEffect(() => {
     const el = loaderRef.current;
@@ -369,6 +379,10 @@ export default function FeedPage() {
             Раньше был ряд div'ов h-16 на реальную карточку ~350px → CLS 0.108. */}
         {loading ? (
           <FeedSkeleton count={4} />
+        ) : error && items.length === 0 ? (
+          /* HIGH-1: сбой сети/сервера — это НЕ «пока тихо». Показываем только
+             когда лента пуста: ошибка догрузки не должна стирать загруженное. */
+          <ErrorState {...errorProps} />
         ) : items.length === 0 ? (
           <div className="text-center py-24">
             <div className="text-[var(--color-faint)] text-sm">
@@ -408,7 +422,7 @@ export default function FeedPage() {
 
                         {/* Инфо + кнопка */}
                         <div className="p-3.5">
-                          <div className="text-[15px] font-bold text-[var(--color-text)] leading-snug group-hover:text-[#22c55e] transition-colors">{item.title}</div>
+                          <div className="text-[15px] font-bold text-[var(--color-text)] leading-snug group-hover:text-[#22c55e] transition-colors" title={item.title}>{item.title}</div>
                           <div className="text-[11px] text-[var(--color-muted)] mt-0.5">{item.seller?.name}</div>
                           {item.description && (
                             <div className="text-[12px] text-[var(--color-muted)] line-clamp-2 mt-1.5">{item.description}</div>
@@ -444,7 +458,7 @@ export default function FeedPage() {
                       {item.media?.[0] ? <img src={resolveMedia(item.media[0])} alt={item.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width={56} height={56} /> : <ShoppingBagIcon />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-[var(--color-text)] truncate group-hover:text-[#22c55e] transition-colors">{item.title}</div>
+                      <div className="text-sm font-semibold text-[var(--color-text)] truncate group-hover:text-[#22c55e] transition-colors" title={item.title}>{item.title}</div>
                       <div className="text-[11px] text-[var(--color-muted)] truncate">{item.seller?.name}</div>
                     </div>
                     <div className="text-sm font-bold text-[#22c55e] whitespace-nowrap">{formatPrice(item.price)}</div>
@@ -467,7 +481,7 @@ export default function FeedPage() {
                     <span className="text-xs text-[var(--color-muted)]">{item.author?.name || item.adOwner?.name || 'Аноним'}</span>
                     {item.isAd && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#22c55e] text-[#0d1512] text-[9px] font-extrabold uppercase tracking-wide shadow-[0_0_12px_rgba(34,197,94,0.4)]">Реклама</span>}
                   </div>
-                  <div className="text-[15px] font-bold text-[var(--color-text)] group-hover:text-[#22c55e] transition-colors">{item.title}</div>
+                  <div className="text-[15px] font-bold text-[var(--color-text)] group-hover:text-[#22c55e] transition-colors" title={item.title}>{item.title}</div>
                   {item.content && <div className="text-[12px] text-[var(--color-muted)] line-clamp-2 mt-1">{item.content}</div>}
 
                   {/* Фото поста — карусель на всю ширину */}
@@ -476,11 +490,11 @@ export default function FeedPage() {
                   )}
 
                   <div className="flex items-center gap-2 mt-2.5">
-                    <button onClick={(e) => togglePostLike(item, e)} className={`flex items-center justify-center gap-1.5 px-2.5 min-h-[44px] min-w-[44px] rounded-lg text-xs font-medium transition-colors ${item.likedByMe ? 'text-[#22c55e] bg-[rgba(34,197,94,0.1)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)]'}`}>
+                    <button onClick={(e) => togglePostLike(item, e)} aria-label={item.likedByMe ? 'Убрать лайк' : 'Поставить лайк'} title={item.likedByMe ? 'Убрать лайк' : 'Поставить лайк'} className={`flex items-center justify-center gap-1.5 px-2.5 min-h-[44px] min-w-[44px] rounded-lg text-xs font-medium transition-colors ${item.likedByMe ? 'text-[#22c55e] bg-[rgba(34,197,94,0.1)]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)]'}`}>
                       <Heart size={14} fill={item.likedByMe ? 'currentColor' : 'none'} />
                       {(item.likeCount ?? 0) > 0 && item.likeCount}
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); saveScrollAndNavigate(`/posts/${item.id}`); }} className="flex items-center justify-center gap-1.5 px-2.5 min-h-[44px] min-w-[44px] rounded-lg text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] transition-colors">
+                    <button onClick={(e) => { e.stopPropagation(); saveScrollAndNavigate(`/posts/${item.id}`); }} aria-label="Открыть комментарии" title="Открыть комментарии" className="flex items-center justify-center gap-1.5 px-2.5 min-h-[44px] min-w-[44px] rounded-lg text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] transition-colors">
                       <MessageCircle size={14} />
                       {(item.commentCount ?? 0) > 0 && item.commentCount}
                     </button>

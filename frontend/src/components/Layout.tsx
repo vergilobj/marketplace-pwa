@@ -122,7 +122,7 @@ export default function Layout() {
                 <DesktopIcon to="/notifications" title="Уведомления">
                   <Bell size={18} />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 badge-count text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                    <span className="absolute -top-0.5 -right-0.5 badge-count text-[11px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>
                   )}
                 </DesktopIcon>
                 <DesktopIcon to="/profile" title="Профиль"><User size={18} /></DesktopIcon>
@@ -135,6 +135,7 @@ export default function Layout() {
             onClick={() => setSearchOpen(!searchOpen)}
             tabIndex={searchOpen ? -1 : 0}
             aria-hidden={searchOpen}
+            aria-label="Поиск"
             className={`shrink-0 ml-auto sm:ml-0 w-11 h-11 rounded-full flex items-center justify-center transition-colors ${searchOpen ? 'opacity-0 pointer-events-none' : ''} bg-[rgba(255,255,255,0.04)] text-[var(--color-muted)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[#22c55e]`}
             title="Поиск"
           >
@@ -172,7 +173,7 @@ export default function Layout() {
           </nav>
         </div>
 
-        <div className="max-w-5xl mx-auto mt-8 pt-6 border-t border-[rgba(255,255,255,0.05)] flex items-center justify-between text-[11px] text-[var(--color-faint)]">
+        <div className="max-w-5xl mx-auto mt-8 pt-6 border-t border-[rgba(255,255,255,0.05)] flex items-center justify-between text-[12px] text-[var(--color-faint)]">
           <span>2026 Базар</span>
           <span>support@bazar.ru</span>
         </div>
@@ -184,7 +185,7 @@ export default function Layout() {
       >
         <MobileTab to="/" icon={<Home size={20} />} label="Главная" pathname={location.pathname} />
         <MobileTab to="/bazar" icon={<Sparkles size={20} />} label="Базар" pathname={location.pathname} />
-        <MobileTab to="/favorites" icon={<Heart size={20} />} label="Избран." pathname={location.pathname} />
+        <MobileTab to="/favorites" icon={<Heart size={20} />} label="Избранное" pathname={location.pathname} />
         <CreateMenu variant="nav" />
         <MobileTab
           to="/cart"
@@ -208,7 +209,7 @@ export default function Layout() {
                   {unreadCount > 0 && <span className="absolute -top-1 right-3 badge-count text-[9px] font-bold rounded-full min-w-4 h-4 px-0.5 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>}
                 </>
               }
-              label="Уведом."
+              label="Уведомления"
               pathname={location.pathname}
             />
             <MobileTab to="/profile" icon={<User size={20} />} label="Профиль" pathname={location.pathname} />
@@ -242,18 +243,21 @@ function DesktopIcon({ to, title, children }: { to: string; title: string; child
   );
 }
 
-/** Мобильный таб с надёжным active-состоянием */
+/** Мобильный таб с надёжным active-состоянием.
+ *  MED-6: пункт — иконочная ссылка, полное имя даёт aria-label, а визуальная
+ *  подпись помечена aria-hidden, чтобы скринридер не читал обрезанный текст. */
 function MobileTab({ to, icon, label, pathname }: { to: string; icon: React.ReactNode; label: string; pathname: string }) {
   const active = isNavActive(pathname, to);
   return (
     <Link
       to={to}
+      aria-label={label}
       aria-current={active ? 'page' : undefined}
       data-nav-active={active ? 'true' : undefined}
       className={`flex flex-col items-center justify-center min-w-0 flex-1 min-h-[44px] text-[10px] relative ${active ? 'text-[#22c55e]' : 'text-[var(--color-muted)]'}`}
     >
       <span className="relative flex items-center justify-center">{icon}</span>
-      <span className="tab-label mt-0.5 block">{label}</span>
+      <span className="tab-label mt-0.5 block" aria-hidden="true">{label}</span>
     </Link>
   );
 }

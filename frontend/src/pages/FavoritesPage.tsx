@@ -9,6 +9,9 @@ import { formatPrice, plural } from "../utils/format";
 import { resolveMedia } from '../utils/media';
 import type { ApiProduct } from '../api/types';
 import { PageSkeleton } from '../components/ui/Skeleton';
+import ErrorState from '../components/ui/ErrorState';
+import { useListError } from '../hooks/useListError';
+import { errorStatus } from '../utils/error';
 
 /**
  * L2: избранное больше НЕ тянет каталог.
@@ -54,6 +57,8 @@ export default function FavoritesPage() {
   const { favorites, cart, toggleFavorite, addToCart, updateQuantity } = useApp();
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  // HIGH-1: сбой загрузки → ErrorState с «Повторить», а не «Нет избранного».
+  const { error, setError, retryKey, errorProps } = useListError();
 
   // Ключ набора — сами id: список товаров должен перезагружаться и при
   // добавлении, и при удалении из избранного. Ref-effect на `favorites`
@@ -78,10 +83,33 @@ export default function FavoritesPage() {
 
       setLoading(true);
       try {
+        /**
+         * HIGH-1: раньше ЛЮБАЯ ошибка товара молча превращалась в null и
+         * элемент просто исчезал из списка. При сетевом сбое так исчезали
+         * ВСЕ избранные — юзер видел «Нет избранного» вместо «не загрузилось».
+         *
+         * Различаем два случая: товар реально снят (4xx — 404/403) и сбой
+         * связи/сервера (нет ответа или 5xx). Первый — пропускаем молча,
+         * второй — считаем, чтобы показать ErrorState.
+         */
+        let networkFailures = 0;
         const rows = await mapWithConcurrency(ids, FAVORITES_FETCH_CONCURRENCY, (id) =>
-          getProductById(id).catch(() => null),
+          getProductById(id).catch((e) => {
+            const status = errorStatus(e);
+            if (status === null || status === 0 || status >= 500 || status === 429) {
+              networkFailures += 1;
+            }
+            return null;
+          }),
         );
-        if (!cancelled) setProducts(rows.filter((p): p is ApiProduct => p !== null));
+        if (cancelled) return;
+        const loaded = rows.filter((p): p is ApiProduct => p !== null);
+        setProducts(loaded);
+        if (networkFailures > 0 && loaded.length === 0) {
+          setError('Не удалось загрузить избранное');
+        } else {
+          setError('');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -90,7 +118,7 @@ export default function FavoritesPage() {
     return () => {
       cancelled = true;
     };
-  }, [favoritesKey]);
+  }, [favoritesKey, retryKey, setError]);
 
   // PERF-4: зелёный квадрат 40×40 → скелетон сетки избранного
   if (loading) return <PageSkeleton rows={0} wide />;
@@ -105,7 +133,9 @@ export default function FavoritesPage() {
         <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Избранное</h1>
         <p className="text-[var(--color-muted)] text-sm mb-6">{products.length} {plural(products.length, ['товар', 'товара', 'товаров'])}</p>
 
-        {products.length === 0 ? (
+        {products.length === 0 && error ? (
+          <ErrorState {...errorProps} />
+        ) : products.length === 0 ? (
           <EmptyState
             icon={<Heart size={32} />}
             message="Нет избранного — время полазить по базару"

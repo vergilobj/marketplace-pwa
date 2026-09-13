@@ -64,7 +64,7 @@ export default function ProductCard({ product }: { product: ApiProduct }) {
       </div>
 
       <div className="p-3 flex flex-col flex-1">
-        <div className="text-sm font-medium text-[var(--color-text)] line-clamp-2 mb-1 flex-1">{product.title}</div>
+        <div className="text-sm font-medium text-[var(--color-text)] line-clamp-2 mb-1 flex-1" title={product.title}>{product.title}</div>
         {product.seller?.name && <div className="text-[11px] text-[var(--color-muted)] mb-2">{product.seller.name}</div>}
 
         <div className="flex items-center justify-between mt-1">

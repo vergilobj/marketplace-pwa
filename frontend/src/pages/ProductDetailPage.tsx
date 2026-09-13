@@ -291,7 +291,7 @@ export default function ProductDetailPage() {
 
   return (
     <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-6 pb-72 lg:pb-20 overflow-x-hidden">
-      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
+      <button onClick={() => navigate(-1)} className="tap-link items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
         <ArrowLeft size={16} /> Назад
       </button>
 
@@ -360,8 +360,13 @@ export default function ProductDetailPage() {
                       type="button"
                       onClick={() => setActiveImg(i)}
                       aria-label={`Показать слайд ${i + 1}`}
-                      className={`h-1.5 rounded-full transition-all duration-200 ${i === slideIdx ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
-                    />
+                      /* MED-1: точки были 6×6/16×6 — попасть пальцем нельзя.
+                         Хит-зона расширена до 44px по высоте и ~12px по ширине
+                         через padding; визуальная точка остаётся 6px (span внутри). */
+                      className="py-3 px-1.5 flex items-center"
+                    >
+                      <span className={`block h-1.5 rounded-full transition-all duration-200 ${i === slideIdx ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`} />
+                    </button>
                   ))}
                   {currentSlide?.type === 'video' && (
                     <span className="ml-1 text-[10px] font-bold uppercase text-white/80">видео</span>

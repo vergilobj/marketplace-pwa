@@ -7,6 +7,9 @@ import { formatPrice } from '../utils/format';
 import { mergeUniqueById } from '../utils/mergeUnique';
 import { useDebounced } from '../hooks/useDebounced';
 import { ProductGridSkeleton } from '../components/ui/Skeleton';
+import ErrorState from '../components/ui/ErrorState';
+import { useListError } from '../hooks/useListError';
+import { errorMessage } from '../utils/error';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 const PAGE_SIZE = 24;
@@ -32,6 +35,9 @@ export default function ProductsPage() {
   const [dataKey, setDataKey] = useState<string | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
 
+  // HIGH-1: сетевой сбой → ErrorState с «Повторить», а не «Пока пусто».
+  const { error, setError, retryKey, errorProps } = useListError();
+
   // R10: поиск уходит на сервер, а не фильтрует первые 24 загруженных записи
   const debouncedSearch = useDebounced(search, 300);
   const queryKey = productsKey(sort, debouncedSearch);
@@ -51,10 +57,13 @@ export default function ProductsPage() {
       else setProducts(prev => mergeUniqueById(prev, items));
       setHasMore(res.page < res.pages);
       setPage(pageNum + 1);
+    } catch (e) {
+      // Догрузка упала — список не трогаем, но не молчим в консоль.
+      setError(errorMessage(e, 'Не удалось догрузить товары'));
     } finally {
       setLoadingMore(false);
     }
-  }, [sort, debouncedSearch]);
+  }, [sort, debouncedSearch, setError]);
 
   // Смена фильтра/поиска → новая выдача с первой страницы.
   // Запрос уходит из эффекта, state-апдейты — в .then/.finally: синхронного
@@ -74,9 +83,14 @@ export default function ProductsPage() {
         setProducts(res.items || []);
         setHasMore(res.page < res.pages);
         setPage(2);
+        setError('');
       })
       .catch((e) => {
-        console.error('Failed to load products', e);
+        if (cancelled) return;
+        // HIGH-1: раньше здесь был только console.error — юзер видел
+        // «Пока пусто» вместо «не загрузилось».
+        setProducts([]);
+        setError(errorMessage(e, 'Не удалось загрузить товары'));
       })
       .finally(() => {
         // Набор помечается обработанным даже при ошибке — иначе скелетон зависнет.
@@ -85,7 +99,7 @@ export default function ProductsPage() {
     return () => {
       cancelled = true;
     };
-  }, [sort, debouncedSearch]);
+  }, [sort, debouncedSearch, retryKey, setError]);
 
   useEffect(() => {
     const el = loaderRef.current;
@@ -146,7 +160,7 @@ export default function ProductsPage() {
               className="w-full pl-10 pr-10 py-3 rounded-xl bg-[var(--color-surface)] text-[var(--color-text)] text-sm outline-none border border-[var(--color-border)] focus:border-[#22c55e] transition-colors"
             />
             {search && (
-              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)] hover:text-[var(--color-text)]">
+              <button onClick={() => setSearch('')} aria-label="Очистить поиск" className="absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-text)]">
                 <X size={16} />
               </button>
             )}
@@ -175,6 +189,11 @@ export default function ProductsPage() {
             габариты реальной ProductCard (квадрат-фото + название + цена). */}
         {loading ? (
           <ProductGridSkeleton count={8} />
+        ) : error && filteredProducts.length === 0 ? (
+          /* HIGH-1: сбой сети/сервера — это НЕ «товаров нет». Показываем
+             только когда показывать нечего: ошибка догрузки поверх уже
+             загруженного списка не должна стирать каталог. */
+          <ErrorState {...errorProps} />
         ) : filteredProducts.length === 0 ? (
           <div className="text-center py-24">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--color-surface)] flex items-center justify-center">

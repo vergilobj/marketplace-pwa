@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { getMyOrders, updateOrderStatus, payOrder, getOrderPayStatus, confirmOrderReceipt } from '../api/orders';
 import { PackageCheck, Clock, Truck, CheckCircle2, XCircle, Copy, Check, X, Loader2, ShieldCheck, RotateCcw, AlertTriangle } from 'lucide-react';
@@ -11,6 +11,8 @@ import { useAuth } from '../hooks/useAuth';
 import { errorMessage } from '../utils/error';
 import type { ApiOrder } from '../api/types';
 import { PageSkeleton } from '../components/ui/Skeleton';
+import ErrorState from '../components/ui/ErrorState';
+import { useListError } from '../hooks/useListError';
 
 const statusConfig: Record<string, { icon: React.ReactNode; cls: string; label: string }> = {
   PENDING: { icon: <Clock size={14} />, cls: 'text-amber-400 bg-amber-400/10', label: 'ждёт' },
@@ -51,9 +53,52 @@ export default function OrdersPage() {
   const [creatingPay, setCreatingPay] = useState(false);
   const [copied, setCopied] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /**
+   * HIGH-1: сбой загрузки → ErrorState с «Повторить», а не «Пока пусто».
+   *
+   * react-hooks/set-state-in-effect: первый запрос уходит ИЗ эффекта цепочкой
+   * `.then/.catch/.finally` (как в ProductsPage/FeedPage/MyProductsPage) —
+   * ни один setState не вызывается синхронно в теле эффекта, каскадного
+   * рендера нет. `fetchOrders` ниже — для событий (после оплаты/подтверждения)
+   * и для поллинга; в теле эффекта он не вызывается.
+   */
+  const { error, setError, retryKey, errorProps } = useListError();
 
-  const fetchOrders = async () => { try { setLoading(true); const data = await getMyOrders(); setOrders(Array.isArray(data) ? data : []); } finally { setLoading(false); } };
-  useEffect(() => { fetchOrders(); }, []);
+  const fetchOrders = useCallback(
+    () =>
+      getMyOrders()
+        .then((data) => {
+          setOrders(Array.isArray(data) ? data : []);
+          setError('');
+        })
+        .catch((e) => {
+          setOrders([]);
+          setError(errorMessage(e, 'Не удалось загрузить заказы'));
+        }),
+    [setError],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    getMyOrders()
+      .then((data) => {
+        if (cancelled) return;
+        setOrders(Array.isArray(data) ? data : []);
+        setError('');
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        // HIGH-1: было только `finally` — при сбое список молча оставался пустым.
+        setOrders([]);
+        setError(errorMessage(e, 'Не удалось загрузить заказы'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [retryKey, setError]);
 
   // Очистка поллинга при размонтировании
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
@@ -75,7 +120,7 @@ export default function OrdersPage() {
       } catch { /* продолжаем поллить */ }
     }, 5000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [pay?.orderId, pay?.depositAddress]);
+  }, [pay?.orderId, pay?.depositAddress, fetchOrders]);
 
   const handleStatus = async (id: string, status: string) => { try { await updateOrderStatus(id, status); toast.success('Статус обновлён'); fetchOrders(); } catch { toast.error('Ошибка'); } };
 
@@ -161,7 +206,9 @@ export default function OrdersPage() {
           ))}
         </div>
 
-        {filtered.length === 0 ? (
+        {orders.length === 0 && error ? (
+          <ErrorState {...errorProps} />
+        ) : filtered.length === 0 ? (
           <div className="text-center py-16">
             <PackageCheck size={40} className="mx-auto text-[var(--color-faint)] mb-4" />
             <p className="text-[var(--color-muted)]">Пока пусто. Начни с малого — выбери что-нибудь на базаре.</p>

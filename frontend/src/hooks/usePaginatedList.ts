@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { mergeUniqueById } from '../utils/mergeUnique';
+import { errorMessage } from '../utils/error';
 
 /**
  * L2: общий хук постраничной загрузки для списков, которые бэкенд отдаёт
@@ -39,6 +40,8 @@ export interface PaginatedList<T> {
   reset: () => void;
   /** Инкремент — триггер `reset` из эффекта (без setState в теле эффекта). */
   reload: () => void;
+  /** HIGH-1: текст ошибки первой страницы. Пустая строка — ошибки нет. */
+  error: string;
 }
 
 export function usePaginatedList<T extends { id: string }>(
@@ -51,6 +54,8 @@ export function usePaginatedList<T extends { id: string }>(
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  /** HIGH-1: текст последней ошибки первой страницы (пустая строка — ошибки нет). */
+  const [error, setErrorState] = useState('');
   const loaderRef = useRef<HTMLDivElement>(null);
 
   // fetchPage вызывающих страниц объявлен инлайн и меняется каждый рендер;
@@ -67,6 +72,7 @@ export function usePaginatedList<T extends { id: string }>(
       if (pageNum === 1) setItems(rows);
       else setItems((prev) => mergeUniqueById(prev, rows));
       setHasMore(rows.length === pageSize);
+      setErrorState('');
       setLoadingMore(false);
     },
     [pageSize],
@@ -84,13 +90,17 @@ export function usePaginatedList<T extends { id: string }>(
         const rows = Array.isArray(data) ? data : [];
         setItems(rows);
         setHasMore(rows.length === pageSize);
+        setErrorState('');
         pageRef.current = 2;
       })
       .catch((e) => {
         if (cancelled) return;
+        // HIGH-1: раньше здесь только console.error — список молча оставался
+        // пустым, юзер видел «Пока нет входящих лидов» вместо сбоя.
         console.error('paginated list load failed', e);
         setItems([]);
         setHasMore(false);
+        setErrorState(errorMessage(e, 'Не удалось загрузить'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -144,6 +154,7 @@ export function usePaginatedList<T extends { id: string }>(
     loaderRef,
     reset: reload,
     reload,
+    error,
   };
 }
 

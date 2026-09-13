@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../api/axios';
 import { Bell, Heart, MessageCircle, ShoppingBag, Gift, CheckCheck } from 'lucide-react';
@@ -6,6 +7,9 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { PageSkeleton } from '../components/ui/Skeleton';
+import ErrorState from '../components/ui/ErrorState';
+import { useListError } from '../hooks/useListError';
+import { errorMessage } from '../utils/error';
 
 const icons: Record<string, React.ReactNode> = {
   like: <Heart size={13} className="text-red-400" />,
@@ -41,12 +45,15 @@ export default function NotificationsPage() {
   const [page, setPage] = useState(1);
   /** Пришло ровно PAGE_SIZE — значит, скорее всего, есть ещё. */
   const [hasMore, setHasMore] = useState(false);
+  // HIGH-1: сбой загрузки → ErrorState, а не «Пока тихо».
+  const { error, setError, retryKey, errorProps } = useListError();
 
   useEffect(() => {
     api.get('/notifications', { params: { page: 1, limit: PAGE_SIZE } })
-      .then(r => { const data = r.data || []; setList(data); setHasMore(data.length >= PAGE_SIZE); })
+      .then(r => { const data = r.data || []; setList(data); setHasMore(data.length >= PAGE_SIZE); setError(''); })
+      .catch((e) => setError(errorMessage(e, 'Не удалось загрузить уведомления')))
       .finally(() => setLoading(false));
-  }, []);
+  }, [retryKey, setError]);
 
   const loadMore = async () => {
     if (loadingMore) return;
@@ -85,13 +92,19 @@ export default function NotificationsPage() {
         </div>
         {list.length > 0 && <p className="text-[var(--color-muted)] text-sm mb-6">{list.filter(n=>!n.isRead).length} непрочитанных</p>}
 
-        {list.length === 0 ? (
+        {list.length === 0 && error ? (
+          <ErrorState {...errorProps} />
+        ) : list.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="w-20 h-20 rounded-full bg-[var(--color-surface)] flex items-center justify-center mb-6">
               <Bell size={32} className="text-[var(--color-faint)]" />
             </div>
             <p className="text-lg font-bold text-[var(--color-text)] mb-1">Пока тихо</p>
-            <p className="text-[var(--color-muted)] text-sm">Лайки, комментарии и заказы будут тут</p>
+            <p className="text-[var(--color-muted)] text-sm mb-4">Лайки, комментарии и заказы будут тут</p>
+            {/* LOW-1: у пустого состояния не было выхода — юзер упирался в тупик. */}
+            <Link to="/products" className="inline-flex items-center justify-center px-5 min-h-[44px] rounded-full bg-[#22c55e] text-[#0d1512] text-sm font-bold hover:bg-[#16a34a] transition-colors">
+              В каталог
+            </Link>
           </div>
         ) : (
           <div className="space-y-2">

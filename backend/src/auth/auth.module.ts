@@ -8,6 +8,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { InvitesModule } from '../invites/invites.module';
 import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
+import { OptionalJwtForPasswordGuard } from './optional-jwt-for-password.guard';
 
 @Module({
   imports: [
@@ -17,14 +18,19 @@ import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_ACCESS_SECRET'),
-        signOptions: { expiresIn: '15m' },
+        signOptions: { expiresIn: '15m', algorithm: 'HS256' },
       }),
     }),
     UsersModule,
     InvitesModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, OptionalJwtAuthGuard],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    OptionalJwtAuthGuard,
+    OptionalJwtForPasswordGuard,
+  ],
   exports: [AuthService, OptionalJwtAuthGuard],
 })
 export class AuthModule {}

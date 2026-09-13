@@ -16,7 +16,11 @@ export default function PrivacyPage() {
         </button>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-4xl font-extrabold tracking-tight text-[var(--color-text)] mb-2">
+          {/* MED-5: «Политика конфиденциальности» — одно длинное слово. На 390
+              в 4xl оно не влезало в контейнер (span right=397 при vw=390) и
+              вылезало за вьюпорт на 7px. Адаптивный кегль + break-words +
+              hyphens решают это без изменения палитры. */}
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-[var(--color-text)] mb-2 break-words hyphens-auto">
             <span style={{ background: 'linear-gradient(90deg, #22c55e, #34d399)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Политика конфиденциальности</span>
           </h1>
           <p className="text-[var(--color-muted)] text-sm mb-8">Как мы обращаемся с твоими данными</p>
@@ -28,7 +32,7 @@ export default function PrivacyPage() {
               <Shield size={20} className="text-[#0d1512]" />
             </div>
           </div>
-          <div className="space-y-4 text-sm leading-relaxed text-[var(--color-muted)]">
+          <div className="space-y-4 text-sm leading-relaxed text-[var(--color-muted)] break-words">
             <p>Мы уважаем вашу приватность и обязуемся защищать ваши персональные данные.</p>
             <h3 className="text-[var(--color-text)] font-semibold text-base">Сбор данных</h3><p>Мы собираем только данные необходимые для работы сервиса: номер телефона, имя, информация о заказах и сообщениях.</p>
             <h3 className="text-[var(--color-text)] font-semibold text-base">Использование данных</h3><p>Ваши данные используются для обеспечения работы маркетплейса, обработки заказов, отправки уведомлений и улучшения сервиса.</p>

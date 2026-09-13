@@ -209,7 +209,7 @@ export default function PostDetailPage() {
     <div className="relative min-h-screen overflow-x-hidden">
       <div className="fixed inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 60% 40% at 50% -5%, rgba(34,197,94,0.10) 0%, transparent 60%)' }} />
       <div className="relative max-w-2xl mx-auto px-4 sm:px-6 pt-10 pb-20">
-        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm"><ArrowLeft size={16} /> Назад</button>
+        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm tap-link"><ArrowLeft size={16} /> Назад</button>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl overflow-hidden bg-[var(--color-surface)] border border-[var(--color-border)]">
           <div className="p-6">
@@ -225,7 +225,7 @@ export default function PostDetailPage() {
                       <button
                         type="button"
                         onClick={() => navigate(`/users/${authorId}`)}
-                        className="inline-flex items-center gap-1 text-sm font-bold text-[var(--color-text)] hover:text-[#22c55e] transition-colors underline underline-offset-2 decoration-[var(--color-border)] hover:decoration-[#22c55e]"
+                        className="tap-link gap-1 text-sm font-bold text-[var(--color-text)] hover:text-[#22c55e] transition-colors underline underline-offset-2 decoration-[var(--color-border)] hover:decoration-[#22c55e]"
                       >
                         {authorName}
                         <User size={12} className="opacity-60" />
@@ -324,7 +324,7 @@ export default function PostDetailPage() {
             )}
 
             <div className="flex items-center gap-2 mt-2.5">
-              <button onClick={handleLike} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${liked?'text-[#22c55e] bg-[rgba(34,197,94,0.1)]':'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)]'}`}><Heart size={14} fill={liked?'currentColor':'none'}/>{likes>0&&likes}</button>
+              <button onClick={handleLike} aria-label={liked ? 'Убрать лайк' : 'Поставить лайк'} title={liked ? 'Убрать лайк' : 'Поставить лайк'} className={`flex items-center gap-1.5 px-2.5 min-h-[44px] min-w-[44px] rounded-lg text-xs font-medium transition-colors ${liked?'text-[#22c55e] bg-[rgba(34,197,94,0.1)]':'text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)]'}`}><Heart size={14} fill={liked?'currentColor':'none'}/>{likes>0&&likes}</button>
               <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--bg-3)] transition-colors"><MessageCircle size={14} />{commentsTotal ?? comments.length}</div>
             </div>
           </div>
@@ -393,6 +393,7 @@ export default function PostDetailPage() {
               type="button"
               onClick={handleComment}
               disabled={sending || !commentText.trim()}
+              aria-label="Отправить комментарий"
               className="shrink-0 px-5 min-h-[48px] rounded-xl bg-[#22c55e] text-[#0d1512] text-sm font-bold hover:bg-[#16a34a] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
             >
               {sending ? <Loader2 size={14} className="animate-spin"/> : <Send size={14}/>}

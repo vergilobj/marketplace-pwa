@@ -8,6 +8,9 @@ import { formatPrice } from '../utils/format';
 import { resolveMedia } from '../utils/media';
 import { mergeUniqueById } from '../utils/mergeUnique';
 import { PageSkeleton } from '../components/ui/Skeleton';
+import ErrorState from '../components/ui/ErrorState';
+import { useListError } from '../hooks/useListError';
+import { errorMessage } from '../utils/error';
 
 /**
  * A5: «Мои товары».
@@ -56,6 +59,8 @@ export default function MyProductsPage() {
   const [busyIds, setBusyIds] = useState<string[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
+  // HIGH-1: сбой загрузки → ErrorState с «Повторить», а не «Нет товаров».
+  const { error, setError, retryKey, errorProps } = useListError();
 
   const loadProducts = useCallback(async (pageNum: number) => {
     setLoadingMore(true);
@@ -67,13 +72,15 @@ export default function MyProductsPage() {
       setProducts((prev) => (pageNum === 1 ? items : mergeUniqueById(prev, items)));
       setHasMore(items.length === PAGE_SIZE);
       setPage(pageNum + 1);
-    } catch {
+      setError('');
+    } catch (e) {
       if (pageNum === 1) setProducts([]);
       setHasMore(false);
+      setError(errorMessage(e, 'Не удалось загрузить товары'));
     } finally {
       setLoadingMore(false);
     }
-  }, []);
+  }, [setError]);
 
   // Первая страница — запрос уходит из эффекта, setState живёт в .then/.finally.
   useEffect(() => {
@@ -86,9 +93,13 @@ export default function MyProductsPage() {
         setProducts(items);
         setHasMore(items.length === PAGE_SIZE);
         setPage(2);
+        setError('');
       })
-      .catch(() => {
-        if (!cancelled) setProducts([]);
+      .catch((e) => {
+        if (cancelled) return;
+        // HIGH-1: было молчаливое setProducts([]) — «Нет товаров» при сбое сети.
+        setProducts([]);
+        setError(errorMessage(e, 'Не удалось загрузить товары'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -103,7 +114,7 @@ export default function MyProductsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retryKey, setError]);
 
   useEffect(() => {
     const el = loaderRef.current;
@@ -152,7 +163,7 @@ export default function MyProductsPage() {
             <button
               type="button"
               onClick={() => navigate(`/users/${userId}`)}
-              className="text-sm text-[var(--color-muted)] hover:text-[#22c55e] transition-colors underline underline-offset-2"
+              className="tap-link text-sm text-[var(--color-muted)] hover:text-[#22c55e] transition-colors underline underline-offset-2"
             >
               Как видят покупатели →
             </button>
@@ -176,7 +187,9 @@ export default function MyProductsPage() {
         </div>
       </motion.div>
 
-      {products.length === 0 ? (
+      {products.length === 0 && error ? (
+        <ErrorState {...errorProps} />
+      ) : products.length === 0 ? (
         <div className="text-center py-24">
           <Package size={40} className="mx-auto text-[var(--color-muted)] opacity-20 mb-4" />
           <p className="text-[var(--color-muted)]">Нет товаров</p>

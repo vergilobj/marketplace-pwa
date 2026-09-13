@@ -4,12 +4,17 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  UseGuards,
+  Request,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { OptionalJwtForPasswordGuard } from './optional-jwt-for-password.guard';
+import type { AuthenticatedRequest } from '../common/types/authenticated-request.interface';
 
 const INVALID_REFRESH = 'Некорректный токен обновления';
 
@@ -17,6 +22,10 @@ const INVALID_REFRESH = 'Некорректный токен обновлени�
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  /**
+   * FIX-AUTH (A-4): ответ НЕ зависит от того, занят телефон или нет —
+   * иначе register превращался в оракул существования пользователя.
+   */
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post('register')
   async register(@Body() dto: RegisterDto) {
@@ -30,29 +39,32 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  /**
+   * FIX-AUTH (A-2): токен проверяется целиком в сервисе — подпись, `jti`,
+   * запись в БД, ротация и reuse detection. Декодировать payload здесь
+   * больше не нужно (и вредно: доверие к неподписанному base64).
+   */
   @Post('refresh')
   async refresh(@Body('refreshToken') refreshToken: string) {
     if (!refreshToken || typeof refreshToken !== 'string') {
       throw new UnauthorizedException('Требуется токен обновления');
     }
 
-    // Разбор payload без доверия к входу: мусор → 401, а не 500.
-    let decoded: { sub?: string };
-    try {
-      const parts = refreshToken.split('.');
-      if (parts.length !== 3 || !parts[1]) {
-        throw new Error('malformed');
-      }
-      const parsed = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-      if (!parsed || typeof parsed !== 'object' || !parsed.sub) {
-        throw new Error('malformed');
-      }
-      decoded = parsed;
-    } catch {
-      throw new UnauthorizedException(INVALID_REFRESH);
-    }
+    return this.authService.refreshToken(refreshToken);
+  }
 
-    // Криптопроверка как была — auth.service.refreshToken (verify).
-    return this.authService.refreshToken(decoded.sub as string, refreshToken);
+  /**
+   * FIX-AUTH (A-2): смена пароля гасит все refresh-токены пользователя и
+   * выдаёт новую пару текущему устройству.
+   */
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(OptionalJwtForPasswordGuard)
+  @Post('change-password')
+  async changePassword(
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(req.user.userId, dto);
   }
 }

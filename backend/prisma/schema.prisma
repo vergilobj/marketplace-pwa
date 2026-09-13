@@ -51,6 +51,35 @@ model User {
   trustScoreAt       DateTime?
   ledgerEntries      LedgerEntry[]
   sellerRequest      SellerRequest?
+  refreshTokens      RefreshToken[]
+}
+
+/**
+ * FIX-AUTH (A-2): refresh-токены с ротацией и reuse detection.
+ *
+ * Раньше refresh-токен жил 7 дней, нигде не хранился и не отзывался: повторное
+ * использование (кража) не детектировалось, смена пароля токены не гасила.
+ *
+ * Здесь хранится строка на каждый выданный refresh-токен:
+ *   - `jti` кладётся в payload токена и проверяется при refresh;
+ *   - успешный refresh помечает старую запись `revokedAt` + `replacedById`
+ *     (ротация: refresh-токен одноразовый);
+ *   - повторный приход с уже отозванным `jti` = признак кражи → ревокается
+ *     ВСЯ цепочка пользователя (все неотозванные токены).
+ *
+ * onDelete: Cascade — у удалённого юзера токены уходят вместе с ним.
+ */
+model RefreshToken {
+  id           String    @id @default(uuid())
+  jti          String    @unique
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
 }
 
 /// A4: заявка «Стать продавцом». Роль меняется ТОЛЬКО после одобрения админом.
