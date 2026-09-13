@@ -14,6 +14,7 @@ import type { AuthenticatedRequest } from '../common/types/authenticated-request
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { InvitesService } from './invites.service';
+import { CreateInviteDto } from '../social/dto/comment-text.dto';
 import {
   PAGINATION_BULK_LIMIT,
   parseLimit,
@@ -29,9 +30,9 @@ export class InvitesController {
   @Post()
   async create(
     @Request() req: AuthenticatedRequest,
-    @Body('code') code?: string,
+    @Body() dto: CreateInviteDto,
   ) {
-    return this.invitesService.createInvite(req.user.userId, code);
+    return this.invitesService.createInvite(req.user.userId, dto.code);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

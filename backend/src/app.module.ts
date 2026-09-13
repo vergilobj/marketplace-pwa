@@ -19,6 +19,7 @@ import { AdminModule } from './admin/admin.module';
 import { AuditModule } from './common/audit/audit.module';
 import { AlertsModule } from './common/alerts/alerts.module';
 import { BazarModule } from './bazar/bazar.module';
+import { FeedbackModule } from './feedback/feedback.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { BazarModule } from './bazar/bazar.module';
     // G2: @Global — внешний канал алертов (ALERT_WEBHOOK_URL).
     AlertsModule,
     BazarModule,
+    FeedbackModule,
   ],
   providers: [
     {

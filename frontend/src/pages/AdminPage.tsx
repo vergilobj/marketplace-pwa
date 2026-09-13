@@ -4,7 +4,7 @@ import { getInvites, createInvite, deleteInvite } from '../api/invites';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Users, ShoppingBag, Newspaper, Wallet, TrendingUp, Download, Plus, Trash2, Copy, Check, Settings, Loader2 } from 'lucide-react';
+import { Users, ShoppingBag, Newspaper, Wallet, TrendingUp, Download, Plus, Trash2, Copy, Check, Settings, Loader2, MessageSquare } from 'lucide-react';
 import { formatPhone } from '../utils/phone';
 import { formatPrice } from "../utils/format";
 import { resolveMedia } from '../utils/media';
@@ -31,8 +31,47 @@ const tabs = [
   { key: 'invites', label: 'Инвайты', icon: <Plus size={15} /> },
   { key: 'transactions', label: 'Транзакции', icon: <Wallet size={15} /> },
   { key: 'withdrawals', label: 'Выводы', icon: <Download size={15} /> },
+  { key: 'feedback', label: 'Обратная связь', icon: <MessageSquare size={15} /> },
   { key: 'settings', label: 'Настройки', icon: <Settings size={15} /> },
 ];
+
+/**
+ * Обращение из `GET /admin/feedback`. Форма ответа — `{ items, total, page,
+ * limit }` (как у остальных админ-списков), `user` приходит урезанным select'ом.
+ */
+type AdminFeedback = {
+  id: string;
+  type: string;
+  message: string;
+  contact?: string | null;
+  status: string;
+  adminNote?: string | null;
+  createdAt: string;
+  user?: { id: string; name?: string | null; phone?: string | null; role?: string } | null;
+};
+
+/** Тип → подпись. Ключи совпадают с FEEDBACK_TYPES на бэкенде. */
+const FEEDBACK_TYPE_LABELS: Record<string, string> = {
+  SUGGESTION: 'Предложение',
+  REQUEST: 'Просьба',
+  QUESTION: 'Вопрос',
+  CONSULTATION: 'Консультация',
+  BUG: 'Баг',
+  OTHER: 'Другое',
+};
+
+/** Статус → подпись и цвет. Ключи совпадают с FEEDBACK_STATUSES на бэкенде. */
+const FEEDBACK_STATUSES: Array<{ key: string; label: string }> = [
+  { key: 'NEW', label: 'Новое' },
+  { key: 'IN_PROGRESS', label: 'В работе' },
+  { key: 'CLOSED', label: 'Закрыто' },
+];
+
+const FEEDBACK_STATUS_CLASSES: Record<string, string> = {
+  NEW: 'bg-[#22c55e]/10 text-[#22c55e]',
+  IN_PROGRESS: 'bg-amber-400/10 text-amber-400',
+  CLOSED: 'bg-white/[0.04] text-[var(--color-muted)]',
+};
 
 /** Post в админке приходит с relation author — берём это из ApiPost. */
 type AdminPost = ApiPost & { author?: { id: string; name?: string | null } | null };
@@ -57,6 +96,10 @@ export default function AdminPage() {
   const [invites, setInvites] = useState<ApiInvite[]>([]);
   const [transactions, setTransactions] = useState<ApiTransaction[]>([]);
   const [withdrawals, setWithdrawals] = useState<ApiWithdrawal[]>([]);
+  const [feedbacks, setFeedbacks] = useState<AdminFeedback[]>([]);
+  const [feedbackStatus, setFeedbackStatus] = useState('');
+  /** Черновики заметок админа по id обращения — до нажатия «Сохранить». */
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [settings, setSettings] = useState<ApiSettings>({});
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -75,7 +118,7 @@ export default function AdminPage() {
    * Ответы бывают двух форм: `{ items, total, page, pages }` (юзеры, товары,
    * посты, транзакции) и просто массив (выводы, инвайты) — обрабатываем обе.
    */
-  const loadTab = async (tab: string, pageNum: number, q: string, reset: boolean) => {
+  const loadTab = async (tab: string, pageNum: number, q: string, reset: boolean, statusFilter = '') => {
     if (reset) setLoading(true);
     else setLoadingMore(true);
 
@@ -84,6 +127,14 @@ export default function AdminPage() {
     qs.set('page', String(pageNum));
     qs.set('limit', String(ADMIN_PAGE_SIZE));
     const suffix = `?${qs.toString()}`;
+
+    // Обращения фильтруются по статусу — отдельный querystring (`search`
+    // бэкенд тут не поддерживает).
+    const feedbackQs = new URLSearchParams();
+    if (statusFilter) feedbackQs.set('status', statusFilter);
+    feedbackQs.set('page', String(pageNum));
+    feedbackQs.set('limit', String(ADMIN_PAGE_SIZE));
+    const feedbackSuffix = `?${feedbackQs.toString()}`;
 
     const apply = <T extends { id: string }>(rows: T[], pages: number | null, setter: Dispatch<SetStateAction<T[]>>) => {
       if (reset) setter(rows);
@@ -140,6 +191,13 @@ export default function AdminPage() {
           setHasMore(false);
           break;
         }
+        case 'feedback': {
+          const r = await api.get<{ items: AdminFeedback[]; pages?: number }>(
+            `/admin/feedback${feedbackSuffix}`,
+          );
+          apply(r.data.items || [], r.data.pages ?? null, (v) => setFeedbacks(v));
+          break;
+        }
         default:
           setHasMore(false);
       }
@@ -158,15 +216,15 @@ export default function AdminPage() {
     // эффекта (setLoading внутри loadTab) давал каскадный рендер на каждый вход.
     (async () => {
       setPage(1);
-      await loadTab(activeTab, 1, search, true);
+      await loadTab(activeTab, 1, search, true, feedbackStatus);
     })();
     // loadTab намеренно не в зависимостях: функция пересоздаётся каждый рендер,
-    // а эффект должен срабатывать только на смену вкладки/поиска.
-  }, [activeTab, search]);
+    // а эффект должен срабатывать только на смену вкладки/поиска/фильтра.
+  }, [activeTab, search, feedbackStatus]);
 
   const handleLoadMore = () => {
     if (loading || loadingMore) return;
-    void loadTab(activeTab, page, search, false);
+    void loadTab(activeTab, page, search, false, feedbackStatus);
   };
 
   const handleCreateInvite = async () => { try { const r = await createInvite(); setInvites(prev => [r, ...prev]); toast.success('Инвайт создан'); } catch { toast.error('Ошибка'); } };
@@ -178,6 +236,36 @@ export default function AdminPage() {
   const handleApproveWithdrawal = async (id: string) => { try { await api.patch(`/users/admin/withdrawals/${id}/approve`); setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'approved' } : w)); } catch { toast.error('Ошибка'); } };
   const handleRejectWithdrawal = async (id: string) => { try { await api.patch(`/users/admin/withdrawals/${id}/reject`); setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'rejected' } : w)); } catch { toast.error('Ошибка'); } };
   const handleUpdateSetting = async (key: string, value: string) => { try { await api.put('/settings', { key, value }); setSettings((prev) => ({ ...prev, [key]: value })); toast.success('Сохранено'); } catch { toast.error('Ошибка'); } };
+
+  /**
+   * Смена статуса обращения. Заметка отправляется вместе со статусом, если
+   * админ её набрал (иначе достаточно смены статуса). Локальный стейт
+   * обновляем ответом сервера — так UI не расходится с БД.
+   */
+  const handleUpdateFeedback = async (id: string, status?: string) => {
+    const noteDraft = noteDrafts[id];
+    const payload: { status?: string; adminNote?: string } = {};
+    if (status) payload.status = status;
+    if (noteDraft !== undefined) payload.adminNote = noteDraft;
+
+    if (!payload.status && payload.adminNote === undefined) {
+      toast.error('Нечего сохранять');
+      return;
+    }
+
+    try {
+      const r = await api.patch<AdminFeedback>(`/admin/feedback/${id}`, payload);
+      setFeedbacks((prev) => prev.map((f) => (f.id === id ? { ...f, ...r.data } : f)));
+      setNoteDrafts((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      toast.success('Сохранено');
+    } catch {
+      toast.error('Ошибка');
+    }
+  };
 
   const renderDashboard = () => (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -329,6 +417,139 @@ export default function AdminPage() {
     { key: 'stop_words', label: 'Стоп-слова (через запятую)', placeholder: 'спам, casino' },
   ];
 
+  /**
+   * Таб «Обратная связь»: список обращений с автором, фильтр по статусу,
+   * смена статуса и заметка админа. Пагинация — общая кнопка «Показать ещё».
+   */
+  const renderFeedback = () => (
+    <div>
+      {/* Фильтр по статусу */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => setFeedbackStatus('')}
+          className={`px-4 min-h-[44px] rounded-full text-sm font-semibold transition-all ${
+            feedbackStatus === ''
+              ? 'bg-[#22c55e] text-[#0d1512]'
+              : 'bg-[var(--bg-3)] text-[var(--color-muted)] hover:text-[var(--color-text)]'
+          }`}
+        >
+          Все
+        </button>
+        {FEEDBACK_STATUSES.map((s) => (
+          <button
+            key={s.key}
+            type="button"
+            onClick={() => setFeedbackStatus(s.key)}
+            className={`px-4 min-h-[44px] rounded-full text-sm font-semibold transition-all ${
+              feedbackStatus === s.key
+                ? 'bg-[#22c55e] text-[#0d1512]'
+                : 'bg-[var(--bg-3)] text-[var(--color-muted)] hover:text-[var(--color-text)]'
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {feedbacks.length === 0 ? (
+        <p className="text-sm text-[var(--color-muted)] py-10 text-center">
+          {feedbackStatus ? 'В этом статусе обращений нет' : 'Обращений пока нет'}
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {feedbacks.map((f) => (
+            <div
+              key={f.id}
+              className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[var(--color-text)] truncate">
+                    {f.user?.name || 'Без имени'}
+                  </p>
+                  <p className="text-xs text-[var(--color-muted)]">
+                    {f.user?.phone ? formatPhone(f.user.phone) : '—'}
+                    {f.contact ? ` • связь: ${f.contact}` : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)]">
+                    {FEEDBACK_TYPE_LABELS[f.type] || f.type}
+                  </span>
+                  <span
+                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                      FEEDBACK_STATUS_CLASSES[f.status] || FEEDBACK_STATUS_CLASSES.CLOSED
+                    }`}
+                  >
+                    {FEEDBACK_STATUSES.find((s) => s.key === f.status)?.label || f.status}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-sm text-[var(--color-text)] whitespace-pre-wrap break-words">
+                {f.message}
+              </p>
+
+              <p className="text-[11px] text-[var(--color-faint)] mt-2">
+                {f.createdAt
+                  ? format(new Date(f.createdAt), 'd MMM yyyy, HH:mm', { locale: ru })
+                  : ''}
+              </p>
+
+              {/* Заметка админа: показываем уже сохранённую, если черновика нет */}
+              <div className="mt-3">
+                <label
+                  htmlFor={`feedback-note-${f.id}`}
+                  className="block text-[11px] font-semibold text-[var(--color-muted)] mb-1"
+                >
+                  Заметка админа (уйдёт автору в уведомлении)
+                </label>
+                <textarea
+                  id={`feedback-note-${f.id}`}
+                  rows={2}
+                  maxLength={1000}
+                  value={noteDrafts[f.id] ?? f.adminNote ?? ''}
+                  onChange={(e) =>
+                    setNoteDrafts((prev) => ({ ...prev, [f.id]: e.target.value }))
+                  }
+                  placeholder="Что решили / что ответить автору"
+                  className="w-full px-3 py-2 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm outline-none focus:border-[#22c55e]/50 transition-all resize-none placeholder:text-[var(--color-faint)]"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                {FEEDBACK_STATUSES.map((s) => (
+                  <button
+                    key={s.key}
+                    type="button"
+                    onClick={() => void handleUpdateFeedback(f.id, s.key)}
+                    disabled={f.status === s.key && noteDrafts[f.id] === undefined}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 ${
+                      f.status === s.key
+                        ? 'bg-[#22c55e]/10 text-[#22c55e]'
+                        : 'bg-[var(--bg-3)] text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => void handleUpdateFeedback(f.id)}
+                  disabled={noteDrafts[f.id] === undefined}
+                  className="ml-auto px-3 py-1.5 rounded-lg bg-[#22c55e] text-[#0d1512] text-xs font-bold hover:bg-[#16a34a] transition-all disabled:opacity-40"
+                >
+                  Сохранить заметку
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   const renderSettings = () => (
     <div className="space-y-4 max-w-md">
       {SETTINGS_FIELDS.map(f => {
@@ -355,6 +576,7 @@ export default function AdminPage() {
       case 'invites': return renderInvites();
       case 'transactions': return renderTransactions();
       case 'withdrawals': return renderWithdrawals();
+      case 'feedback': return renderFeedback();
       case 'settings': return renderSettings();
       default: return null;
     }

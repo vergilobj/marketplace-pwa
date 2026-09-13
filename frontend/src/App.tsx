@@ -33,6 +33,7 @@ const MyProductsPage = lazy(() => import('./pages/MyProductsPage'));
 const ProductsPage = lazy(() => import('./pages/ProductsPage'));
 const BazarChatPage = lazy(() => import('./pages/BazarChatPage'));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'));
+const FeedbackPage = lazy(() => import('./pages/FeedbackPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 function Lazy({ children }: { children: React.ReactNode }) {
@@ -185,6 +186,8 @@ export default function App() {
           {/* p2p-чат заменён на Базар (/bazar). Старая страница ChatPage удалена 2026-09-11. */}
           <Route path="/orders" element={<ProtectedRoute><Lazy><OrdersPage /></Lazy></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Lazy><ProfilePage /></Lazy></ProtectedRoute>} />
+          {/* «Обратная связь» — доступна любому авторизованному (без requiredRole) */}
+          <Route path="/feedback" element={<ProtectedRoute><Lazy><FeedbackPage /></Lazy></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><Lazy><NotificationsPage /></Lazy></ProtectedRoute>} />
           <Route path="/referrals" element={<ProtectedRoute><Lazy><ReferralsPage /></Lazy></ProtectedRoute>} />
           <Route path="/withdrawals" element={<ProtectedRoute><Lazy><WithdrawalsPage /></Lazy></ProtectedRoute>} />

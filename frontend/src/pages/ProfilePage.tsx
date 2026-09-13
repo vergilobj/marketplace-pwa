@@ -4,7 +4,7 @@ import { getProfile, updateProfile, getStats, becomeSeller, getMySellerRequest, 
 import { IMaskInput } from 'react-imask';
 import { formatPhone, unformatPhone } from '../utils/phone';
 import { formatPrice } from '../utils/format';
-import { User, Settings, TrendingUp, Gift, LogOut, Save, ShieldCheck, Store, Megaphone, ShoppingBag, Clock } from 'lucide-react';
+import { User, Settings, TrendingUp, Gift, LogOut, Save, ShieldCheck, Store, Megaphone, ShoppingBag, Clock, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { CreateMenu } from '../components/CreateMenu';
@@ -115,6 +115,7 @@ export default function ProfilePage() {
     { label: 'Мои заказы', to: '/orders', icon: <ShoppingBag size={16} /> },
     { label: 'Рефералы', to: '/referrals', icon: <Gift size={16} /> },
     { label: 'Вывод средств', to: '/withdrawals', icon: <TrendingUp size={16} /> },
+    { label: 'Обратная связь', to: '/feedback', icon: <MessageSquare size={16} /> },
     ...(isSeller ? [
       { label: 'Мои товары', to: '/my-products', icon: <Store size={16} /> },
       { label: 'Создать рекламу', to: '/posts/ad/new', icon: <Megaphone size={16} /> },

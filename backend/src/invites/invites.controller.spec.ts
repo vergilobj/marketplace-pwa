@@ -30,7 +30,7 @@ describe('InvitesController', () => {
       service.createInvite.mockResolvedValue({ code: 'CODE', ownerId: 'u1' });
       const result = await controller.create(
         { user: { userId: 'u1', role: 'ADMIN' } },
-        'MYCODE',
+        { code: 'MYCODE' },
       );
       expect(result.code).toBe('CODE');
       expect(service.createInvite).toHaveBeenCalledWith('u1', 'MYCODE');

@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 /**
  * CWE-209: безопасный ответ на неизвестное исключение.
@@ -13,6 +14,24 @@ import {
  * чтобы не менять форму ответа для существующих тестов.
  */
 const SAFE_500_MESSAGE = 'Internal server error';
+
+/**
+ * GAPS-A: Prisma P2025 («required record not found») на update/delete по
+ * несуществующему id. Раньше такое уходило в generic 500 — клиент не отличал
+ * «нет сущности» от сбоя сервера. Маппим в 404 единообразно для ВСЕХ роутов,
+ * чтобы не зависеть от того, сделал ли конкретный сервис findUnique-пречек.
+ * Проверяем и `instanceof`, и `code` (моки/кросс-инстансная сборка).
+ */
+function isRecordNotFound(exception: unknown): boolean {
+  if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+    return exception.code === 'P2025';
+  }
+  return (
+    typeof exception === 'object' &&
+    exception !== null &&
+    (exception as { code?: unknown }).code === 'P2025'
+  );
+}
 
 /**
  * Признаки утечки внутренних деталей: stack trace, абсолютные пути,
@@ -71,6 +90,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (exception instanceof HttpException) {
       this.replyHttpException(exception, response);
+      return;
+    }
+
+    // GAPS-A: P2025 (update/delete по несуществующему id) → 404, не 500.
+    if (isRecordNotFound(exception)) {
+      this.reply(
+        response,
+        {
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'Запись не найдена',
+          error: 'Not Found',
+        },
+        HttpStatus.NOT_FOUND,
+      );
       return;
     }
 
@@ -169,7 +202,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
-        : ((exception as { statusCode?: number })?.statusCode ?? 500);
+        : isRecordNotFound(exception)
+          ? HttpStatus.NOT_FOUND
+          : ((exception as { statusCode?: number })?.statusCode ?? 500);
 
     const name = exception instanceof Error ? exception.name : typeof exception;
     const message =

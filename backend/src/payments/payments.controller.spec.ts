@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UnauthorizedException } from '@nestjs/common';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { NowPaymentsProvider } from './nowpayments.provider';
@@ -103,13 +104,13 @@ describe('PaymentsController', () => {
   });
 
   describe('handleIpn', () => {
-    it('should reject invalid signature', async () => {
+    it('GAPS-A: неверная подпись → 401 (было 200 {status:"rejected"})', async () => {
       mockNowPayments.verifyIpnSignature.mockReturnValue(false);
-      const result = await controller.handleIpn({}, 'bad-sig');
-      expect(result).toEqual({
-        status: 'rejected',
-        reason: 'invalid_signature',
-      });
+      await expect(controller.handleIpn({}, 'bad-sig')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      // Бизнес-состояние не тронуто.
+      expect(service.processSuccessfulPayment).not.toHaveBeenCalled();
     });
 
     it('should process payment on finished status', async () => {

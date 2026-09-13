@@ -20,6 +20,9 @@ import { Roles } from '../auth/roles.decorator';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ReviewSellerRequestDto } from './dto/review-seller-request.dto';
+import { BatchRoleDto, BatchApproveDto } from './dto/batch-users.dto';
+import { ChangeUserRoleDto } from './dto/change-user-role.dto';
+import { RequestWithdrawalDto } from './dto/request-withdrawal.dto';
 import { UserRole } from '@prisma/client';
 import {
   parseLimit,
@@ -214,13 +217,12 @@ export class UsersController {
   @Post('me/withdrawal')
   async requestWithdrawal(
     @Request() req: AuthenticatedRequest,
-    @Body('amount') amount: number,
-    @Body('toAddress') toAddress?: string,
+    @Body() dto: RequestWithdrawalDto,
   ) {
     return this.usersService.requestWithdrawal(
       req.user.userId,
-      amount,
-      toAddress,
+      dto.amount,
+      dto.toAddress,
     );
   }
 
@@ -269,8 +271,8 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Patch(':id/role')
-  async changeRole(@Param('id') id: string, @Body('role') role: UserRole) {
-    return this.usersService.changeRole(id, role);
+  async changeRole(@Param('id') id: string, @Body() dto: ChangeUserRoleDto) {
+    return this.usersService.changeRole(id, dto.role);
   }
 
   // Эндпоинт статистики
@@ -283,16 +285,16 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Patch('batch/role')
-  async batchChangeRole(@Body() body: { userIds: string[]; role: UserRole }) {
-    await this.usersService.batchChangeRole(body.userIds, body.role);
+  async batchChangeRole(@Body() dto: BatchRoleDto) {
+    await this.usersService.batchChangeRole(dto.userIds, dto.role);
     return { message: 'Roles updated' };
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Patch('batch/approve')
-  async batchApprove(@Body() body: { userIds: string[] }) {
-    await this.usersService.batchApprove(body.userIds);
+  async batchApprove(@Body() dto: BatchApproveDto) {
+    await this.usersService.batchApprove(dto.userIds);
     return { message: 'Users approved' };
   }
 

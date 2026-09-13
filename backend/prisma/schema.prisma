@@ -52,6 +52,7 @@ model User {
   ledgerEntries      LedgerEntry[]
   sellerRequest      SellerRequest?
   refreshTokens      RefreshToken[]
+  feedbacks          Feedback[]
 }
 
 /**
@@ -511,4 +512,28 @@ model ProactiveEvent {
   createdAt DateTime @default(now())
 
   @@unique([userId, kind, refId])
+}
+
+/// «Обратная связь» — предложения, просьбы, вопросы, консультации, баги.
+///
+/// Зачем: владелец просил прямую связь с админом («если людям что-то
+/// неудобно, чтобы они написали — и эта связь приходила к тебе и ко мне»).
+/// Отдельная категория CONSULTATION — заявка на консультацию.
+///
+/// `type`/`status` — строки, а не enum: набор типов может расширяться без
+/// миграции БД (валидация значений — на DTO через @IsIn).
+model Feedback {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // SUGGESTION | REQUEST | QUESTION | CONSULTATION | BUG | OTHER
+  message   String
+  contact   String?
+  status    String   @default("NEW") // NEW | IN_PROGRESS | CLOSED
+  adminNote String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
 }

@@ -21,6 +21,7 @@ import { Roles } from '../auth/roles.decorator';
 import { NotificationsService } from './notifications.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
+import { BroadcastDto } from './dto/broadcast.dto';
 
 @Controller('notifications')
 export class NotificationsController {
@@ -93,16 +94,12 @@ export class NotificationsController {
   @Roles('ADMIN')
   @Post('broadcast')
   async broadcast(
-    @Body('message') message: string,
-    @Body('role') role?: string,
+    @Body() dto: BroadcastDto,
   ) {
     // Получаем всех пользователей (или по роли).
-    // role приходит строкой из body — сужаем до enum, невалидное значение
-    // отдаст пустой список (Prisma отфильтрует), это осознанное поведение.
-    const roleFilter =
-      role && (Object.values(UserRole) as string[]).includes(role)
-        ? (role as UserRole)
-        : undefined;
+    // GAPS-A: role валидируется DTO (@IsIn по UserRole) — мусорная роль
+    // отбивается 400, а не молча рассылает всем.
+    const roleFilter = dto.role as UserRole | undefined;
     const users = await this.prisma.user.findMany({
       where: roleFilter ? { role: roleFilter } : {},
       select: { id: true },
@@ -112,7 +109,7 @@ export class NotificationsController {
       await this.notificationsService.createNotification(
         user.id,
         'broadcast',
-        message,
+        dto.message,
       );
     }
 

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma/prisma.service';
 import {
@@ -152,10 +152,17 @@ export class NotificationsService {
   }
 
   async markAsRead(id: string, userId: string) {
-    return this.prisma.notification.updateMany({
+    const res = await this.prisma.notification.updateMany({
       where: { id, userId },
       data: { isRead: true },
     });
+    // GAPS-A: раньше чужой/несуществующий id давал 200 {count:0} —
+    // «тихий успех» вместо 404. Фронт и так игнорирует ошибку (catch ignore),
+    // так что смена кода безопасна.
+    if (res.count === 0) {
+      throw new NotFoundException('Уведомление не найдено');
+    }
+    return res;
   }
 
   async getUnreadCount(userId: string): Promise<number> {

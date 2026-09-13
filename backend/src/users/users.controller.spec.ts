@@ -145,7 +145,7 @@ describe('UsersController', () => {
       service.requestWithdrawal.mockResolvedValue({ id: 'wr-1', amount: 100 });
       const result = await controller.requestWithdrawal(
         { user: { userId: 'user-1', role: 'ADMIN' } },
-        100,
+        { amount: 100 },
       );
       expect(result.id).toBe('wr-1');
     });
@@ -163,7 +163,7 @@ describe('UsersController', () => {
   describe('changeRole', () => {
     it('should change user role', async () => {
       service.changeRole.mockResolvedValue({ ...mockUser, role: 'SELLER' });
-      await controller.changeRole('user-1', 'SELLER');
+      await controller.changeRole('user-1', { role: 'SELLER' });
       expect(service.changeRole).toHaveBeenCalledWith('user-1', 'SELLER');
     });
   });

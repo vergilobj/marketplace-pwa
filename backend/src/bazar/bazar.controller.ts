@@ -15,6 +15,13 @@ import { DealService } from './deal.service';
 import { AutopilotService } from './autopilot.service';
 import { ReputationService } from './reputation.service';
 import { SendBazarMessageDto } from './dto/send-bazar-message.dto';
+import { DealRelayDto } from './dto/deal-relay.dto';
+import { DealCounterDto } from './dto/deal-counter.dto';
+import { DealReasonDto } from './dto/deal-reason.dto';
+import { RecordViewDto } from './dto/record-view.dto';
+import { AutopilotStartDto } from './dto/autopilot-start.dto';
+import { AutopilotResumeDto } from './dto/autopilot-resume.dto';
+import { GenerateDescriptionDto } from './dto/generate-description.dto';
 import {
   DEAL_THREAD_DEFAULT_LIMIT,
   DEAL_THREAD_MAX_LIMIT,
@@ -103,7 +110,7 @@ export class BazarController {
   relay(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-    @Body() body: { text: string },
+    @Body() body: DealRelayDto,
   ) {
     return this.dealService.relay(req.user.userId, {
       dealId: id,
@@ -122,9 +129,9 @@ export class BazarController {
   cancel(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-    @Body() body?: { reason?: string },
+    @Body() body: DealReasonDto = {},
   ) {
-    return this.dealService.lose(req.user.userId, id, body?.reason);
+    return this.dealService.lose(req.user.userId, id, body.reason);
   }
 
   /** Контр-оффер (торг). */
@@ -132,11 +139,11 @@ export class BazarController {
   counter(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-    @Body() body: { amount: number },
+    @Body() body: DealCounterDto,
   ) {
     return this.dealService.counterOffer(req.user.userId, {
       dealId: id,
-      amount: Number(body.amount),
+      amount: body.amount,
     });
   }
 
@@ -171,16 +178,16 @@ export class BazarController {
   dispute(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-    @Body() body?: { reason?: string },
+    @Body() body: DealReasonDto = {},
   ) {
-    return this.dealService.openDispute(req.user.userId, id, body?.reason);
+    return this.dealService.openDispute(req.user.userId, id, body.reason);
   }
 
   /** Записать ViewEvent (открытие карточки товара). */
   @Post('views')
   recordView(
     @Req() req: AuthenticatedRequest,
-    @Body() body: { productId: string },
+    @Body() body: RecordViewDto,
   ) {
     return this.bazarService.recordView(req.user.userId, body.productId);
   }
@@ -189,7 +196,7 @@ export class BazarController {
   @Post('autopilot/start')
   autopilotStart(
     @Req() req: AuthenticatedRequest,
-    @Body() body: { goal: string; budget?: number },
+    @Body() body: AutopilotStartDto,
   ) {
     return this.autopilotService.start(req.user.userId, body.goal, body.budget);
   }
@@ -198,13 +205,7 @@ export class BazarController {
   @Post('autopilot/resume')
   autopilotResume(
     @Req() req: AuthenticatedRequest,
-    @Body()
-    body: {
-      type: 'confirm' | 'refine';
-      accept?: boolean;
-      productId?: string;
-      feedback?: string;
-    },
+    @Body() body: AutopilotResumeDto,
   ) {
     return this.autopilotService.resume(req.user.userId, body);
   }
@@ -213,7 +214,7 @@ export class BazarController {
   @Post('products/generate')
   generateDescription(
     @Req() req: AuthenticatedRequest,
-    @Body() body: { rawText: string },
+    @Body() body: GenerateDescriptionDto,
   ) {
     void req;
     return this.bazarService.generateDescription(body.rawText);
@@ -227,6 +228,9 @@ export class BazarController {
    */
   @Get('users/:id/trust')
   getTrust(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    // GAPS-A: анти-enumeration. Раньше несуществующий id → 404, а
+    // существующий-не-продавец → 403 — перебором id можно было узнать, кто
+    // зарегистрирован. Теперь оба случая дают ОДИН и тот же 403 (сервис).
     return this.reputationService.publicTrust(id, req.user);
   }
 }

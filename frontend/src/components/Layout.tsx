@@ -169,6 +169,7 @@ export default function Layout() {
             <Link to="/favorites" className="tap-link px-1 text-[var(--color-muted)] hover:text-[#22c55e] transition-colors">Избранное</Link>
             <Link to="/cart" className="tap-link px-1 text-[var(--color-muted)] hover:text-[#22c55e] transition-colors">Корзина</Link>
             <Link to="/bazar" className="tap-link px-1 text-[var(--color-muted)] hover:text-[#22c55e] transition-colors">Базар</Link>
+            <Link to="/feedback" className="tap-link px-1 text-[var(--color-muted)] hover:text-[#22c55e] transition-colors">Обратная связь</Link>
             <Link to="/privacy" className="tap-link px-1 text-[var(--color-muted)] hover:text-[#22c55e] transition-colors">Приватность</Link>
           </nav>
         </div>

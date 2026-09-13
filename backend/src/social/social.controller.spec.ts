@@ -66,7 +66,7 @@ describe('SocialController', () => {
       const result = await controller.addComment(
         { user: { userId: 'u1', role: 'ADMIN' } },
         'post-1',
-        'Nice!',
+        { text: 'Nice!' },
       );
       expect(result.text).toBe('Nice!');
     });
@@ -85,7 +85,7 @@ describe('SocialController', () => {
       const result = await controller.updateComment(
         { user: { userId: 'u1', role: 'BUYER' } },
         'c1',
-        'Updated',
+        { text: 'Updated' },
       );
       expect(result.text).toBe('Updated');
     });

@@ -11,6 +11,7 @@ import {
   Logger,
   Request,
   Optional,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -126,7 +127,8 @@ export class PaymentsController {
     // Verify HMAC-SHA512 signature
     if (!signature || !this.nowPayments.verifyIpnSignature(body, signature)) {
       this.logger.warn('IPN rejected: invalid signature');
-      return { status: 'rejected', reason: 'invalid_signature' };
+      // GAPS-A: неверная подпись → 401 (было 200). Тело нейтральное.
+      throw new UnauthorizedException('Invalid signature');
     }
 
     const orderId = this.nowPayments.extractOrderId(body);

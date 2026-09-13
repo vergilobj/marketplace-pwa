@@ -13,6 +13,7 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.interface';
 import { SocialService } from './social.service';
+import { CommentTextDto } from './dto/comment-text.dto';
 import {
   PAGINATION_BULK_LIMIT,
   parseLimit,
@@ -58,9 +59,9 @@ export class SocialController {
   async addComment(
     @Request() req: AuthenticatedRequest,
     @Param('postId') postId: string,
-    @Body('text') text: string,
+    @Body() dto: CommentTextDto,
   ) {
-    return this.socialService.addComment(req.user.userId, postId, text);
+    return this.socialService.addComment(req.user.userId, postId, dto.text);
   }
 
   @Get(':postId/comments')
@@ -80,13 +81,13 @@ export class SocialController {
   async updateComment(
     @Request() req: AuthenticatedRequest,
     @Param('commentId') commentId: string,
-    @Body('text') text: string,
+    @Body() dto: CommentTextDto,
   ) {
     return this.socialService.updateComment(
       commentId,
       req.user.userId,
       req.user.role,
-      text,
+      dto.text,
     );
   }
 

@@ -78,9 +78,9 @@ export class PaymentsService {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
-    if (!order) throw new Error('Заказ не найден');
+    if (!order) throw new NotFoundException('Заказ не найден');
     if (order.status !== 'PENDING')
-      throw new Error('Order already paid or cancelled');
+      throw new BadRequestException('Order already paid or cancelled');
 
     // B8/§7.4: комиссии считаются в OrdersService.create / DealService.accept и
     // снапшотятся в Order. Здесь НЕ пересчитываем — иначе ставка, изменённая

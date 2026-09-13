@@ -6,6 +6,7 @@ import {
   Logger,
   Post,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
@@ -46,7 +47,11 @@ export class PaymodWebhookController {
       this.logger.warn(
         'paymod webhook rejected: invalid signature or stale timestamp',
       );
-      return { status: 'rejected', reason: 'invalid_signature' };
+      // GAPS-A: неверная/отсутствующая подпись → 401, а не 200. Раньше
+      // атакующий не видел, что провалился, и лог не сигналил ответом.
+      // Тело нейтральное, без деталей. Легитимный webhook (валидная подпись)
+      // по-прежнему обрабатывается и получает 200.
+      throw new UnauthorizedException('Invalid signature');
     }
 
     const event = body.event as string;

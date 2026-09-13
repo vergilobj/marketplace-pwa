@@ -104,6 +104,9 @@ export class ReputationService {
    *   - чужой — только если у него есть хотя бы один товар (он продавец).
    * Это закрывает enumeration trustScore всех юзеров по id и оставляет
    * публичность там, где она осмысленна.
+   *
+   * GAPS-A: несуществующий юзер для чужого зрителя тоже даёт 403 (не 404) —
+   * чтобы 404-vs-403 не работал как оракул существования аккаунта.
    */
   async publicTrust(
     targetId: string,
@@ -119,11 +122,20 @@ export class ReputationService {
         products: { select: { id: true }, take: 1 },
       },
     });
-    if (!user) throw new NotFoundException('Пользователь не найден');
 
     const isSelf = targetId === viewer.userId;
     const isStaff =
       viewer.role === UserRole.ADMIN || viewer.role === UserRole.MODERATOR;
+
+    // GAPS-A (анти-enumeration N9/N16): несуществующий юзер и существующий-не-
+    // продавец раньше отличались кодом (404 vs 403) — перебором id можно было
+    // узнать, кто зарегистрирован. Теперь ОБА случая дают один и тот же 403 с
+    // одинаковым телом. Свой профиль и ADMIN/MODERATOR по-прежнему видят trust.
+    if (!user && !isSelf && !isStaff) {
+      throw new ForbiddenException('Репутация доступна только для продавцов');
+    }
+    if (!user) throw new NotFoundException('Пользователь не найден');
+
     const isPublicSeller = user.products.length > 0;
 
     if (!isSelf && !isStaff && !isPublicSeller) {
