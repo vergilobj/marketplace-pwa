@@ -48,7 +48,7 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
 
       <div className="p-3.5 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-[#22c55e] text-white text-[11px] font-semibold flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-full bg-[#22c55e] text-[#0d1512] text-[11px] font-semibold flex items-center justify-center shrink-0">
             {(post.author?.name || post.adOwner?.name || 'A')[0].toUpperCase()}
           </div>
           <div>

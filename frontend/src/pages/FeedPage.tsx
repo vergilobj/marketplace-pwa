@@ -18,6 +18,7 @@ import { mergeUniqueById } from '../utils/mergeUnique';
 import { readFeedCache, writeFeedCache } from './feedCache';
 import type { ApiPost, ApiProduct } from '../api/types';
 import { FeedSkeleton } from '../components/ui/Skeleton';
+import { consumeAccessDenied, showAccessDeniedToast } from '../components/accessDeniedNotice';
 
 type SortType = 'newest' | 'popular' | 'price_asc' | 'price_desc';
 type TabType = 'all' | 'posts' | 'products' | 'ads';
@@ -68,6 +69,18 @@ export default function FeedPage() {
   const [sort, setSort] = useState<SortType>('newest');
   // Чистый рендер: момент монтирования читаем один раз (см. adIsLive ниже).
   const [mountedAt] = useState(() => Date.now());
+  /**
+   * COSMETIC-2: объяснение редиректа с закрытого раздела.
+   *
+   * ProtectedRoute вместо молчаливого <Navigate to="/"> оставляет причину в
+   * sessionStorage («Раздел доступен только продавцам») и уводит сюда. Тост,
+   * показанный до анмаунта закрытой страницы, навигацию не переживает, поэтому
+   * показываем его здесь — на странице-приёмнике, читая причину ровно один раз.
+   */
+  useEffect(() => {
+    const denied = consumeAccessDenied();
+    if (denied) showAccessDeniedToast(denied);
+  }, []);
   const [search, setSearch] = useState(() => sp.get('search') || '');
   // R10: поиск уходит на сервер с дебаунсом, а не фильтрует 20 загруженных записей
   const debouncedSearch = useDebounced(search, 300);
@@ -340,7 +353,7 @@ export default function FeedPage() {
         <div className="mb-6 flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar min-w-0 max-w-full">
             {[{ key: 'all', label: 'Всё' }, { key: 'posts', label: 'Канал' }, { key: 'products', label: 'Товары' }, { key: 'ads', label: 'Реклама' }].map(tab => (
-              <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`px-4 min-h-[44px] inline-flex items-center rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${activeTab === tab.key ? 'bg-[#22c55e] text-white' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}>{tab.label}</button>
+              <button key={tab.key} onClick={() => setActiveTab(tab.key as TabType)} className={`px-4 min-h-[44px] inline-flex items-center rounded-lg text-sm font-bold whitespace-nowrap transition-colors ${activeTab === tab.key ? 'bg-[#22c55e] text-[#0d1512]' : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}>{tab.label}</button>
             ))}
           </div>
           <div className="flex gap-1.5 shrink-0 sm:ml-auto max-w-full overflow-x-auto pb-1 no-scrollbar">
@@ -406,7 +419,7 @@ export default function FeedPage() {
                             {!inCart ? (
                               <button
                                 onClick={(e) => { e.stopPropagation(); addToCart(item); }}
-                                className="shrink-0 min-h-[44px] px-5 rounded-xl bg-[#22c55e] text-white text-sm font-bold flex items-center gap-1.5 transition-colors hover:bg-[#16a34a]"
+                                className="shrink-0 min-h-[44px] px-5 rounded-xl bg-[#22c55e] text-[#0d1512] text-sm font-bold flex items-center gap-1.5 transition-colors hover:bg-[#16a34a]"
                               >
                                 <ShoppingCart size={16} /> В корзину
                               </button>
@@ -436,7 +449,7 @@ export default function FeedPage() {
                     </div>
                     <div className="text-sm font-bold text-[#22c55e] whitespace-nowrap">{formatPrice(item.price)}</div>
                     {!inCart ? (
-                      <button onClick={(e) => { e.stopPropagation(); addToCart(item); }} title="В корзину" aria-label="В корзину" className="shrink-0 w-11 h-11 rounded-lg bg-[#22c55e] text-white transition-colors flex items-center justify-center"><ShoppingCart size={17} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); addToCart(item); }} title="В корзину" aria-label="В корзину" className="shrink-0 w-11 h-11 rounded-lg bg-[#22c55e] text-[#0d1512] transition-colors flex items-center justify-center"><ShoppingCart size={17} /></button>
                     ) : (
                       <div className="shrink-0 flex items-center gap-1" onClick={e => e.stopPropagation()}>
                         <button onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }} aria-label="Меньше" className="w-11 h-11 rounded-lg border border-[var(--color-border)] hover:bg-[var(--bg-3)] text-[var(--color-text)] flex items-center justify-center"><Minus size={15} /></button>
@@ -450,7 +463,7 @@ export default function FeedPage() {
               return (
                 <motion.div key={'po-' + item.id} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }} transition={{ duration: 0.2 }} onClick={() => saveScrollAndNavigate(`/posts/${item.id}`)} className={`py-5 cursor-pointer group ${item.isAd ? 'my-3 px-3.5 rounded-2xl border border-[var(--color-border)] transition-all duration-200 hover:border-[#22c55e]/40 hover:bg-gradient-to-br hover:from-[#22c55e]/12 hover:via-transparent hover:to-[#14b8a6]/10 hover:shadow-[0_0_0_1px_rgba(34,197,94,0.08),0_8px_32px_-12px_rgba(34,197,94,0.35)]' : ''}`}>
                   <div className="flex items-center gap-2 mb-1.5">
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[9px] font-bold text-[#0d1512] ${item.isAd ? 'bg-gradient-to-br from-[#22c55e] to-[#14b8a6]' : 'bg-[#22c55e] text-white'}`}>{(item.author?.name || item.adOwner?.name || 'A')[0].toUpperCase()}</div>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[9px] font-bold text-[#0d1512] ${item.isAd ? 'bg-gradient-to-br from-[#22c55e] to-[#14b8a6]' : 'bg-[#22c55e]'}`}>{(item.author?.name || item.adOwner?.name || 'A')[0].toUpperCase()}</div>
                     <span className="text-xs text-[var(--color-muted)]">{item.author?.name || item.adOwner?.name || 'Аноним'}</span>
                     {item.isAd && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#22c55e] text-[#0d1512] text-[9px] font-extrabold uppercase tracking-wide shadow-[0_0_12px_rgba(34,197,94,0.4)]">Реклама</span>}
                   </div>

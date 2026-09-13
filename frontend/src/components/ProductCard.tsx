@@ -57,7 +57,7 @@ export default function ProductCard({ product }: { product: ApiProduct }) {
           aria-label={fav ? 'Убрать из избранного' : 'В избранное'}
           className="fav-btn absolute top-0.5 right-0.5 w-11 h-11 flex items-center justify-center"
         >
-          <span className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${fav ? 'bg-[#22c55e] text-white' : 'bg-black/60 text-white opacity-0 group-hover:opacity-100'}`}>
+          <span className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${fav ? 'bg-[#22c55e] text-[#0d1512]' : 'bg-black/60 text-white opacity-0 group-hover:opacity-100'}`}>
             <Heart size={15} fill={fav ? 'currentColor' : 'none'} />
           </span>
         </button>
@@ -78,7 +78,7 @@ export default function ProductCard({ product }: { product: ApiProduct }) {
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); addToCart(product); }}
-              className="w-11 h-11 rounded-lg bg-[#22c55e] text-white hover:bg-[#16a34a] transition-colors flex items-center justify-center shrink-0"
+              className="w-11 h-11 rounded-lg bg-[#22c55e] text-[#0d1512] hover:bg-[#16a34a] transition-colors flex items-center justify-center shrink-0"
               title="В корзину"
               aria-label="В корзину"
             >

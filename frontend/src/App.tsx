@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Layout from './components/Layout';
+import AccessDenied from './components/AccessDenied';
+import { rememberAccessDenied } from './components/accessDeniedNotice';
 import { useAuth } from './hooks/useAuth';
 
 // Eager — critical path (first paint)
@@ -57,9 +59,30 @@ function Lazy({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * COSMETIC-2: сколько держим объяснение «раздел недоступен», прежде чем
+ * молча уйти на главную. Раньше редирект был мгновенным и без причины.
+ */
+const ACCESS_DENIED_DWELL_MS = 5000;
+
+/** Человеческий текст причины — по требуемой роли. */
+function deniedReasonText(requiredRole?: string): string {
+  return requiredRole === 'ADMIN'
+    ? 'Раздел доступен только администраторам'
+    : 'Раздел доступен только продавцам';
+}
+
+/** Заголовок заглушки: с каким именно разделом не пустили. */
+function deniedTitle(requiredRole?: string): string {
+  return requiredRole === 'ADMIN'
+    ? 'Раздел только для администраторов'
+    : 'Раздел только для продавцов';
+}
+
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string }) {
   const { isAuthenticated, user, rolePending, refresh } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   /**
    * BUG-2: роль в клейме access-токена статична. Если админ одобрил заявку
@@ -93,6 +116,36 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode;
     };
   }, [isAuthenticated, refresh]);
 
+  /**
+   * COSMETIC-2: роль проверена и не подходит.
+   *
+   * Guard НЕ ослаблен — условие ровно то же, что было в старом редиректе
+   * (`role !== requiredRole && role !== 'ADMIN'`), и children по-прежнему
+   * не рендерятся: ни один компонент закрытого раздела не монтируется и
+   * ни одного его запроса не уходит. Меняется только ИНФОРМИРОВАНИЕ:
+   * вместо мгновенного молчаливого <Navigate to="/"> показываем объяснение
+   * (адрес остаётся прежним) и через паузу уводим на главную, где лента
+   * показывает тост с причиной.
+   */
+  const roleBlocked =
+    !!requiredRole && !rolePending && user?.role !== requiredRole && user?.role !== 'ADMIN';
+
+  useEffect(() => {
+    if (!roleBlocked) return;
+    const reason = deniedReasonText(requiredRole);
+    // Причина уходит в sessionStorage: тост, показанный до анмаунта, не
+    // переживает навигацию — его покажет лента на своей стороне.
+    rememberAccessDenied({
+      path: location.pathname,
+      reason: requiredRole ?? '',
+      message: `${reason}. Возвращаем на главную`,
+    });
+    const timer = window.setTimeout(() => {
+      navigate('/', { replace: true });
+    }, ACCESS_DENIED_DWELL_MS);
+    return () => window.clearTimeout(timer);
+  }, [roleBlocked, requiredRole, location.pathname, navigate]);
+
   // location.state.from — чтобы после логина вернуть юзера туда, откуда выкинуло.
   if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location }} />;
   /**
@@ -103,7 +156,13 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode;
    * либо рендер, либо редирект.
    */
   if (requiredRole && rolePending) return <div className="min-h-screen" role="status" aria-label="Загрузка" />;
-  if (requiredRole && user?.role !== requiredRole && user?.role !== 'ADMIN') return <Navigate to="/" replace />;
+  if (roleBlocked)
+    return (
+      <AccessDenied
+        title={deniedTitle(requiredRole)}
+        description={`${deniedReasonText(requiredRole)}. Доступ к этому разделу закрыт — через несколько секунд вернём на главную.`}
+      />
+    );
   return <>{children}</>;
 }
 

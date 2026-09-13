@@ -18,8 +18,16 @@ const Button: React.FC<ButtonProps> = ({
     'inline-flex items-center justify-center px-6 py-3 rounded-full font-semibold text-sm transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100';
 
   const variants: Record<string, string> = {
+    /*
+     * COSMETIC-2: текст — ТЁМНЫЙ, а не #0b0e0d.
+     *
+     * Фон primary задаётся inline-стилем (градиент #22c55e→#34d399), поэтому
+     * класс цвета должен побеждать. #0b0e0d на #0d1512-фоне карточек давал
+     * нечитаемый текст в пустых состояниях (/favorites, /cart).
+     * #0d1512 на зелёном = 8.13:1 — тот же канон, что у остальных кнопок.
+     */
     primary:
-      'text-[#0b0e0d] hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(34,197,94,0.38)]',
+      'text-[#0d1512] hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(34,197,94,0.38)]',
     secondary:
       'text-[var(--color-text)] bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.12)] backdrop-blur hover:border-[rgba(34,197,94,0.5)] hover:text-[#22c55e]',
     ghost:

@@ -122,7 +122,7 @@ export default function Layout() {
                 <DesktopIcon to="/notifications" title="Уведомления">
                   <Bell size={18} />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                    <span className="absolute -top-0.5 -right-0.5 badge-count text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>
                   )}
                 </DesktopIcon>
                 <DesktopIcon to="/profile" title="Профиль"><User size={18} /></DesktopIcon>
@@ -205,7 +205,7 @@ export default function Layout() {
               icon={
                 <>
                   <Bell size={20} />
-                  {unreadCount > 0 && <span className="absolute -top-1 right-3 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-4 h-4 px-0.5 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+                  {unreadCount > 0 && <span className="absolute -top-1 right-3 badge-count text-[9px] font-bold rounded-full min-w-4 h-4 px-0.5 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>}
                 </>
               }
               label="Уведом."
