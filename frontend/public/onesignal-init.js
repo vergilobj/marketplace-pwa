@@ -81,7 +81,10 @@ function maybeShowPushPrompt(OneSignal) {
 
 function showPushPrompt(mode, OneSignal) {
   if (document.getElementById('bazar-push-prompt')) return;
-  if (sessionStorage.getItem('bazar_push_prompt_closed') === '1') return;
+  // ⚠️ sessionStorage может бросать в приватном режиме Safari — оборачиваем.
+  try {
+    if (sessionStorage.getItem('bazar_push_prompt_closed') === '1') return;
+  } catch (_) { /* storage недоступен — просто показываем плашку */ }
 
   const C = {
     card: 'var(--card, #111d18)',
@@ -157,10 +160,16 @@ function showPushPrompt(mode, OneSignal) {
   });
 
   const close = () => {
-    sessionStorage.setItem('bazar_push_prompt_closed', '1');
+    // ⚠️ ПОРЯДОК КРИТИЧЕН: сначала визуально прячем, потом пишем в хранилище.
+    // В приватном режиме Safari `sessionStorage` бросает QuotaExceededError.
+    // Раньше setItem стоял ПЕРВЫМ → исключение прерывало функцию и плашка
+    // оставалась висеть (реальный баг, воспроизведён 2026-09-14).
     el.style.opacity = '0';
     el.style.transform = 'translateY(12px)';
     setTimeout(() => el.remove(), 250);
+    try {
+      sessionStorage.setItem('bazar_push_prompt_closed', '1');
+    } catch (_) { /* приватный режим / storage заблокирован — не критично */ }
   };
 
   document.getElementById('bazar-push-close')?.addEventListener('click', close);
@@ -172,19 +181,28 @@ function showPushPrompt(mode, OneSignal) {
 
   document.getElementById('bazar-push-no')?.addEventListener('click', close);
 
-  document.getElementById('bazar-push-yes')?.addEventListener('click', async () => {
-    const btn = document.getElementById('bazar-push-yes');
-    if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
-    try {
-      // Клик = жест пользователя → Chrome разрешает показать нативный запрос.
-      const granted = await OneSignal.Notifications.requestPermission();
-      if (granted) {
-        try { await OneSignal.User.PushSubscription.optIn(); } catch (_) { /* noop */ }
-      }
-    } catch (e) {
-      console.warn('requestPermission failed:', e && e.message);
-    }
+  document.getElementById('bazar-push-yes')?.addEventListener('click', () => {
+    // ГЛАВНОЕ: закрываем плашку СРАЗУ, синхронно, до всяких await.
+    // Раньше close() стоял после await requestPermission() — если промис
+    // не резолвился (iOS-PWA, закрытый системный диалог), плашка висела
+    // навсегда. Теперь исчезновение не зависит от ответа браузера.
     close();
+
+    // Дальше — разрешение в фоне. Клик уже случился (жест пользователя),
+    // поэтому нативный запрос Chrome/Safari показать разрешено.
+    (async () => {
+      try {
+        const granted = await Promise.race([
+          OneSignal.Notifications.requestPermission(),
+          new Promise((resolve) => setTimeout(() => resolve(false), 15000)),
+        ]);
+        if (granted) {
+          try { await OneSignal.User.PushSubscription.optIn(); } catch (_) { /* noop */ }
+        }
+      } catch (e) {
+        console.warn('requestPermission failed:', e && e.message);
+      }
+    })();
   });
 }
 
