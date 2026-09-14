@@ -72,6 +72,7 @@ export const ALL_TEST_PHONE_PREFIXES = [
   'fixcrit-', // users-search-leak.integration.spec.ts (FIX-CRIT regression)
   'fb-', // test/feedback.e2e-spec.ts (обратная связь)
   'fbt-', // test/feedback-thread.e2e-spec.ts (тред обращений)
+  'cst-', // test/consult.e2e-spec.ts (ИИ-консультант, ЭТАП 2)
   'gaps-a-', // test/gaps-a-validation-webhook-trust.e2e-spec.ts (GAPS-A)
 ];
 
@@ -292,6 +293,9 @@ export async function cleanupTestData(
   // ── 1. Листья: всё, что ссылается на User/Order/Product ───────────────
   await prisma.notification.deleteMany({ where: { userId: inUsers } });
   await prisma.auditLog.deleteMany({ where: { userId: inUsers } });
+  // ConsultLog.userId — БЕЗ FK (см. schema.prisma), но чистим явно: иначе
+  // логи консультанта копятся между прогонами и ломают счётчики истории.
+  await prisma.consultLog.deleteMany({ where: { userId: inUsers } });
   // SellerRequest.userId — RESTRICT: без этого `user.deleteMany` падает.
   await prisma.sellerRequest.deleteMany({ where: { userId: inUsers } });
   await prisma.withdrawalRequest.deleteMany({ where: { userId: inUsers } });

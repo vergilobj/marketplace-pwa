@@ -550,6 +550,55 @@ export class FeedbackService {
     return updated;
   }
 
+  /**
+   * Ответ ИИ в треде (§5.2 ШАГ 5, Этап 2 ТЗ).
+   *
+   * Отдельный вход, а не `postAdminMessage`: автор — `AI` (kind=AI_ANSWER),
+   * юзер всегда видит, что это не человек (FR-2.2). Переиспользует
+   * `appendMessage`, поэтому статус (AI_HANDLED), счётчики и `lastMessageAt`
+   * считаются по общим правилам §4.3, а не «руками» — рассинхрона не будет.
+   *
+   * Уведомление автору НЕ шлётся: это ответ на его же вопрос в его же треде,
+   * push «вам ответил ИИ» через секунду после вопроса — шум. Админам тоже не
+   * шлётся (правило §4.3: ИИ не дёргает админа на каждый чих).
+   */
+  async postAiMessage(
+    feedbackId: string,
+    body: string,
+    meta?: Prisma.InputJsonValue,
+  ) {
+    const text = this.resolveBody(body);
+    await this.getById(feedbackId);
+
+    return this.appendMessage({
+      feedbackId,
+      authorId: null,
+      authorRole: 'AI',
+      body: text,
+      kind: 'AI_ANSWER',
+      meta,
+      silent: true,
+    });
+  }
+
+  /**
+   * Найти открытый тред юзера, в который можно дописать ответ ИИ (§5.2 ШАГ 5).
+   *
+   * Условие SPEC: последнее сообщение не старше 24 часов. Закрытые треды не
+   * трогаем — там разговор закончен, продолжение должно создавать новый.
+   */
+  async findOpenThreadForConsult(userId: string) {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    return this.prisma.feedback.findFirst({
+      where: {
+        userId,
+        status: { not: 'CLOSED' },
+        lastMessageAt: { gte: cutoff },
+      },
+      orderBy: { lastMessageAt: 'desc' },
+    });
+  }
+
   // ==================== Статистика ====================
 
   /**
@@ -712,8 +761,17 @@ export class FeedbackService {
     authorRole: string;
     body: string;
     kind: FeedbackMessageKind;
+    /** Метаданные сообщения (для AI_ANSWER — knowledgeEntryId/confidence). */
+    meta?: Prisma.InputJsonValue;
+    /**
+     * Не слать уведомления вообще (ни автору, ни админам).
+     * Нужен ответам ИИ: это ответ на вопрос юзера в его же треде, пинг
+     * «вам ответил ИИ» через секунду после вопроса — шум (§4.3).
+     */
+    silent?: boolean;
   }) {
-    const { feedbackId, authorId, authorRole, body, kind } = input;
+    const { feedbackId, authorId, authorRole, body, kind, meta, silent } =
+      input;
     const isNote = kind === 'NOTE';
     const isAi = authorRole === 'AI';
     const isSystem = authorRole === 'SYSTEM';
@@ -726,6 +784,7 @@ export class FeedbackService {
           authorRole,
           body,
           kind,
+          meta: meta ?? undefined,
           // Заметка админа юзеру не видна — сразу «прочитана» им, иначе
           // счётчик unreadForUser навсегда застрянет на невидимом сообщении.
           isReadByUser: authorRole === 'USER' || isNote,
@@ -771,8 +830,9 @@ export class FeedbackService {
     const counters = await this.syncCounters(feedbackId);
     const updated = await this.getById(feedbackId);
 
-    // Уведомления — только для «настоящих» сообщений (не NOTE/SYSTEM).
-    if (!isNote && !isSystem) {
+    // Уведомления — только для «настоящих» сообщений (не NOTE/SYSTEM)
+    // и только когда вызывающий явно не попросил молчать (silent).
+    if (!isNote && !isSystem && !silent) {
       if (authorRole === 'USER') {
         await this.notifyAdminsAboutUserMessage(updated);
       } else {

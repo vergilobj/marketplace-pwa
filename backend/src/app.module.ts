@@ -20,6 +20,7 @@ import { AuditModule } from './common/audit/audit.module';
 import { AlertsModule } from './common/alerts/alerts.module';
 import { BazarModule } from './bazar/bazar.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { ConsultModule } from './consult/consult.module';
 
 @Module({
   imports: [
@@ -48,6 +49,8 @@ import { FeedbackModule } from './feedback/feedback.module';
     AlertsModule,
     BazarModule,
     FeedbackModule,
+    // ЭТАП 2: ИИ-консультант (база знаний — Этап 3).
+    ConsultModule,
   ],
   providers: [
     {

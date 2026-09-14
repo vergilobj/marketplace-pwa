@@ -35,6 +35,8 @@ import { SettingsModule } from '../settings/settings.module';
     ProactiveService,
     ArbitrageService,
   ],
-  exports: [BazarService, BazarApiClient, DealService],
+  // CatalogSearchService экспортируется для ConsultModule (ЭТАП 2):
+  // ИИ-консультант берёт товарный контекст тем же сервисом, что и Базар.
+  exports: [BazarService, BazarApiClient, DealService, CatalogSearchService],
 })
 export class BazarModule {}

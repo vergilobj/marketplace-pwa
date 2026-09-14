@@ -593,3 +593,32 @@ model FeedbackMessage {
 
   @@index([feedbackId, createdAt])
 }
+
+/**
+ * Лог обращений к ИИ-консультанту (ЭТАП 2 ТЗ §5.2 ШАГ 6, §5.5 №14).
+ *
+ * Зачем отдельная таблица, а не только BazarMessage: `ConsultLog` хранит
+ * машинную телеметрию ответа — источник (`KNOWLEDGE | CATALOG | LLM | FALLBACK`),
+ * уверенность, ссылку на знание и на созданный тред, задержку. По ней считаются
+ * метрики «сколько вопросов ИИ закрыл сам» и работает rate-limit.
+ *
+ * `userId` — БЕЗ FK-relation намеренно: схему делят несколько задач, а User
+ * трогать нельзя (новые обратные связи ломают чужие ветки). Очистка — в
+ * `cleanupTestData` по userId.
+ */
+model ConsultLog {
+  id          String  @id @default(uuid())
+  userId      String
+  question    String
+  answer      String
+  source      String // KNOWLEDGE | CATALOG | LLM | FALLBACK
+  knowledgeId String?
+  similarity  Float?
+  helpful     Boolean?
+  feedbackId  String? // если ушло в фолбэк — созданный/дополненный тред
+  latencyMs   Int?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([source, createdAt])
+}
