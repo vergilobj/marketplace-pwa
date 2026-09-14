@@ -130,8 +130,9 @@ function showPushPrompt(mode, OneSignal) {
   el.setAttribute('aria-label', 'Включить уведомления');
   el.style.cssText = [
     'position:fixed', 'left:12px', 'right:12px',
-    // iOS PWA: учитываем home-индикатор + высоту таб-бара
-    'bottom:calc(96px + var(--safe-bottom, 0px))',
+    // Плашка НЕ должна перекрывать FAB консультанта (он на bottom:96px, 56px высотой).
+    // Поднимаем над ним: 96 + 56 + 12 = 164px.
+    'bottom:calc(164px + var(--safe-bottom, 0px))',
     'z-index:2147483001', 'max-width:420px', 'margin:0 auto',
     `background:${C.card}`, `color:${C.ink}`,
     // Граница + двойная тень: карточка НЕ должна сливаться с фоном страницы
