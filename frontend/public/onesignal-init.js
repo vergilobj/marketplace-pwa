@@ -46,14 +46,11 @@ OneSignalDeferred.push(async function (OneSignal) {
       allowLocalhostAsSecureOrigin: true,
     });
 
-    // Если разрешение ещё не выдано — просим сразу при входе, каждый раз.
-    // OneSignal по умолчанию не повторяет slidedown после отказа, поэтому
-    // сбрасываем флаг и вызываем промпт вручную.
+    // Если разрешение ещё не выдано — показываем промпт сразу при входе.
+    // В v16 есть только OneSignal.Slidedown.promptPush()
+    // (метода setIsSlidedownAllowed из v15 больше НЕТ).
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
       try {
-        if (OneSignal.Slidedown?.setIsSlidedownAllowed) {
-          OneSignal.Slidedown.setIsSlidedownAllowed(true);
-        }
         if (OneSignal.Slidedown?.promptPush) {
           await OneSignal.Slidedown.promptPush();
         }
