@@ -92,7 +92,7 @@ export class ProductsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('BUYER', 'SELLER', 'ADMIN')
+  @Roles('SELLER', 'ADMIN')
   @Post()
   async create(
     @Request() req: AuthenticatedRequest,
