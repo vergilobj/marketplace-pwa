@@ -60,7 +60,14 @@ export default function Layout() {
   const isSeller = user?.role === 'SELLER' || user?.role === 'ADMIN';
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+    <div
+      className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]"
+      style={{
+        paddingTop: 'var(--safe-top)',
+        paddingLeft: 'var(--safe-left)',
+        paddingRight: 'var(--safe-right)',
+      }}
+    >
       <header className="sticky top-3 z-50 px-4">
         <div className="max-w-5xl mx-auto flex items-center gap-2 h-16 px-3.5 rounded-2xl bg-[rgba(17,25,24,0.72)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] shadow-[0_8px_32px_-8px_rgba(0,0,0,0.5)] relative">
           {/* Логотип */}
@@ -149,7 +156,7 @@ export default function Layout() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 md:pb-10">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:pb-10" style={{ paddingBottom: 'calc(7rem + var(--safe-bottom))' }}>
         <PageTransition><Outlet /></PageTransition>
       </main>
 
@@ -182,7 +189,11 @@ export default function Layout() {
 
       <nav
         aria-label="Основная навигация"
-        className="md:hidden fixed bottom-3 left-3 right-3 bg-[rgba(17,25,24,0.88)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] rounded-2xl flex justify-around items-center py-2 z-40 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)]"
+        className="md:hidden fixed left-3 right-3 bg-[rgba(17,25,24,0.88)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] rounded-2xl flex justify-around items-center py-2 z-40 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)]"
+        style={{
+          // iOS PWA: поднимаем меню над home-индикатором. В браузере = 12px (как было).
+          bottom: 'calc(0.75rem + var(--safe-bottom))',
+        }}
       >
         <MobileTab to="/" icon={<Home size={20} />} label="Главная" pathname={location.pathname} />
         <MobileTab to="/bazar" icon={<Sparkles size={20} />} label="Базар" pathname={location.pathname} />

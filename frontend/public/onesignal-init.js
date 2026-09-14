@@ -63,17 +63,23 @@ function currentPermission() {
 
 function maybeShowPushPrompt(OneSignal) {
   const { isIOS, isStandalone } = detectPlatform();
-  const perm = currentPermission();
 
-  // Уже подписаны или отказались — не мозолим глаза.
-  if (perm === 'granted') return;
-  if (perm === 'denied') return;
-
-  // iOS вне «Домой»: нативный push невозможен, показываем инструкцию.
+  // 🔴 ВАЖНО: ветку iOS проверяем ПЕРВОЙ, до проверки permission.
+  // В обычной вкладке Safari на iOS web push НЕ поддерживается, и браузер
+  // может вернуть `denied` — ранний return по permission съедал инструкцию
+  // «Добавить на экран Домой» (реальный баг 2026-09-14: владелец не видел
+  // подсказку вообще). Инструкция про установку приложения не зависит от
+  // разрешения — её показываем всегда, пока приложение не добавлено.
   if (isIOS && !isStandalone) {
     showPushPrompt('ios-install', OneSignal);
     return;
   }
+
+  const perm = currentPermission();
+
+  // Уже подписаны или отказались — не мозолим глаза (Android/десктоп/standalone).
+  if (perm === 'granted') return;
+  if (perm === 'denied') return;
 
   // iOS уже на экране «Домой» или Android/десктоп — можно просить разрешение.
   showPushPrompt('enable', OneSignal);
@@ -103,7 +109,9 @@ function showPushPrompt(mode, OneSignal) {
   el.setAttribute('aria-modal', 'false');
   el.setAttribute('aria-label', 'Включить уведомления');
   el.style.cssText = [
-    'position:fixed', 'left:12px', 'right:12px', 'bottom:88px',
+    'position:fixed', 'left:12px', 'right:12px',
+    // iOS PWA: учитываем home-индикатор + высоту таб-бара
+    'bottom:calc(88px + var(--safe-bottom, 0px))',
     'z-index:2147483001', 'max-width:420px', 'margin:0 auto',
     `background:${C.card}`, `color:${C.ink}`,
     // Граница + двойная тень: карточка НЕ должна сливаться с фоном страницы
