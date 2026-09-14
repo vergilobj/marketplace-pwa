@@ -23,9 +23,10 @@ OneSignalDeferred.push(async function (OneSignal) {
         offset: { bottom: '80px', right: '15px' },
         showCredit: false,
       },
-      // Мягкий промпт: показывается сам, без нативного запроса браузера.
-      // Нативное разрешение спрашивается только после клика «Да» —
-      // Chrome блокирует автозапросы без действия пользователя.
+      // Мягкий промпт показываем СРАЗУ (без задержки).
+      // ⚠️ Chrome запрещает вызывать нативный запрос разрешения без клика
+      // пользователя (политика с 2020). Поэтому сразу показываем свой
+      // slidedown, а нативное разрешение спрашивается после «Да, включить».
       promptOptions: {
         slidedown: {
           prompts: [
@@ -37,13 +38,29 @@ OneSignalDeferred.push(async function (OneSignal) {
                 acceptButton: 'Да, включить',
                 cancelButton: 'Позже',
               },
-              delay: { pageViews: 2, timeDelay: 20 },
+              delay: { pageViews: 1, timeDelay: 0 },
             },
           ],
         },
       },
       allowLocalhostAsSecureOrigin: true,
     });
+
+    // Если разрешение ещё не выдано — просим сразу при входе, каждый раз.
+    // OneSignal по умолчанию не повторяет slidedown после отказа, поэтому
+    // сбрасываем флаг и вызываем промпт вручную.
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      try {
+        if (OneSignal.Slidedown?.setIsSlidedownAllowed) {
+          OneSignal.Slidedown.setIsSlidedownAllowed(true);
+        }
+        if (OneSignal.Slidedown?.promptPush) {
+          await OneSignal.Slidedown.promptPush();
+        }
+      } catch (e) {
+        console.warn('Slidedown prompt skipped:', e && e.message);
+      }
+    }
     window.OneSignal = OneSignal;
   } catch (e) {
     console.warn('OneSignal init skipped:', e && e.message);
