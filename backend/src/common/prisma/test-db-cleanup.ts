@@ -71,6 +71,7 @@ export const ALL_TEST_PHONE_PREFIXES = [
   'alert-', // scripts/verify-money-alerts.js
   'fixcrit-', // users-search-leak.integration.spec.ts (FIX-CRIT regression)
   'fb-', // test/feedback.e2e-spec.ts (обратная связь)
+  'fbt-', // test/feedback-thread.e2e-spec.ts (тред обращений)
   'gaps-a-', // test/gaps-a-validation-webhook-trust.e2e-spec.ts (GAPS-A)
 ];
 
