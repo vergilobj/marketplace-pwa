@@ -6,7 +6,19 @@
     <meta name="theme-color" content="#0b0e0d" />
     <title>Базар</title>
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <!--
+      iOS web push: Apple разрешает пуши ТОЛЬКО для web-приложений,
+      добавленных на главный экран (iOS 16.4+). Для этого нужны:
+        - manifest с display: standalone (уже есть)
+        - apple-mobile-web-app-capable = yes
+        - apple-touch-icon ровно 180x180
+      Без этих тегов Safari не считает сайт приложением и push не работает.
+    -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Базар" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
