@@ -69,7 +69,7 @@ export default function Layout() {
         paddingRight: 'var(--safe-right)',
       }}
     >
-      <header className="sticky z-50 px-4" style={{ top: 'calc(var(--safe-top) + 8px)' }}>
+      <header className="sticky z-50 px-4" style={{ top: 'calc(var(--safe-top) + 14px)' }}>
         <div className="max-w-5xl mx-auto flex items-center gap-2 h-16 px-3.5 rounded-2xl bg-[rgba(17,25,24,0.72)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] shadow-[0_8px_32px_-8px_rgba(0,0,0,0.5)] relative">
           {/* Логотип */}
           {/* R14: лого было 36px высотой — тач-зона ≥44px */}
@@ -195,9 +195,9 @@ export default function Layout() {
           // `fixed` НЕ наследует padding родителя → safe-area считаем сами.
           // База 20px снизу / 16px по бокам — чтобы был воздух ДАЖЕ если
           // env(safe-area-inset-*) вернёт 0 (десктоп, часть браузеров).
-          left: 'calc(var(--safe-left) + 16px)',
-          right: 'calc(var(--safe-right) + 16px)',
-          bottom: 'calc(var(--safe-bottom) + 20px)',
+          left: 'calc(var(--safe-left) + 18px)',
+          right: 'calc(var(--safe-right) + 18px)',
+          bottom: 'calc(var(--safe-bottom) + 32px)',
         }}
       >
         <MobileTab to="/" icon={<Home size={20} />} label="Главная" pathname={location.pathname} />
