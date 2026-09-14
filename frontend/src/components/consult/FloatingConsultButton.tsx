@@ -64,9 +64,13 @@ export default function FloatingConsultButton() {
           // 56px (круг) — тач-таргет заметно больше требуемых 44px.
           background: '#22c55e',
           color: '#0b0e0d',
-          bottom: 'calc(var(--safe-bottom) + 96px)',
-          // Правее этого значения сидит колокольчик OneSignal (right 15px, ~48px).
-          right: 'calc(var(--safe-right) + 80px)',
+          // FIX (2026-09-14): было bottom 96 / right 80 — кнопка прижималась
+          // к нижнему меню (зазор 2px) и висела далеко от правого края.
+          // Ставим 18px от края (как у меню) и ПОДНИМАЕМ над колокольчиком
+          // OneSignal: он занимает bottom 80..112 (32px), поэтому FAB с
+          // bottom 136 сидит выше него с зазором 16px и не перекрывает.
+          bottom: 'calc(var(--safe-bottom) + 136px)',
+          right: 'calc(var(--safe-right) + 18px)',
         }}
       >
         <AnimatePresence mode="wait" initial={false}>
