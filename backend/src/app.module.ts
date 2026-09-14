@@ -21,6 +21,7 @@ import { AlertsModule } from './common/alerts/alerts.module';
 import { BazarModule } from './bazar/bazar.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { ConsultModule } from './consult/consult.module';
+import { KnowledgeModule } from './knowledge/knowledge.module';
 
 @Module({
   imports: [
@@ -51,6 +52,8 @@ import { ConsultModule } from './consult/consult.module';
     FeedbackModule,
     // ЭТАП 2: ИИ-консультант (база знаний — Этап 3).
     ConsultModule,
+    // ЭТАП 3: база знаний + обучение на ответах админов (§6).
+    KnowledgeModule,
   ],
   providers: [
     {

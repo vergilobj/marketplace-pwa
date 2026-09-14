@@ -522,17 +522,19 @@ describe('ИИ-консультант (integration): /consult/*', () => {
     expect(res.body.answer).toContain('1500');
   });
 
-  // ── База знаний (Этап 3): хук честно пустой ───────────────────────────
+  // ── База знаний (Этап 3): поиск подключён к таблице ───────────────────
 
-  it('базы знаний ещё нет — поиск отдаёт пусто и не мешает ответу', async () => {
-    // В тестовой БД KnowledgeEntry НЕ создаётся (её предмет — Этап 3).
+  it('таблица базы знаний существует и поиск не мешает ответу', async () => {
+    // ЭТАП 3 создал KnowledgeEntry миграцией 20260914130000_knowledge_base.
+    // Здесь проверяем ИНТЕГРАЦИЮ: поиск видит таблицу и, не найдя совпадений,
+    // не ломает обычный ответ консультанта.
     const tables = await prisma.$queryRawUnsafe<{ table_name: string }[]>(
       `SELECT table_name FROM information_schema.tables
         WHERE table_schema = current_schema() AND table_name = 'KnowledgeEntry'`,
     );
-    expect(tables.length).toBe(0);
+    expect(tables.length).toBe(1);
 
-    const res = await ask({ text: 'Вопрос при отсутствующей базе знаний' }).expect(
+    const res = await ask({ text: 'Вопрос при пустой базе знаний' }).expect(
       201,
     );
     expect(res.body.source).not.toBe('KNOWLEDGE');

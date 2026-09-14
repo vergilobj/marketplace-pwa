@@ -23,9 +23,11 @@ import {
   BadRequestException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   Logger,
   ServiceUnavailableException,
+  forwardRef,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -105,6 +107,7 @@ export class ConsultService {
     private readonly api: BazarApiClient,
     private readonly catalog: CatalogSearchService,
     private readonly knowledge: KnowledgeSearchService,
+    @Inject(forwardRef(() => FeedbackService))
     private readonly feedback: FeedbackService,
   ) {}
 

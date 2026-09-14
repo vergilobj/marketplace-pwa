@@ -622,3 +622,84 @@ model ConsultLog {
   @@index([userId, createdAt])
   @@index([source, createdAt])
 }
+
+/**
+ * База знаний консультанта (ЭТАП 3 ТЗ §6.1, §4.1).
+ *
+ * Это и есть «папка со шпаргалками»: пара «вопрос → ответ», написанная
+ * админом (или одобренная им из ответа ИИ). Модель НЕ дообучается —
+ * `KnowledgeSearchService` находит подходящую запись по `questionNorm`
+ * (pg_trgm + FTS) и консультант отвечает словами админа.
+ *
+ * `questionNorm` — нормализованная формулировка (lower, ё→е, без пунктуации
+ * и стоп-слов), считается в коде через `knowledge-normalizer.normalize()`.
+ * Это ключ поиска, поэтому он ОБЯЗАН заполняться при каждой записи вопроса.
+ *
+ * `productId` — без FK-relation намеренно: схему делят несколько задач,
+ * модель `Product` трогать нельзя. Целостность держит миграция.
+ *
+ * Статусы строками (DRAFT | ACTIVE | STALE | ARCHIVED | REVIEW), а не enum:
+ * набор состояний расширяется без миграции БД, валидация — на DTO.
+ */
+model KnowledgeEntry {
+  id           String  @id @default(uuid())
+  question     String // эталонная формулировка (её правит админ)
+  questionNorm String // нормализованная — по ней ищем
+  answer       String
+  answerShort  String? // короткая версия для чата
+
+  productId String?
+  tags      String[] @default([])
+  category  String? // доставка | оплата | гарантия | товар | прочее
+
+  source String @default("ADMIN") // ADMIN | IMPORT | AI_APPROVED
+  status String @default("ACTIVE") // DRAFT | ACTIVE | STALE | ARCHIVED | REVIEW
+
+  createdById      String?
+  sourceFeedbackId String? // тред, из ответа в котором выросло знание
+
+  usageCount      Int       @default(0)
+  helpfulCount    Int       @default(0)
+  notHelpfulCount Int       @default(0)
+  lastUsedAt      DateTime?
+  reviewDueAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, lastUsedAt])
+  @@index([category])
+  @@index([productId])
+}
+
+/**
+ * Кандидат в базу знаний (ЭТАП 3 ТЗ §6.1 ПУТЬ A).
+ *
+ * Админ ответил в треде → ответ автоматически становится кандидатом
+ * (`PENDING`), а в UI появляется плашка «Сохранить как знание?». Админ
+ * ОБЯЗАТЕЛЬНО правит формулировку вопроса (FR-3.2): вопрос юзера («а скок
+ * доставка?») — плохой ключ поиска, эталонный пишет админ.
+ *
+ * `messageId` уникален: один ответ админа — ровно один кандидат (иначе
+ * повторная отправка сообщения плодила бы дубли).
+ *
+ * `PENDING` — из ответа админа, `REVIEW` — из подтверждённого юзером ответа
+ * ИИ (ПУТЬ C). `knowledgeEntryId` заполняется при одобрении — это связь
+ * «какое знание выросло из какого кандидата».
+ */
+model KnowledgeCandidate {
+  id        String @id @default(uuid())
+  feedbackId String
+  messageId String @unique // ответ админа, из которого вырос кандидат
+
+  questionDraft String // вопрос юзера как есть
+  answerDraft   String
+  status        String @default("PENDING") // PENDING | REVIEW | ACCEPTED | REJECTED
+
+  createdById      String?
+  knowledgeEntryId String?
+  createdAt        DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([feedbackId])
+}

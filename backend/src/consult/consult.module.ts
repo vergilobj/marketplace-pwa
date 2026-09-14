@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConsultController } from './consult.controller';
 import { ConsultService } from './consult.service';
 import { KnowledgeSearchService } from './knowledge-search.service';
@@ -8,7 +8,7 @@ import { ModerationModule } from '../moderation/moderation.module';
 import { SettingsModule } from '../settings/settings.module';
 
 /**
- * ИИ-консультант «Базар» (ЭТАП 2 ТЗ §5.1).
+ * ИИ-консультант «Базар» (ЭТАП 2 ТЗ §5.1, база знаний — ЭТАП 3 §6).
  *
  * Отдельный модуль, а не расширение BazarModule: Базар — про сделки и каталог,
  * консультант — про ответы на вопросы. Общий у них только транспорт к LLM,
@@ -16,18 +16,18 @@ import { SettingsModule } from '../settings/settings.module';
  *
  * Единственная точка вызова LLM остаётся одна — `BazarApiClient.complete()`.
  *
- * Чего здесь НЕТ на этом этапе:
+ * Чего здесь НЕТ:
  *   - KnowledgeModule (`knowledge.service.ts`, `knowledge.controller.ts`) —
- *     база знаний создаётся на Этапе 3 (§6). `KnowledgeSearchService` уже
- *     готов к ней и отдаёт пустой результат, пока таблицы нет;
+ *     он импортирует ЭТОТ модуль ради `KnowledgeSearchService`, обратной
+ *     зависимости нет (иначе цикл). CRUD базы знаний живёт в KnowledgeModule;
  *   - ConsultCron (автозакрытие тредов + устаревание знаний) — автозакрытие
- *     тредов уже живёт в `FeedbackService.autoCloseStaleThreads` (§4.3),
- *     устареванию знаний нужна таблица знаний.
+ *     тредов живёт в `FeedbackService.autoCloseStaleThreads` (§4.3),
+ *     устаревание знаний — в `KnowledgeService.runMaintenance` (§6.3).
  */
 @Module({
   imports: [
     BazarModule,
-    FeedbackModule,
+    forwardRef(() => FeedbackModule),
     ModerationModule,
     SettingsModule,
   ],

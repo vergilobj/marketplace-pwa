@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../api/axios';
-import { Bell, Heart, MessageCircle, ShoppingBag, Gift, CheckCheck } from 'lucide-react';
+import { Bell, Heart, MessageCircle, ShoppingBag, Gift, CheckCheck, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -17,7 +17,24 @@ const icons: Record<string, React.ReactNode> = {
   order: <ShoppingBag size={13} className="text-[#22c55e]" />,
   referral: <Gift size={13} className="text-amber-400" />,
   broadcast: <Bell size={13} className="text-[#34d399]" />,
+  feedback: <MessageCircle size={13} className="text-[#22c55e]" />,
+  consult: <Sparkles size={13} className="text-[#34d399]" />,
 };
+
+/**
+ * ЭТАП 4 §4.5 п.3: куда ведёт уведомление по типу.
+ *
+ * До правки клик по уведомлению только помечал его прочитанным — юзер видел
+ * «Ответ по обращению…» и не мог перейти к самому ответу. Теперь типы с
+ * `relatedId` открывают тред обращения; остальные остаются некликабельными.
+ */
+function notificationHref(n: { type?: string; relatedId?: string | null }): string | null {
+  const related = n?.relatedId;
+  if (!related) return null;
+  if (n.type === 'feedback' || n.type === 'consult') return `/feedback/${related}`;
+  if (n.type === 'order') return `/orders?highlight=${related}`;
+  return null;
+}
 
 /**
  * FIX-REST фикс 9: было 100.
@@ -108,25 +125,33 @@ export default function NotificationsPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {list.map((n,i) => (
+            {list.map((n,i) => {
+              const href = notificationHref(n);
+              const Card: React.ElementType = href ? Link : 'div';
+              return (
               <motion.div
                 key={n.id}
                 initial={{opacity:0,x:-8}}
                 animate={{opacity:1,x:0}}
                 transition={{delay:i*0.02}}
-                onClick={()=>!n.isRead&&markRead(n.id)}
-                className={`rounded-2xl p-4 cursor-pointer transition-all bg-[var(--color-surface)] border ${!n.isRead ? 'border-[#22c55e]/40' : 'border-[var(--color-border)]'} hover:border-[#22c55e]/60`}
               >
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-[var(--bg-3)] flex items-center justify-center shrink-0">{icons[n.type]||<Bell size={13}/>}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${!n.isRead?'font-bold text-[var(--color-text)]':'text-[var(--color-muted)]'}`}>{n.message}</p>
-                    <p className="text-[11px] text-[var(--color-faint)] mt-1">{n.createdAt?format(new Date(n.createdAt),'d MMM, HH:mm',{locale:ru}):''}</p>
+                <Card
+                  {...(href ? { to: href } : {})}
+                  onClick={()=>!n.isRead&&markRead(n.id)}
+                  className={`block rounded-2xl p-4 cursor-pointer transition-all bg-[var(--color-surface)] border ${!n.isRead ? 'border-[#22c55e]/40' : 'border-[var(--color-border)]'} hover:border-[#22c55e]/60`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-[var(--bg-3)] flex items-center justify-center shrink-0">{icons[n.type]||<Bell size={13}/>}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm ${!n.isRead?'font-bold text-[var(--color-text)]':'text-[var(--color-muted)]'}`}>{n.message}</p>
+                      <p className="text-[11px] text-[var(--color-faint)] mt-1">{n.createdAt?format(new Date(n.createdAt),'d MMM, HH:mm',{locale:ru}):''}</p>
+                    </div>
+                    {!n.isRead && <div className="w-2 h-2 rounded-full bg-[#22c55e] shrink-0 mt-1.5"/>}
                   </div>
-                  {!n.isRead && <div className="w-2 h-2 rounded-full bg-[#22c55e] shrink-0 mt-1.5"/>}
-                </div>
+                </Card>
               </motion.div>
-            ))}
+              );
+            })}
           </div>
         )}
 

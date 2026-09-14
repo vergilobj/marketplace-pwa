@@ -22,12 +22,17 @@
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import {
   extractKeywords,
   extractTopics,
   normalize,
   trigramSimilarity,
 } from './knowledge-normalizer';
+
+/** Пороги §5.2 (совпадают с дефолтами consult.dto, задаются в Setting). */
+const DEFAULT_CONFIDENCE_THRESHOLD = 0.45;
+const DEFAULT_HINT_THRESHOLD = 0.25;
 
 /** Одна запись базы знаний в том виде, в котором её видит консультант. */
 export interface KnowledgeHit {
@@ -89,7 +94,37 @@ export function __resetKnowledgeTableCache(): void {
 export class KnowledgeSearchService {
   private readonly logger = new Logger(KnowledgeSearchService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settings: SettingsService,
+  ) {}
+
+  /** Порог «отвечаем прямо из базы знаний» (§5.2 ШАГ 3, §5.6). */
+  async confidenceThreshold(): Promise<number> {
+    return this.settingNumber(
+      'consult_confidence_threshold',
+      DEFAULT_CONFIDENCE_THRESHOLD,
+    );
+  }
+
+  /** Порог «подкладываем знания в промпт» (RAG-lite, §5.2 ШАГ 3, §5.6). */
+  async hintThreshold(): Promise<number> {
+    return this.settingNumber(
+      'consult_hint_threshold',
+      DEFAULT_HINT_THRESHOLD,
+    );
+  }
+
+  private async settingNumber(key: string, def: number): Promise<number> {
+    try {
+      const raw = await this.settings.get(key);
+      const n = raw != null ? Number(raw) : NaN;
+      return Number.isFinite(n) ? n : def;
+    } catch {
+      // Настройки недоступны (нет таблицы Setting) — работаем на дефолтах.
+      return def;
+    }
+  }
 
   /**
    * Найти ответ в базе знаний.
@@ -207,11 +242,91 @@ export class KnowledgeSearchService {
           LIMIT ${CANDIDATE_LIMIT}`,
         ...params,
       );
-      return rows;
+
+      // §6.2 п.3: параллельно FTS по 'russian' — ловит случаи, где trgm
+      // промахивается на порядке слов. Скор объединяем по max (п.4).
+      const fts = await this.fetchByFullText(text, productId);
+      return this.mergeByMaxSim(rows, fts);
     } catch {
       // pg_trgm недоступен — keyword-режим.
       return this.fetchByKeywords(text, productId);
     }
+  }
+
+  /**
+   * Полнотекстовый поиск (§6.2 п.3).
+   *
+   * `ts_rank` нормируем к 0..1 делением на 0.5 (rank для короткого вопроса
+   * почти всегда < 0.5) и жёстко клампим: нужен порядок величин, сравнимый с
+   * similarity, а не точная семантика ранга.
+   *
+   * Любая ошибка (нет конфигурации russian, нет колонки) — пустой результат:
+   * FTS здесь вспомогательный, падать из-за него нельзя.
+   */
+  private async fetchByFullText(
+    text: string,
+    productId?: string | null,
+  ): Promise<RawKnowledgeRow[]> {
+    const query = this.buildTsQuery(text);
+    if (!query) return [];
+
+    try {
+      const productFilter =
+        productId != null
+          ? `AND ("productId" IS NULL OR "productId" = $2)`
+          : '';
+      const params: unknown[] = productId != null ? [query, productId] : [query];
+      return await this.prisma.$queryRawUnsafe<RawKnowledgeRow[]>(
+        `SELECT id, question, "answerShort", answer, "productId",
+                "usageCount", "helpfulCount", "notHelpfulCount",
+                "lastUsedAt", "updatedAt",
+                LEAST(1.0, ts_rank(to_tsvector('russian', question),
+                                    to_tsquery('russian', $1)) / 0.5) AS sim
+           FROM "KnowledgeEntry"
+          WHERE status = 'ACTIVE'
+            AND to_tsvector('russian', question) @@ to_tsquery('russian', $1)
+            ${productFilter}
+          ORDER BY sim DESC, "usageCount" DESC
+          LIMIT ${CANDIDATE_LIMIT}`,
+        ...params,
+      );
+    } catch (err) {
+      this.logger.debug(
+        `FTS по базе знаний недоступен: ${(err as Error).message}`,
+      );
+      return [];
+    }
+  }
+
+  /** `to_tsquery`-строка из значимых слов: `доставка | ижевск`. */
+  private buildTsQuery(text: string): string | null {
+    const words = extractTopics(text)
+      .filter((w) => w.length >= 3)
+      .map((w) => w.replace(/[^a-zа-я0-9]/gi, ''))
+      .filter(Boolean);
+    if (!words.length) return null;
+    return words.join(' | ');
+  }
+
+  /** Объединение trgm- и FTS-выборок: скор = max(sim), дубли по id схлопываем. */
+  private mergeByMaxSim(
+    trgm: RawKnowledgeRow[],
+    fts: RawKnowledgeRow[],
+  ): RawKnowledgeRow[] {
+    const byId = new Map<string, RawKnowledgeRow>();
+    for (const row of [...trgm, ...fts]) {
+      const known = byId.get(row.id);
+      if (!known) {
+        byId.set(row.id, { ...row });
+        continue;
+      }
+      const a = typeof known.sim === 'number' ? known.sim : 0;
+      const b = typeof row.sim === 'number' ? row.sim : 0;
+      if (b > a) known.sim = row.sim;
+    }
+    return Array.from(byId.values()).sort(
+      (x, y) => (y.sim ?? 0) - (x.sim ?? 0),
+    );
   }
 
   /** Keyword-фолбэк: ILIKE по значимым словам, похожесть считаем в приложении. */

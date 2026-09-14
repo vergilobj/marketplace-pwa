@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShoppingCart, Minus, Plus, ArrowLeft, ChevronLeft, ChevronRight, Heart,
   Sparkles, Video, PackageX, LayoutGrid, Clock, CheckCircle2, ShieldCheck,
-  Loader2, User,
+  Loader2, User, Bot,
 } from 'lucide-react';
 import { getProductById, getSimilarProducts } from '../api/products';
 import { createOrder, getOrderPaymentStatus } from '../api/orders';
@@ -485,6 +485,16 @@ export default function ProductDetailPage() {
             </button>
           )}
 
+          {/* ЭТАП 4 §5.4: «Спросить у ИИ» — ведёт на страницу консультанта с
+              контекстом товара. Существующие кнопки («Купить», «В корзину»,
+              «Купить через Базара») не тронуты: это отдельная строка ниже. */}
+          <button
+            onClick={() => navigate(`/consult?productId=${product.id}`)}
+            className="hidden lg:flex w-full mt-2 items-center justify-center gap-2 px-4 py-3 rounded-xl border border-[var(--color-border)] text-[var(--color-text)] hover:border-[#22c55e]/40 hover:bg-[var(--color-surface)] transition-colors text-sm font-bold"
+          >
+            <Bot size={16} /> Спросить у ИИ
+          </button>
+
           {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
         </div>
       </div>
@@ -678,6 +688,16 @@ export default function ProductDetailPage() {
             <Sparkles size={15} /> Купить через Базара
           </button>
         )}
+
+        {/* ЭТАП 4 §5.4: «Спросить у ИИ» на мобиле — прямо в панели действий,
+            чтобы вопрос по товару был в один тап (плавающая кнопка на этой
+            странице скрыта и не конфликтует с «Купить»). */}
+        <button
+          onClick={() => navigate(`/consult?productId=${product.id}`)}
+          className="mt-2 w-full min-h-[44px] flex items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] text-[var(--color-text)] text-sm font-bold"
+        >
+          <Bot size={15} /> Спросить у ИИ
+        </button>
       </div>
 
       {/* Модалка фото */}

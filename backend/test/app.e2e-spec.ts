@@ -24,23 +24,29 @@ describe('App E2E', () => {
   });
 
   describe('Public Endpoints', () => {
-    it('GET /products returns array', async () => {
+    // L1 (2026-09-12): списки отдают пагинированный конверт
+    // { items, total, page, pages }, а не голый массив. Тесты обновлены
+    // под текущий контракт (были написаны до введения пагинации).
+    it('GET /products returns paginated envelope', async () => {
       const res = await request(app.getHttpServer())
         .get('/products')
         .expect(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(Array.isArray(res.body.items)).toBe(true);
+      expect(typeof res.body.total).toBe('number');
     });
 
-    it('GET /posts returns array', async () => {
+    it('GET /posts returns paginated envelope', async () => {
       const res = await request(app.getHttpServer()).get('/posts').expect(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(Array.isArray(res.body.items)).toBe(true);
+      expect(typeof res.body.total).toBe('number');
     });
 
-    it('GET /posts/feed returns array', async () => {
+    it('GET /posts/feed returns paginated envelope', async () => {
       const res = await request(app.getHttpServer())
         .get('/posts/feed')
         .expect(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(Array.isArray(res.body.items)).toBe(true);
+      expect(typeof res.body.total).toBe('number');
     });
 
     it('GET /products/:id 404 for missing', async () => {
@@ -118,10 +124,14 @@ describe('App E2E', () => {
       request(app.getHttpServer()).get('/invites').expect(401));
     it('GET /settings returns 401', () =>
       request(app.getHttpServer()).get('/settings').expect(401));
-    it('POST /chat/webhook returns 401', () =>
+    // p2p-чат отключён (ChatModule убран из AppModule), роут /chat/webhook
+    // больше не существует → 404. Проверяем защиту актуального эндпоинта.
+    it('GET /feedback/my returns 401', () =>
+      request(app.getHttpServer()).get('/feedback/my').expect(401));
+    it('POST /consult/ask returns 401', () =>
       request(app.getHttpServer())
-        .post('/chat/webhook')
-        .send({ id: 'm1', text: 'hi' })
+        .post('/consult/ask')
+        .send({ text: 'hi' })
         .expect(401));
   });
 });

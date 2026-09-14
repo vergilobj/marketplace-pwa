@@ -73,6 +73,7 @@ export const ALL_TEST_PHONE_PREFIXES = [
   'fb-', // test/feedback.e2e-spec.ts (обратная связь)
   'fbt-', // test/feedback-thread.e2e-spec.ts (тред обращений)
   'cst-', // test/consult.e2e-spec.ts (ИИ-консультант, ЭТАП 2)
+  'kno-', // test/knowledge.e2e-spec.ts (база знаний, ЭТАП 3)
   'gaps-a-', // test/gaps-a-validation-webhook-trust.e2e-spec.ts (GAPS-A)
 ];
 
@@ -296,6 +297,24 @@ export async function cleanupTestData(
   // ConsultLog.userId — БЕЗ FK (см. schema.prisma), но чистим явно: иначе
   // логи консультанта копятся между прогонами и ломают счётчики истории.
   await prisma.consultLog.deleteMany({ where: { userId: inUsers } });
+  // База знаний (ЭТАП 3): KnowledgeEntry/KnowledgeCandidate тоже БЕЗ FK на
+  // User — чистим явно, иначе тестовые знания протекают в следующие прогоны
+  // и ломают и дедупликацию, и статистику поиска.
+  await prisma.knowledgeCandidate.deleteMany({ where: { createdById: inUsers } });
+  await prisma.knowledgeEntry.deleteMany({ where: { createdById: inUsers } });
+  // Кандидаты/знания, привязанные к тредам наших юзеров (createdById мог быть
+  // null, если админ удалён раньше).
+  const feedbackIdsOfUsers = await prisma.feedback.findMany({
+    where: { userId: inUsers },
+    select: { id: true },
+  });
+  if (feedbackIdsOfUsers.length) {
+    const fids = { in: feedbackIdsOfUsers.map((f) => f.id) };
+    await prisma.knowledgeCandidate.deleteMany({ where: { feedbackId: fids } });
+    await prisma.knowledgeEntry.deleteMany({
+      where: { sourceFeedbackId: fids },
+    });
+  }
   // SellerRequest.userId — RESTRICT: без этого `user.deleteMany` падает.
   await prisma.sellerRequest.deleteMany({ where: { userId: inUsers } });
   await prisma.withdrawalRequest.deleteMany({ where: { userId: inUsers } });

@@ -4,11 +4,13 @@ import { getInvites, createInvite, deleteInvite } from '../api/invites';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { Users, ShoppingBag, Newspaper, Wallet, TrendingUp, Download, Plus, Trash2, Copy, Check, Settings, Loader2, MessageSquare } from 'lucide-react';
+import { Users, ShoppingBag, Newspaper, Wallet, TrendingUp, Download, Plus, Trash2, Copy, Check, Settings, Loader2, MessageSquare, BookOpen } from 'lucide-react';
 import { formatPhone } from '../utils/phone';
 import { formatPrice } from "../utils/format";
 import { resolveMedia } from '../utils/media';
 import { mergeUniqueById } from '../utils/mergeUnique';
+import KnowledgeTab from './admin/KnowledgeTab';
+import AdminFeedbackPanel, { type AdminFeedbackListItem } from './admin/AdminFeedbackPanel';
 import type {
   ApiAdminDashboard,
   ApiInvite,
@@ -32,46 +34,34 @@ const tabs = [
   { key: 'transactions', label: 'Транзакции', icon: <Wallet size={15} /> },
   { key: 'withdrawals', label: 'Выводы', icon: <Download size={15} /> },
   { key: 'feedback', label: 'Обратная связь', icon: <MessageSquare size={15} /> },
+  { key: 'knowledge', label: 'База знаний', icon: <BookOpen size={15} /> },
   { key: 'settings', label: 'Настройки', icon: <Settings size={15} /> },
 ];
 
 /**
  * Обращение из `GET /admin/feedback`. Форма ответа — `{ items, total, page,
  * limit }` (как у остальных админ-списков), `user` приходит урезанным select'ом.
+ *
+ * ЭТАП 4 §4.6: тип переиспользуется двухпанельным тредом
+ * (`admin/AdminFeedbackPanel.tsx`) — единый источник правды по полям.
  */
-type AdminFeedback = {
-  id: string;
-  type: string;
-  message: string;
-  contact?: string | null;
-  status: string;
-  adminNote?: string | null;
-  createdAt: string;
-  user?: { id: string; name?: string | null; phone?: string | null; role?: string } | null;
-};
+export type AdminFeedback = AdminFeedbackListItem;
 
-/** Тип → подпись. Ключи совпадают с FEEDBACK_TYPES на бэкенде. */
-const FEEDBACK_TYPE_LABELS: Record<string, string> = {
-  SUGGESTION: 'Предложение',
-  REQUEST: 'Просьба',
-  QUESTION: 'Вопрос',
-  CONSULTATION: 'Консультация',
-  BUG: 'Баг',
-  OTHER: 'Другое',
-};
-
-/** Статус → подпись и цвет. Ключи совпадают с FEEDBACK_STATUSES на бэкенде. */
-const FEEDBACK_STATUSES: Array<{ key: string; label: string }> = [
-  { key: 'NEW', label: 'Новое' },
+/**
+ * Фильтры треда обращений (§4.3: у треда шесть статусов, а не три).
+ *
+ * Было: NEW / IN_PROGRESS / CLOSED — жизненный цикл из одной строки. Стало:
+ * появляются WAITING_ADMIN / WAITING_USER / AI_HANDLED, и админу нужен фильтр
+ * «Ждёт админа» — иначе очередь не видно.
+ */
+const FEEDBACK_STATUS_FILTERS: Array<{ key: string; label: string }> = [
+  { key: 'WAITING_ADMIN', label: 'Ждёт админа' },
+  { key: 'NEW', label: 'Новые' },
   { key: 'IN_PROGRESS', label: 'В работе' },
+  { key: 'WAITING_USER', label: 'Ждём юзера' },
+  { key: 'AI_HANDLED', label: 'Ответил ИИ' },
   { key: 'CLOSED', label: 'Закрыто' },
 ];
-
-const FEEDBACK_STATUS_CLASSES: Record<string, string> = {
-  NEW: 'bg-[#22c55e]/10 text-[#22c55e]',
-  IN_PROGRESS: 'bg-amber-400/10 text-amber-400',
-  CLOSED: 'bg-white/[0.04] text-[var(--color-muted)]',
-};
 
 /** Post в админке приходит с relation author — берём это из ApiPost. */
 type AdminPost = ApiPost & { author?: { id: string; name?: string | null } | null };
@@ -98,8 +88,8 @@ export default function AdminPage() {
   const [withdrawals, setWithdrawals] = useState<ApiWithdrawal[]>([]);
   const [feedbacks, setFeedbacks] = useState<AdminFeedback[]>([]);
   const [feedbackStatus, setFeedbackStatus] = useState('');
-  /** Черновики заметок админа по id обращения — до нажатия «Сохранить». */
-  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  /** Открытый тред в двухпанельном виде (§4.6) — id выбранного обращения. */
+  const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
   const [settings, setSettings] = useState<ApiSettings>({});
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -238,29 +228,25 @@ export default function AdminPage() {
   const handleUpdateSetting = async (key: string, value: string) => { try { await api.put('/settings', { key, value }); setSettings((prev) => ({ ...prev, [key]: value })); toast.success('Сохранено'); } catch { toast.error('Ошибка'); } };
 
   /**
-   * Смена статуса обращения. Заметка отправляется вместе со статусом, если
-   * админ её набрал (иначе достаточно смены статуса). Локальный стейт
-   * обновляем ответом сервера — так UI не расходится с БД.
+   * Смена статуса обращения (§4.3).
+   *
+   * Раньше сюда же уезжала «Заметка админа» (плоское поле `adminNote`) — ЭТАП 4
+   * заменил его на тред сообщений, поэтому здесь остаётся только статус, а сам
+   * ответ админа уходит через `POST /admin/feedback/:id/messages` из
+   * `AdminFeedbackPanel`. Локальный стейт обновляем ответом сервера — UI не
+   * расходится с БД.
    */
   const handleUpdateFeedback = async (id: string, status?: string) => {
-    const noteDraft = noteDrafts[id];
-    const payload: { status?: string; adminNote?: string } = {};
-    if (status) payload.status = status;
-    if (noteDraft !== undefined) payload.adminNote = noteDraft;
-
-    if (!payload.status && payload.adminNote === undefined) {
+    if (!status) {
       toast.error('Нечего сохранять');
       return;
     }
 
     try {
-      const r = await api.patch<AdminFeedback>(`/admin/feedback/${id}`, payload);
-      setFeedbacks((prev) => prev.map((f) => (f.id === id ? { ...f, ...r.data } : f)));
-      setNoteDrafts((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
+      const r = await api.patch<AdminFeedback>(`/admin/feedback/${id}`, { status });
+      setFeedbacks((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, ...(r.data ?? {}), status } : f)),
+      );
       toast.success('Сохранено');
     } catch {
       toast.error('Ошибка');
@@ -418,8 +404,16 @@ export default function AdminPage() {
   ];
 
   /**
-   * Таб «Обратная связь»: список обращений с автором, фильтр по статусу,
-   * смена статуса и заметка админа. Пагинация — общая кнопка «Показать ещё».
+   * Таб «Обратная связь» (ЭТАП 4 §5, SPEC §4.6).
+   *
+   * Было: карточки со «Заметкой админа» (плоское поле `adminNote`).
+   * Стало: двухпанельный тред — список слева, переписка справа. Ответы админа
+   * уходят отдельным эндпоинтом `/admin/feedback/:id/messages`, а под ответом
+   * появляется плашка «Сохранить как знание?» (ПУТЬ A §6.1).
+   *
+   * Панель вынесена в отдельный компонент: тред держит собственное состояние
+   * (сообщения, кандидаты в знания, черновики), и держать это в AdminPage,
+   * который и без того весит 600+ строк, было бы регрессом читаемости.
    */
   const renderFeedback = () => (
     <div>
@@ -436,7 +430,7 @@ export default function AdminPage() {
         >
           Все
         </button>
-        {FEEDBACK_STATUSES.map((s) => (
+        {FEEDBACK_STATUS_FILTERS.map((s) => (
           <button
             key={s.key}
             type="button"
@@ -452,101 +446,15 @@ export default function AdminPage() {
         ))}
       </div>
 
-      {feedbacks.length === 0 ? (
-        <p className="text-sm text-[var(--color-muted)] py-10 text-center">
-          {feedbackStatus ? 'В этом статусе обращений нет' : 'Обращений пока нет'}
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {feedbacks.map((f) => (
-            <div
-              key={f.id}
-              className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--color-text)] truncate">
-                    {f.user?.name || 'Без имени'}
-                  </p>
-                  <p className="text-xs text-[var(--color-muted)]">
-                    {f.user?.phone ? formatPhone(f.user.phone) : '—'}
-                    {f.contact ? ` • связь: ${f.contact}` : ''}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)]">
-                    {FEEDBACK_TYPE_LABELS[f.type] || f.type}
-                  </span>
-                  <span
-                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
-                      FEEDBACK_STATUS_CLASSES[f.status] || FEEDBACK_STATUS_CLASSES.CLOSED
-                    }`}
-                  >
-                    {FEEDBACK_STATUSES.find((s) => s.key === f.status)?.label || f.status}
-                  </span>
-                </div>
-              </div>
-
-              <p className="text-sm text-[var(--color-text)] whitespace-pre-wrap break-words">
-                {f.message}
-              </p>
-
-              <p className="text-[11px] text-[var(--color-faint)] mt-2">
-                {f.createdAt
-                  ? format(new Date(f.createdAt), 'd MMM yyyy, HH:mm', { locale: ru })
-                  : ''}
-              </p>
-
-              {/* Заметка админа: показываем уже сохранённую, если черновика нет */}
-              <div className="mt-3">
-                <label
-                  htmlFor={`feedback-note-${f.id}`}
-                  className="block text-[11px] font-semibold text-[var(--color-muted)] mb-1"
-                >
-                  Заметка админа (уйдёт автору в уведомлении)
-                </label>
-                <textarea
-                  id={`feedback-note-${f.id}`}
-                  rows={2}
-                  maxLength={1000}
-                  value={noteDrafts[f.id] ?? f.adminNote ?? ''}
-                  onChange={(e) =>
-                    setNoteDrafts((prev) => ({ ...prev, [f.id]: e.target.value }))
-                  }
-                  placeholder="Что решили / что ответить автору"
-                  className="w-full px-3 py-2 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm outline-none focus:border-[#22c55e]/50 transition-all resize-none placeholder:text-[var(--color-faint)]"
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 mt-2">
-                {FEEDBACK_STATUSES.map((s) => (
-                  <button
-                    key={s.key}
-                    type="button"
-                    onClick={() => void handleUpdateFeedback(f.id, s.key)}
-                    disabled={f.status === s.key && noteDrafts[f.id] === undefined}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 ${
-                      f.status === s.key
-                        ? 'bg-[#22c55e]/10 text-[#22c55e]'
-                        : 'bg-[var(--bg-3)] text-[var(--color-muted)] hover:text-[var(--color-text)]'
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => void handleUpdateFeedback(f.id)}
-                  disabled={noteDrafts[f.id] === undefined}
-                  className="ml-auto px-3 py-1.5 rounded-lg bg-[#22c55e] text-[#0d1512] text-xs font-bold hover:bg-[#16a34a] transition-all disabled:opacity-40"
-                >
-                  Сохранить заметку
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <AdminFeedbackPanel
+        items={feedbacks}
+        activeId={activeFeedbackId}
+        onSelect={setActiveFeedbackId}
+        onChangeStatus={handleUpdateFeedback}
+        onRefresh={async () => {
+          await loadTab('feedback', 1, search, true, feedbackStatus);
+        }}
+      />
     </div>
   );
 
@@ -577,6 +485,7 @@ export default function AdminPage() {
       case 'transactions': return renderTransactions();
       case 'withdrawals': return renderWithdrawals();
       case 'feedback': return renderFeedback();
+      case 'knowledge': return <KnowledgeTab />;
       case 'settings': return renderSettings();
       default: return null;
     }

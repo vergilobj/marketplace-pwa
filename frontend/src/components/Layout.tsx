@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../hooks/useAuth';
 import PageTransition from './PageTransition';
 import { CreateMenu } from './CreateMenu';
+import FloatingConsultButton from './consult/FloatingConsultButton';
 import { isNavActive } from './navActive';
 
 const GS = { background: '#22c55e' } as const;
@@ -235,6 +236,12 @@ export default function Layout() {
           <MobileTab to="/login" icon={<User size={20} />} label="Войти" pathname={location.pathname} />
         )}
       </nav>
+
+      {/* ЭТАП 4 §5.4: плавающая кнопка ИИ-консультанта — на всех страницах,
+          кроме /consult (там чат целиком). Компонент сам решает, показываться
+          ли: скрыт для гостя и на мобильной карточке товара (там своя кнопка и
+          нижняя панель действий, поверх которой FAB сел бы на «Купить»). */}
+      <FloatingConsultButton />
     </div>
   );
 }

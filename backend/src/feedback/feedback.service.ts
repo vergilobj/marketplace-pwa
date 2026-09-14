@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { Prisma, UserRole } from '@prisma/client';
@@ -11,6 +13,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AlertsService } from '../common/alerts/alerts.service';
+import { KnowledgeService } from '../knowledge/knowledge.service';
 import {
   PAGINATION_BULK_LIMIT,
   clampLimit,
@@ -100,6 +103,14 @@ export class FeedbackService {
     private readonly notifications: NotificationsService,
     private readonly alerts: AlertsService,
     private readonly moderation: ModerationService,
+    /**
+     * ЭТАП 3 §6.1 ПУТЬ A: ответ админа в треде автоматически становится
+     * кандидатом в базу знаний. Связь обратная (KnowledgeService тоже берёт
+     * отсюда статистику треда), поэтому модули ссылаются друг на друга через
+     * `forwardRef` — цикл узкий и осознанный.
+     */
+    @Inject(forwardRef(() => KnowledgeService))
+    private readonly knowledge: KnowledgeService,
   ) {}
 
   // ==================== Создание ====================
@@ -332,7 +343,10 @@ export class FeedbackService {
     }
 
     const where: Prisma.FeedbackMessageWhereInput = { feedbackId: id };
-    if (!admin) where.kind = { not: 'NOTE' };
+    // NOTE — внутренняя заметка админа, KNOWLEDGE — служебная запись о
+    // сохранении в базу знаний. Юзеру ни то, ни другое не показывается
+    // (FR-3.7: база знаний — раздел админки).
+    if (!admin) where.kind = { notIn: ['NOTE', 'KNOWLEDGE'] };
 
     const messages = await this.prisma.feedbackMessage.findMany({
       where,
@@ -421,9 +435,67 @@ export class FeedbackService {
         });
         result.feedback = await this.getById(feedbackId);
       }
+
+      // §6.1 ПУТЬ A: ответ админа → черновик знания. Только для тредов-вопросов
+      // (QUESTION/CONSULTATION): ответ в треде «баг» или «предложение» — это
+      // разбор конкретного случая, а не знание для базы.
+      if (result.feedback.type === 'QUESTION' || result.feedback.type === 'CONSULTATION') {
+        // Вопросом-черновиком берём ПОСЛЕДНИЙ вопрос юзера в треде (на него и
+        // отвечали); админ отредактирует формулировку при одобрении (FR-3.2).
+        const candidate = await this.knowledge.createCandidateFromAdminMessage({
+          feedbackId,
+          messageId: result.message.id,
+          questionDraft:
+            (await this.lastUserQuestion(feedbackId)) ??
+            result.feedback.subject ??
+            result.message.body,
+          answerDraft: text,
+          createdById: adminId,
+        });
+        if (candidate) {
+          // Флаг для фронта: показать плашку «Сохранить как знание?».
+          (result as { knowledgeCandidate?: unknown }).knowledgeCandidate =
+            candidate;
+        }
+      }
     }
 
     return result;
+  }
+
+  /**
+   * Сообщение kind=KNOWLEDGE — «в базу знаний сохранено».
+   *
+   * Пишется при одобрении кандидата (§6.1 ПУТЬ A). Юзеру оно не показывается
+   * как ответ (kind не TEXT), но остаётся в истории треда: видно, какое
+   * знание родилось из какой переписки. Уведомления не шлём — это служебная
+   * запись, а не ответ человеку.
+   */
+  async postKnowledgeMessage(
+    feedbackId: string,
+    meta: Prisma.InputJsonValue,
+    body?: string,
+  ): Promise<void> {
+    await this.getById(feedbackId);
+    await this.appendMessage({
+      feedbackId,
+      authorId: null,
+      authorRole: 'SYSTEM',
+      body: body ?? 'Ответ сохранён в базу знаний консультанта.',
+      kind: 'KNOWLEDGE',
+      meta,
+      silent: true,
+    });
+  }
+
+  /** Последний вопрос юзера в треде — черновик формулировки знания. */
+  private async lastUserQuestion(feedbackId: string): Promise<string | null> {
+    const msg = await this.prisma.feedbackMessage.findFirst({
+      where: { feedbackId, authorRole: 'USER' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { body: true },
+    });
+    return msg?.body ?? null;
   }
 
   /**
@@ -787,7 +859,10 @@ export class FeedbackService {
           meta: meta ?? undefined,
           // Заметка админа юзеру не видна — сразу «прочитана» им, иначе
           // счётчик unreadForUser навсегда застрянет на невидимом сообщении.
-          isReadByUser: authorRole === 'USER' || isNote,
+          // KNOWLEDGE — служебная запись о сохранении в базу: бейдж юзеру о
+          // ней не нужен (он про неё не знает), поэтому тоже «прочитана».
+          isReadByUser:
+            authorRole === 'USER' || isNote || kind === 'KNOWLEDGE',
           isReadByAdmin: authorRole === 'ADMIN' || isAi || isSystem,
         },
       });
@@ -857,7 +932,11 @@ export class FeedbackService {
   private async syncCounters(feedbackId: string) {
     const [unreadForUser, unreadForAdmin] = await Promise.all([
       this.prisma.feedbackMessage.count({
-        where: { feedbackId, isReadByUser: false, kind: { not: 'NOTE' } },
+        where: {
+          feedbackId,
+          isReadByUser: false,
+          kind: { notIn: ['NOTE', 'KNOWLEDGE'] },
+        },
       }),
       this.prisma.feedbackMessage.count({
         where: {
@@ -895,7 +974,7 @@ export class FeedbackService {
         where: {
           feedbackId,
           isReadByUser: false,
-          kind: { not: 'NOTE' },
+          kind: { notIn: ['NOTE', 'KNOWLEDGE'] },
         },
         data: { isReadByUser: true },
       });
@@ -937,7 +1016,9 @@ export class FeedbackService {
 
     for (const id of ids) {
       const mine = messages.filter((m) => m.feedbackId === id);
-      const visible = mine.filter((m) => m.kind !== 'NOTE');
+      const visible = mine.filter(
+        (m) => m.kind !== 'NOTE' && m.kind !== 'KNOWLEDGE',
+      );
       out.set(id, {
         lastPreview: visible.length ? previewOf(visible[0].body) : null,
         hasAiAnswer: mine.some((m) => m.kind === 'AI_ANSWER'),
