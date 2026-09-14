@@ -10,6 +10,27 @@
 // Порядок гарантирован `defer`: этот файл подключён ПОСЛЕ SDK OneSignal
 // в index.html, defer сохраняет порядок выполнения.
 window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+// 🔴 ПЛАШКА ПОКАЗЫВАЕТСЯ ДО И НЕЗАВИСИМО ОТ OneSignal.
+// Раньше вызов стоял внутри try ПОСЛЕ `await OneSignal.init()`. На iOS Safari
+// в обычной вкладке web push не поддерживается, init падает → catch →
+// инструкция «Добавить на экран Домой» НЕ ПОКАЗЫВАЛАСЬ ВООБЩЕ (реальный баг
+// 2026-09-14). Инструкция про установку приложения не имеет отношения к SDK —
+// показываем её сразу, без ожидания и без зависимости от инициализации.
+(function showPromptEarly() {
+  const run = () => {
+    try { maybeShowPushPrompt(window.OneSignal || null); }
+    catch (e) { console.warn('push prompt error:', e && e.message); }
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', run, { once: true });
+  } else {
+    run();
+  }
+  // Страховка: если DOM ещё не был готов на момент defer-скрипта.
+  window.addEventListener('load', run, { once: true });
+})();
+
 OneSignalDeferred.push(async function (OneSignal) {
   try {
     await OneSignal.init({
@@ -32,7 +53,6 @@ OneSignalDeferred.push(async function (OneSignal) {
     });
 
     window.OneSignal = OneSignal;
-    maybeShowPushPrompt(OneSignal);
   } catch (e) {
     console.warn('OneSignal init skipped:', e && e.message);
   }
@@ -111,7 +131,7 @@ function showPushPrompt(mode, OneSignal) {
   el.style.cssText = [
     'position:fixed', 'left:12px', 'right:12px',
     // iOS PWA: учитываем home-индикатор + высоту таб-бара
-    'bottom:calc(88px + var(--safe-bottom, 0px))',
+    'bottom:calc(96px + var(--safe-bottom, 0px))',
     'z-index:2147483001', 'max-width:420px', 'margin:0 auto',
     `background:${C.card}`, `color:${C.ink}`,
     // Граница + двойная тень: карточка НЕ должна сливаться с фоном страницы

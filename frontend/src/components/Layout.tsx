@@ -63,12 +63,13 @@ export default function Layout() {
     <div
       className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]"
       style={{
-        paddingTop: 'var(--safe-top)',
+        // +8px «воздуха» сверх safe-area: владелец просил отступ от краёв.
+        paddingTop: 'calc(var(--safe-top) + 8px)',
         paddingLeft: 'var(--safe-left)',
         paddingRight: 'var(--safe-right)',
       }}
     >
-      <header className="sticky top-3 z-50 px-4">
+      <header className="sticky z-50 px-4" style={{ top: 'calc(var(--safe-top) + 8px)' }}>
         <div className="max-w-5xl mx-auto flex items-center gap-2 h-16 px-3.5 rounded-2xl bg-[rgba(17,25,24,0.72)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] shadow-[0_8px_32px_-8px_rgba(0,0,0,0.5)] relative">
           {/* Логотип */}
           {/* R14: лого было 36px высотой — тач-зона ≥44px */}
@@ -189,10 +190,14 @@ export default function Layout() {
 
       <nav
         aria-label="Основная навигация"
-        className="md:hidden fixed left-3 right-3 bg-[rgba(17,25,24,0.88)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] rounded-2xl flex justify-around items-center py-2 z-40 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)]"
+        className="md:hidden fixed bg-[rgba(17,25,24,0.88)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] rounded-2xl flex justify-around items-center py-2 z-40 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)]"
         style={{
-          // iOS PWA: поднимаем меню над home-индикатором. В браузере = 12px (как было).
-          bottom: 'calc(0.75rem + var(--safe-bottom))',
+          // `fixed` НЕ наследует padding родителя → safe-area считаем сами.
+          // База 20px снизу / 16px по бокам — чтобы был воздух ДАЖЕ если
+          // env(safe-area-inset-*) вернёт 0 (десктоп, часть браузеров).
+          left: 'calc(var(--safe-left) + 16px)',
+          right: 'calc(var(--safe-right) + 16px)',
+          bottom: 'calc(var(--safe-bottom) + 20px)',
         }}
       >
         <MobileTab to="/" icon={<Home size={20} />} label="Главная" pathname={location.pathname} />
