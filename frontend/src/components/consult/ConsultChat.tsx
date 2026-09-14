@@ -355,9 +355,10 @@ export default function ConsultChat({ compact = false, onClose }: ConsultChatPro
         </div>
       </div>
 
-      {/* Лента */}
+      {/* Лента. pb-16 — чтобы последнее сообщение не уходило под плавающую
+          кнопку консультанта (она сидит в правом нижнем углу поверх контента). */}
       <div
-        className={`space-y-4 overflow-y-auto pt-4 px-1 ${compact ? 'flex-1 min-h-0' : 'flex-1 min-h-0'}`}
+        className={`space-y-4 overflow-y-auto pt-4 px-1 pb-16 ${compact ? 'flex-1 min-h-0' : 'flex-1 min-h-0'}`}
       >
         {loading ? (
           <div className="space-y-3">
