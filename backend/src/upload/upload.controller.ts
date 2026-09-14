@@ -95,6 +95,11 @@ export class UploadController {
     }),
   )
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
+    // Без файла @UploadedFile() даёт undefined → file.filename падал с 500.
+    // Должно быть 400: клиент прислал некорректный запрос (аудит 2026-09-14).
+    if (!file) {
+      throw new BadRequestException('Файл не передан');
+    }
     // FIX-REST фикс 3: файл сжимается ДО репликации — иначе на вторую ноду
     // уедет тяжёлый оригинал, а оптимизируется только локальная копия.
     // Best-effort: сбой сжатия не должен ломать загрузку (см. сервис).
@@ -131,6 +136,10 @@ export class UploadController {
     }),
   )
   uploadVideo(@UploadedFile() file: Express.Multer.File) {
+    // Та же защита, что и в uploadFile: без файла → 400, а не 500.
+    if (!file) {
+      throw new BadRequestException('Файл не передан');
+    }
     // PD-FIX-1: видео реплицируем в подпапку videos/ (тот же механизм).
     this.replication.replicate(`videos/${file.filename}`);
     return { url: this.uploadService.getVideoUrl(file.filename) };
