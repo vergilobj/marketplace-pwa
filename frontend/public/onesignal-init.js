@@ -11,24 +11,60 @@
 // в index.html, defer сохраняет порядок выполнения.
 window.OneSignalDeferred = window.OneSignalDeferred || [];
 
-// 🔴 ПЛАШКА ПОКАЗЫВАЕТСЯ ДО И НЕЗАВИСИМО ОТ OneSignal.
-// Раньше вызов стоял внутри try ПОСЛЕ `await OneSignal.init()`. На iOS Safari
-// в обычной вкладке web push не поддерживается, init падает → catch →
-// инструкция «Добавить на экран Домой» НЕ ПОКАЗЫВАЛАСЬ ВООБЩЕ (реальный баг
-// 2026-09-14). Инструкция про установку приложения не имеет отношения к SDK —
-// показываем её сразу, без ожидания и без зависимости от инициализации.
-(function showPromptEarly() {
-  const run = () => {
+// 🔴 ПЛАШКА ПОКАЗЫВАЕТСЯ ПОСЛЕ ДЕЙСТВИЯ, А НЕ СРАЗУ.
+//
+// Раньше вызов стоял по DOMContentLoaded — плашка вылезала поверх страницы
+// входа до того, как человек что-либо сделал, и перекрывала форму (реальный
+// баг 2026-09-15). Теперь ждём первого ОСМЫСЛЕННОГО действия: пользователь
+// открыл карточку товара. Только тогда спрашиваем про уведомления.
+//
+// ⚠️ Ветку iOS и проверку permission НЕ трогаем: инструкция «Добавить на
+// экран Домой» не зависит от OneSignal и не должна съедаться падением init
+// (баг 2026-09-14 — владелец не видел подсказку вообще).
+(function armPushPromptEarly() {
+  let armed = true;
+  let timer = null;
+
+  const fire = () => {
+    if (!armed) return;
+    armed = false;
+    if (timer) { clearInterval(timer); timer = null; }
     try { maybeShowPushPrompt(window.OneSignal || null); }
     catch (e) { console.warn('push prompt error:', e && e.message); }
   };
+
+  // «Выбрал что-то» = открыл карточку товара.
+  const isProductPath = () => /^\/products\/[^/]+/.test(location.pathname);
+
+  const start = () => {
+    // Уже на карточке (заход по прямой ссылке) — показываем после паузы,
+    // чтобы человек успел увидеть товар.
+    if (isProductPath()) { setTimeout(fire, 1200); return; }
+
+    // Клик по ссылке на товар — момент выбора.
+    document.addEventListener('click', (ev) => {
+      const el = ev.target;
+      if (el && el.closest && el.closest('a[href*="/products/"]')) {
+        setTimeout(fire, 800);
+      }
+    }, true);
+
+    // SPA-переход на карточку (в т.ч. программный).
+    let last = location.pathname;
+    timer = setInterval(() => {
+      if (!armed) { clearInterval(timer); timer = null; return; }
+      if (location.pathname !== last) {
+        last = location.pathname;
+        if (isProductPath()) setTimeout(fire, 800);
+      }
+    }, 600);
+  };
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', run, { once: true });
+    document.addEventListener('DOMContentLoaded', start, { once: true });
   } else {
-    run();
+    start();
   }
-  // Страховка: если DOM ещё не был готов на момент defer-скрипта.
-  window.addEventListener('load', run, { once: true });
 })();
 
 OneSignalDeferred.push(async function (OneSignal) {
@@ -45,7 +81,7 @@ OneSignalDeferred.push(async function (OneSignal) {
         showCredit: false,
       },
       // Дефолтный slidedown OneSignal ОТКЛЮЧЁН (prompts: []) —
-      // показываем свою плашку в стиле Базара (см. showPushPrompt).
+      // показываем своё модальное окно в стиле Базара (см. showPushPrompt).
       promptOptions: {
         slidedown: { prompts: [] },
       },
@@ -59,7 +95,7 @@ OneSignalDeferred.push(async function (OneSignal) {
 });
 
 // ─────────────────────────────────────────────────────────────────────────
-// Своя плашка подписки в стиле Базара.
+// Своё модальное окно подписки в стиле Базара.
 // ─────────────────────────────────────────────────────────────────────────
 
 function detectPlatform() {
@@ -87,9 +123,8 @@ function maybeShowPushPrompt(OneSignal) {
   // 🔴 ВАЖНО: ветку iOS проверяем ПЕРВОЙ, до проверки permission.
   // В обычной вкладке Safari на iOS web push НЕ поддерживается, и браузер
   // может вернуть `denied` — ранний return по permission съедал инструкцию
-  // «Добавить на экран Домой» (реальный баг 2026-09-14: владелец не видел
-  // подсказку вообще). Инструкция про установку приложения не зависит от
-  // разрешения — её показываем всегда, пока приложение не добавлено.
+  // «Добавить на экран Домой». Инструкция про установку приложения не
+  // зависит от разрешения — её показываем, пока приложение не добавлено.
   if (isIOS && !isStandalone) {
     showPushPrompt('ios-install', OneSignal);
     return;
@@ -105,12 +140,20 @@ function maybeShowPushPrompt(OneSignal) {
   showPushPrompt('enable', OneSignal);
 }
 
+/**
+ * Модальное окно подписки.
+ *
+ * 🔴 Это МОДАЛКА, а не всплывашка: фон затемняется и становится недоступным,
+ * прокрутка страницы блокируется, фокус заперт внутри окна. Поэтому окно
+ * центрируется — подгонять позицию под поля/кнопки больше не нужно
+ * (прежний `avoidOverlap` с ретраями удалён как ненужный).
+ */
 function showPushPrompt(mode, OneSignal) {
   if (document.getElementById('bazar-push-prompt')) return;
   // ⚠️ sessionStorage может бросать в приватном режиме Safari — оборачиваем.
   try {
     if (sessionStorage.getItem('bazar_push_prompt_closed') === '1') return;
-  } catch (_) { /* storage недоступен — просто показываем плашку */ }
+  } catch (_) { /* storage недоступен — просто показываем окно */ }
 
   const C = {
     card: 'var(--card, #111d18)',
@@ -123,18 +166,32 @@ function showPushPrompt(mode, OneSignal) {
 
   const isIOS = mode === 'ios-install';
 
+  // ── Затемняющий слой: перехватывает клики по странице под окном ──
+  const back = document.createElement('div');
+  back.id = 'bazar-push-backdrop';
+  back.setAttribute('aria-hidden', 'true');
+  back.style.cssText = [
+    'position:fixed', 'inset:0',
+    'background:rgba(0,0,0,.62)',
+    'backdrop-filter:blur(2px)',
+    '-webkit-backdrop-filter:blur(2px)',
+    'z-index:2147483000',
+    'opacity:0', 'transition:opacity .22s ease',
+  ].join(';');
+
   const el = document.createElement('div');
   el.id = 'bazar-push-prompt';
   el.setAttribute('role', 'dialog');
-  el.setAttribute('aria-modal', 'false');
+  el.setAttribute('aria-modal', 'true');
   el.setAttribute('aria-label', 'Включить уведомления');
   el.style.cssText = [
-    'position:fixed', 'left:12px', 'right:12px',
-    // Плашка НЕ должна перекрывать FAB консультанта.
-    // FAB: bottom = safe+136, высота 56 → его ВЕРХ на safe+192.
-    // Ставим плашку выше: 208 = 192 + 16 (зазор).
-    'bottom:calc(208px + var(--safe-bottom, 0px))',
-    'z-index:2147483001', 'max-width:420px', 'margin:0 auto',
+    'position:fixed',
+    // Центр экрана — окно никого не перекрывает «в углу».
+    'left:50%', 'top:50%',
+    'transform:translate(-50%,-46%) scale(.96)',
+    'width:calc(100% - 24px)', 'max-width:420px',
+    'max-height:calc(100dvh - 32px)', 'overflow-y:auto', 'overscroll-contain',
+    'z-index:2147483001',
     `background:${C.card}`, `color:${C.ink}`,
     // Граница + двойная тень: карточка НЕ должна сливаться с фоном страницы
     // (--card #111d18 и --bg #0d1512 близки). Сверху — тонкий светлый кант.
@@ -143,9 +200,9 @@ function showPushPrompt(mode, OneSignal) {
     'padding:16px 16px 14px',
     'font-family:var(--font-sans, Manrope, Inter, -apple-system, system-ui, sans-serif)',
     'font-size:14px', 'line-height:1.45',
-    'box-shadow:0 -1px 0 rgba(255,255,255,.06) inset, 0 16px 40px rgba(0,0,0,.65)',
-    'opacity:0', 'transform:translateY(12px)',
-    'transition:opacity .25s cubic-bezier(.2,.6,.3,1), transform .25s cubic-bezier(.2,.6,.3,1)',
+    'box-shadow:0 -1px 0 rgba(255,255,255,.06) inset, 0 24px 60px rgba(0,0,0,.75)',
+    'opacity:0',
+    'transition:opacity .22s cubic-bezier(.2,.6,.3,1), transform .22s cubic-bezier(.2,.6,.3,1)',
   ].join(';');
 
   const body = isIOS
@@ -183,105 +240,88 @@ function showPushPrompt(mode, OneSignal) {
     '</div>' +
     `<div style="display:flex;gap:8px;margin-top:14px">${actions}</div>`;
 
+  document.body.appendChild(back);
   document.body.appendChild(el);
+
   requestAnimationFrame(() => {
+    back.style.opacity = '1';
     el.style.opacity = '1';
-    el.style.transform = 'translateY(0)';
+    el.style.transform = 'translate(-50%,-50%) scale(1)';
   });
 
-  // ⚠️ Плашку создаём по DOMContentLoaded, а формы (логин, создание товара)
-  // рендерит React ПОЗЖЕ. Одноразовый замер не находит полей в DOM и даёт
-  // lift = 0 — реально проверено: поле телефона появлялось уже после вызова.
-  // Поэтому перепроверяем несколько раз, пока форма не отрисуется.
-  // Останавливаемся сразу после успешного подъёма — дальше дёргать незачем.
-  let tries = 0;
-  const recheck = () => {
-    if (++tries > 12 || !el.isConnected) return;
-    if (avoidOverlap(el)) return;              // подняли — готово
-    setTimeout(recheck, 300);
-  };
-  recheck();
+  // Фон страницы не должен прокручиваться под модалкой.
+  const prevOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
 
-  // Обработчики кнопок плашки — вынесены в отдельную функцию, вызываем здесь.
-  attachPushPromptHandlers(el, isIOS, OneSignal);
+  attachPushPromptHandlers(el, back, isIOS, OneSignal, prevOverflow);
 }
 
 /**
- * Плашка не должна накрывать интерактивные элементы.
+ * Обработчики кнопок + жизненный цикл модалки.
  *
- * Фиксированный `bottom: 208px` рассчитан на страницы С нижним меню и FAB
- * консультанта. Там, где их нет (например `/login` — FAB скрыт для
- * неавторизованных), плашка садится прямо на поле телефона: замер на 390px
- * показал перекрытие 276×15px (реальный баг 2026-09-15).
- *
- * Поэтому после отрисовки проверяем пересечение с видимыми полями ввода и
- * кнопками и поднимаем плашку ровно настолько, чтобы зазор был 12px.
- *
- * @returns {boolean} true — подняли (или поднимать не нужно); false — цели ещё
- *   не отрисованы, стоит перепроверить позже.
+ * @param el          карточка окна
+ * @param back        затемняющий слой
+ * @param isIOS       ветка iOS-инструкции (одна кнопка «Понятно»)
+ * @param OneSignal   SDK (может быть null — тогда просто закрываемся)
+ * @param prevOverflow прежнее значение overflow у body (вернуть при закрытии)
  */
-function avoidOverlap(el) {
-  try {
-    const r = el.getBoundingClientRect();
-    // Плашка уже выше верхней трети экрана — дальше поднимать некуда.
-    if (r.top < window.innerHeight * 0.35) return true;
+function attachPushPromptHandlers(el, back, isIOS, OneSignal, prevOverflow) {
+  let closed = false;
 
-    const targets = document.querySelectorAll('input, textarea, select, button, a[href]');
-    let lift = 0;
-    for (const t of targets) {
-      if (el.contains(t)) continue;
-      const cs = getComputedStyle(t);
-      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
-      const b = t.getBoundingClientRect();
-      if (b.width === 0 || b.height === 0) continue;
-      // Пересечение по обеим осям
-      const ix = Math.min(r.right, b.right) - Math.max(r.left, b.left);
-      const iy = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
-      if (ix > 0 && iy > 0) {
-        // Насколько поднять, чтобы верх плашки оказался НАД верхом элемента
-        lift = Math.max(lift, r.bottom - b.top + 12);
-      }
-    }
-    if (lift > 0) {
-      const cur = parseFloat(getComputedStyle(el).bottom) || 0;
-      el.style.bottom = `${Math.round(cur + lift)}px`;
-      return true;
-    }
-    return false;   // целей нет — возможно, ещё не отрисовались
-  } catch (_) {
-    return true;    // геометрия недоступна — дальше не пытаемся
-  }
-}
-
-function attachPushPromptHandlers(el, isIOS, OneSignal) {
   const close = () => {
-    // ⚠️ ПОРЯДОК КРИТИЧЕН: сначала визуально прячем, потом пишем в хранилище.
-    // В приватном режиме Safari `sessionStorage` бросает QuotaExceededError.
-    // Раньше setItem стоял ПЕРВЫМ → исключение прерывало функцию и плашка
-    // оставалась висеть (реальный баг, воспроизведён 2026-09-14).
+    if (closed) return;
+    closed = true;
+
+    // ⚠️ ПОРЯДОК КРИТИЧЕН: сначала визуально прячем и снимаем блокировки,
+    // потом пишем в хранилище. В приватном режиме Safari `sessionStorage`
+    // бросает QuotaExceededError — раньше setItem стоял ПЕРВЫМ, исключение
+    // прерывало функцию, и модалка оставалась висеть (баг 2026-09-14).
     el.style.opacity = '0';
-    el.style.transform = 'translateY(12px)';
-    setTimeout(() => el.remove(), 250);
+    el.style.transform = 'translate(-50%,-46%) scale(.96)';
+    back.style.opacity = '0';
+    setTimeout(() => { el.remove(); back.remove(); }, 220);
+
+    // Снимаем блокировки: прокрутка и перехват клавиш.
+    document.body.style.overflow = prevOverflow || '';
+    document.removeEventListener('keydown', onKey, true);
+
     try {
       sessionStorage.setItem('bazar_push_prompt_closed', '1');
     } catch (_) { /* приватный режим / storage заблокирован — не критично */ }
   };
 
+  // Escape и Tab — клавиатурный контроль модалки.
+  const onKey = (ev) => {
+    if (ev.key === 'Escape') { ev.preventDefault(); close(); return; }
+    if (ev.key !== 'Tab') return;
+    // Фокус не должен уходить за пределы окна.
+    const f = el.querySelectorAll('button, [href], input, select, textarea');
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+    else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+  };
+  document.addEventListener('keydown', onKey, true);
+
   document.getElementById('bazar-push-close')?.addEventListener('click', close);
 
   if (isIOS) {
     document.getElementById('bazar-push-ok')?.addEventListener('click', close);
+    // Фокус — на единственную кнопку, чтобы работала клавиатура.
+    setTimeout(() => document.getElementById('bazar-push-ok')?.focus(), 240);
     return;
   }
 
   document.getElementById('bazar-push-no')?.addEventListener('click', close);
 
   document.getElementById('bazar-push-yes')?.addEventListener('click', () => {
-    // ГЛАВНОЕ: закрываем плашку СРАЗУ, синхронно, до всяких await.
+    // ГЛАВНОЕ: закрываем окно СРАЗУ, синхронно, до всяких await.
     // Раньше close() стоял после await requestPermission() — если промис
-    // не резолвился (iOS-PWA, закрытый системный диалог), плашка висела
+    // не резолвился (iOS-PWA, закрытый системный диалог), окно висело
     // навсегда. Теперь исчезновение не зависит от ответа браузера.
     close();
+
+    if (!OneSignal || !OneSignal.Notifications) return;
 
     // Дальше — разрешение в фоне. Клик уже случился (жест пользователя),
     // поэтому нативный запрос Chrome/Safari показать разрешено.
@@ -299,6 +339,9 @@ function attachPushPromptHandlers(el, isIOS, OneSignal) {
       }
     })();
   });
+
+  // Фокус — на основную кнопку.
+  setTimeout(() => document.getElementById('bazar-push-yes')?.focus(), 240);
 }
 
 function stepRow(n, text) {
