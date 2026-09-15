@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, ShoppingCart, Trash2, Plus, Minus } from 'lucide-react';
+import { Heart, HeartOff, ShoppingCart, Plus, Minus } from 'lucide-react';
 import EmptyState from '../components/ui/EmptyState';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { getProductById } from '../api/products';
 import { formatPrice, plural } from "../utils/format";
-import { resolveMedia } from '../utils/media';
 import type { ApiProduct } from '../api/types';
-import { PageSkeleton } from '../components/ui/Skeleton';
+import { ProductGridSkeleton, SkeletonLine } from '../components/ui/Skeleton';
 import ErrorState from '../components/ui/ErrorState';
+import MediaImage from '../components/ui/MediaImage';
 import { useListError } from '../hooks/useListError';
 import { errorStatus } from '../utils/error';
 
@@ -120,8 +120,31 @@ export default function FavoritesPage() {
     };
   }, [favoritesKey, retryKey, setError]);
 
-  // PERF-4: зелёный квадрат 40×40 → скелетон сетки избранного
-  if (loading) return <PageSkeleton rows={0} wide />;
+  /**
+   * B2 (WAVE 2, п.8): скелетон совпадает с реальной сеткой избранного.
+   *
+   * Было `PageSkeleton rows={0} wide` — одна широкая карточка на всю страницу,
+   * а затем та же страница рисовала сетку 2/3 колонки. При подмене контент
+   * прыгал. Теперь — тот же `ProductGridSkeleton`, что и в каталоге, но с
+   * сеткой и форматом фото избранного (квадрат-фото, 2/3 колонки) и с
+   * заголовком/счётчиком сверху, как у загруженной страницы.
+   */
+  if (loading) {
+    return (
+      <div className="relative min-h-screen overflow-x-hidden">
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-20">
+          <SkeletonLine className="h-7 w-40 mb-3" />
+          <SkeletonLine className="h-3.5 w-24 mb-6" />
+          <ProductGridSkeleton
+            count={6}
+            gridClassName="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4"
+            imageClassName="w-full aspect-square rounded-none"
+            cardClassName="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)]"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
@@ -159,7 +182,21 @@ export default function FavoritesPage() {
                   onClick={() => navigate(`/products/${product.id}`)}
                 >
                   <div className="aspect-square bg-[var(--bg-3)] relative shrink-0">
-                    {product.media?.[0] && <img src={resolveMedia(product.media[0])} alt={product.title} width={640} height={640} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" decoding="async" />}
+                    {/* B2 п.4: битое/404-медиа → та же заглушка, что и при отсутствии фото. */}
+                    <MediaImage
+                      src={product.media?.[0]}
+                      alt={product.title}
+                      width={640}
+                      height={640}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
+                      decoding="async"
+                      fallback={
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ShoppingCart size={24} className="text-[var(--color-faint)]" />
+                        </div>
+                      }
+                    />
                     <span className="absolute bottom-3 left-3 px-3 py-1.5 rounded-xl bg-black/70 backdrop-blur-xl text-sm font-bold text-white">{price}</span>
                   </div>
                   <div className="p-3.5 flex flex-col flex-1">
@@ -175,7 +212,29 @@ export default function FavoritesPage() {
                       ) : (
                         <button onClick={(e) => { e.stopPropagation(); addToCart(product); }} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#22c55e] text-[#0d1512] text-xs font-bold hover:bg-[#16a34a] transition-all"><ShoppingCart size={13} /> В корзину</button>
                       )}
-                      <button onClick={(e) => { e.stopPropagation(); toggleFavorite(product.id); }} className="px-3 py-2 rounded-xl bg-red-400/10 text-red-400 text-xs font-bold hover:bg-red-400/20 transition-all shrink-0"><Trash2 size={13} /></button>
+                      {/*
+                        * B2 (WAVE 2, п.5): была красная кнопка с иконкой Trash2 —
+                        * читалась как «удалить товар», хотя убирает только из
+                        * избранного. Плюс без подписи для скринридера и без
+                        * подтверждения: промах по тач-таргету молча выкидывал
+                        * товар из списка.
+                        *
+                        * Стало: HeartOff (та же семья, что Heart в ProductCard),
+                        * нейтральный цвет вместо «тревожного» красного,
+                        * aria-label и подтверждение.
+                        */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!confirm('Убрать из избранного?')) return;
+                          toggleFavorite(product.id);
+                        }}
+                        aria-label="Убрать из избранного"
+                        title="Убрать из избранного"
+                        className="px-3 py-2 rounded-xl bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] text-[var(--color-muted)] text-xs font-bold hover:text-[var(--color-text)] hover:border-[#22c55e]/40 transition-all shrink-0"
+                      >
+                        <HeartOff size={13} />
+                      </button>
                     </div>
                   </div>
                 </motion.div>

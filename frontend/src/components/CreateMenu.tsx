@@ -29,6 +29,21 @@ export function CreateMenu({ variant = 'icon', className = '', label = 'Созд
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  /**
+   * SCROLL-LOCK (2026-09-15): под открытым bottom-sheet'ом фон прокручивался —
+   * свайп уводил страницу за оверлеем. Приводим к поведению Modal: пока меню
+   * открыто, `body.overflow = hidden`. Прежнее значение запоминаем и
+   * возвращаем при закрытии — чтобы не снять блокировку чужой модалки.
+   */
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
   if (!isAuthenticated) return null;
 
   const go = (to: string) => {
@@ -46,7 +61,7 @@ export function CreateMenu({ variant = 'icon', className = '', label = 'Созд
         aria-label="Создать"
         onClick={() => setOpen(true)}
         data-create-menu="nav"
-        className={`flex flex-col items-center justify-center shrink-0 min-h-[44px] text-[#0b0e0d] ${className}`}
+        className={`flex flex-col items-center justify-center shrink-0 self-stretch min-w-[44px] min-h-[44px] text-[#0b0e0d] ${className}`}
       >
         <span className="w-11 h-11 -mt-4 rounded-full bg-[#22c55e] text-[#0b0e0d] flex items-center justify-center shadow-[0_6px_20px_-4px_rgba(34,197,94,0.6)] border-4 border-[rgba(17,25,24,0.88)]">
           <Plus size={22} strokeWidth={2.5} />

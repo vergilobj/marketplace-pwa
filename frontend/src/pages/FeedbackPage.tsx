@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { formatDate } from '../utils/format';
 import { MessageSquare, Send, HelpCircle } from 'lucide-react';
 import { PageSkeleton } from '../components/ui/Skeleton';
 import EmptyState from '../components/ui/EmptyState';
@@ -132,7 +131,7 @@ export default function FeedbackPage() {
       return;
     }
     if (text.length > MESSAGE_MAX) {
-      toast.error(`Слишком длинно: ${text.length}/${MESSAGE_MAX}`);
+      toast.error(`Слишком длинно: ${text.length}/${MESSAGE_MAX} символов — сократи текст`);
       return;
     }
     if (sending) return;
@@ -202,7 +201,7 @@ export default function FeedbackPage() {
             maxLength={MESSAGE_MAX}
             onChange={(e) => setMessage(e.target.value)}
             rows={4}
-            placeholder="Расскажите, что неудобно или чего не хватает…"
+            placeholder="Расскажи, что неудобно или чего не хватает…"
             className="w-full px-4 py-3 rounded-2xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm leading-relaxed outline-none focus:border-[#22c55e]/50 transition-all resize-none overflow-y-auto placeholder:text-[var(--color-faint)]"
           />
           <div className="flex justify-end mt-1 mb-5">
@@ -216,7 +215,7 @@ export default function FeedbackPage() {
           </div>
 
           <label htmlFor="feedback-contact" className="block text-sm font-bold text-[var(--color-text)] mb-1.5">
-            Как с вами связаться
+            Как с тобой связаться
           </label>
           <input
             id="feedback-contact"
@@ -234,7 +233,7 @@ export default function FeedbackPage() {
             className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 min-h-[44px] rounded-full bg-[#22c55e] text-[#0d1512] text-sm font-bold hover:bg-[#16a34a] transition-colors disabled:opacity-60"
           >
             <Send size={15} />
-            {sending ? 'Отправляем…' : 'Отправить'}
+            {sending ? 'Отправляем…' : 'Отправить обращение'}
           </button>
         </div>
 
@@ -248,7 +247,7 @@ export default function FeedbackPage() {
             headingLevel="h3"
             icon={<MessageSquare size={32} />}
             title="Обращений пока нет"
-            description="Напишите первым — предложение, вопрос или заявка на консультацию."
+            description="Напиши первым — предложение, вопрос или заявка на консультацию."
           />
         ) : (
           <div className="space-y-3">
@@ -277,9 +276,7 @@ export default function FeedbackPage() {
                   </p>
 
                   <p className="text-[11px] text-[var(--color-faint)] mt-2">
-                    {f.createdAt
-                      ? format(new Date(f.createdAt), 'd MMM yyyy, HH:mm', { locale: ru })
-                      : ''}
+                    {formatDate(f.createdAt, 'full')}
                   </p>
 
                   {f.adminNote && (

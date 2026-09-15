@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { formatPrice } from "../utils/format";
 import { resolveMedia } from '../utils/media';
 import { buildGallery } from '../utils/video';
+import MediaImage from './ui/MediaImage';
 import type { ApiProduct } from '../api/types';
 
 export default function ProductCard({ product }: { product: ApiProduct }) {
@@ -39,7 +40,18 @@ export default function ProductCard({ product }: { product: ApiProduct }) {
               <Play size={28} className="text-white/70" />
             </div>
           ) : (
-            <img src={resolveMedia(first!.src)} alt={product.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width={640} height={480} style={{ aspectRatio: '4 / 3' }} />
+            /* B2 п.4: 404/битый файл → та же заглушка, что и при отсутствии медиа. */
+            <MediaImage
+              src={first!.src}
+              alt={product.title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
+              width={640}
+              height={480}
+              style={{ aspectRatio: '4 / 3' }}
+              fallback={<div className="w-full h-full flex items-center justify-center"><ShoppingCart size={28} className="text-[var(--color-faint)]" /></div>}
+            />
           )
         ) : (
           <div className="w-full h-full flex items-center justify-center"><ShoppingCart size={28} className="text-[var(--color-faint)]" /></div>

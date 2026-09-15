@@ -2,11 +2,10 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import api from '../api/axios';
 import { getInvites, createInvite, deleteInvite } from '../api/invites';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
 import { Users, ShoppingBag, Newspaper, Wallet, TrendingUp, Download, Plus, Trash2, Copy, Check, Settings, Loader2, MessageSquare, BookOpen } from 'lucide-react';
 import { formatPhone } from '../utils/phone';
-import { formatPrice } from "../utils/format";
+import { formatPrice, formatDate } from "../utils/format";
+import { errorMessage } from '../utils/error';
 import { resolveMedia } from '../utils/media';
 import { mergeUniqueById } from '../utils/mergeUnique';
 import KnowledgeTab from './admin/KnowledgeTab';
@@ -30,11 +29,14 @@ const tabs = [
   { key: 'users', label: 'Пользователи', icon: <Users size={15} /> },
   { key: 'products', label: 'Товары', icon: <ShoppingBag size={15} /> },
   { key: 'posts', label: 'Посты', icon: <Newspaper size={15} /> },
-  { key: 'invites', label: 'Инвайты', icon: <Plus size={15} /> },
+  // B4 §6: «Инвайты»/«База знаний» — жаргон, владелец проекта их не понимал.
+  // Ключи вкладок (`invites`, `knowledge`) — часть внутреннего контракта
+  // (`activeTab`, switch в renderContent) и остаются как есть.
+  { key: 'invites', label: 'Приглашения', icon: <Plus size={15} /> },
   { key: 'transactions', label: 'Транзакции', icon: <Wallet size={15} /> },
   { key: 'withdrawals', label: 'Выводы', icon: <Download size={15} /> },
   { key: 'feedback', label: 'Обратная связь', icon: <MessageSquare size={15} /> },
-  { key: 'knowledge', label: 'База знаний', icon: <BookOpen size={15} /> },
+  { key: 'knowledge', label: 'Ответы', icon: <BookOpen size={15} /> },
   { key: 'settings', label: 'Настройки', icon: <Settings size={15} /> },
 ];
 
@@ -217,15 +219,97 @@ export default function AdminPage() {
     void loadTab(activeTab, page, search, false, feedbackStatus);
   };
 
-  const handleCreateInvite = async () => { try { const r = await createInvite(); setInvites(prev => [r, ...prev]); toast.success('Инвайт создан'); } catch { toast.error('Ошибка'); } };
-  const handleDeleteInvite = async (code: string) => { try { await deleteInvite(code); setInvites(prev => prev.filter(i => i.code !== code)); toast.success('Удалён'); } catch { toast.error('Ошибка'); } };
-  const handleCopyInvite = (code: string) => { navigator.clipboard.writeText(code); setCopied(code); toast.success('Скопировано!'); setTimeout(() => setCopied(''), 2000); };
-  const handleChangeRole = async (userId: string, role: UserRole) => { try { await api.patch(`/users/${userId}/role`, { role }); setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u)); toast.success('Роль изменена'); } catch { toast.error('Ошибка'); } };
-  const handleToggleProduct = async (id: string) => { try { await api.patch(`/products/${id}/toggle-active`); setProducts(prev => prev.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p)); } catch { toast.error('Ошибка'); } };
-  const handleTogglePost = async (id: string) => { try { await api.patch(`/posts/${id}/toggle-visibility`); setPosts(prev => prev.map(p => p.id === id ? { ...p, isHidden: !p.isHidden } : p)); } catch { toast.error('Ошибка'); } };
-  const handleApproveWithdrawal = async (id: string) => { try { await api.patch(`/users/admin/withdrawals/${id}/approve`); setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'approved' } : w)); } catch { toast.error('Ошибка'); } };
-  const handleRejectWithdrawal = async (id: string) => { try { await api.patch(`/users/admin/withdrawals/${id}/reject`); setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'rejected' } : w)); } catch { toast.error('Ошибка'); } };
-  const handleUpdateSetting = async (key: string, value: string) => { try { await api.put('/settings', { key, value }); setSettings((prev) => ({ ...prev, [key]: value })); toast.success('Сохранено'); } catch { toast.error('Ошибка'); } };
+  /**
+   * B4 §1/§2: обработчики инвайтов.
+   *
+   * Было: `catch { toast.error('Ошибка') }` — юзер не знал ни что случилось,
+   * ни что делать. Стало: `errorMessage(e, …)` (текст бэка / «нет связи» /
+   * «слишком много попыток») плюс подсказка, что предпринять.
+   */
+  const handleCreateInvite = async () => {
+    try {
+      const r = await createInvite();
+      setInvites(prev => [r, ...prev]);
+      toast.success('Приглашение создано');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось создать приглашение — попробуй ещё раз'));
+    }
+  };
+  const handleDeleteInvite = async (code: string) => {
+    try {
+      await deleteInvite(code);
+      setInvites(prev => prev.filter(i => i.code !== code));
+      toast.success('Приглашение удалено');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось удалить приглашение — обнови страницу'));
+    }
+  };
+  const handleCopyInvite = (code: string) => { navigator.clipboard.writeText(code); setCopied(code); toast.success('Код скопирован'); setTimeout(() => setCopied(''), 2000); };
+  const handleChangeRole = async (userId: string, role: UserRole) => { try { await api.patch(`/users/${userId}/role`, { role }); setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u)); toast.success(`Роль изменена на ${role}`); } catch (e: unknown) { toast.error(errorMessage(e, 'Не удалось сменить роль — попробуй ещё раз')); } };
+
+  /**
+   * B4 §2: скрытие/показ товара.
+   *
+   * Было: ноль обратной связи (только цвет кнопки). Стало: тост с конкретикой
+   * и текстом ошибки, если запрос упал (локальный стейт тогда НЕ трогаем —
+   * UI не расходится с БД).
+   */
+  const handleToggleProduct = async (id: string) => {
+    const current = products.find((p) => p.id === id);
+    const willHide = current?.isActive ?? false;
+    try {
+      await api.patch(`/products/${id}/toggle-active`);
+      setProducts(prev => prev.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p));
+      toast.success(willHide ? 'Товар скрыт из каталога' : 'Товар снова виден в каталоге');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось изменить видимость товара — попробуй ещё раз'));
+    }
+  };
+  const handleTogglePost = async (id: string) => {
+    const current = posts.find((p) => p.id === id);
+    const willHide = !(current?.isHidden ?? false);
+    try {
+      await api.patch(`/posts/${id}/toggle-visibility`);
+      setPosts(prev => prev.map(p => p.id === id ? { ...p, isHidden: !p.isHidden } : p));
+      toast.success(willHide ? 'Пост скрыт из ленты' : 'Пост снова виден в ленте');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось изменить видимость поста — попробуй ещё раз'));
+    }
+  };
+
+  /**
+   * B4 §2: вывод средств. Одобрение/отклонение — денежное действие, а обратной
+   * связи не было вообще: менялся только цвет бейджа в строке. Теперь админ
+   * видит подтверждение (и сумму) либо причину отказа.
+   */
+  const handleApproveWithdrawal = async (id: string) => {
+    try {
+      await api.patch(`/users/admin/withdrawals/${id}/approve`);
+      setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'approved' } : w));
+      toast.success('Вывод одобрен — средства отправлены на кошелёк');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось одобрить вывод — заявка осталась на рассмотрении'));
+    }
+  };
+  const handleRejectWithdrawal = async (id: string) => {
+    try {
+      await api.patch(`/users/admin/withdrawals/${id}/reject`);
+      setWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: 'rejected' } : w));
+      toast.success('Вывод отклонён — деньги вернулись на баланс юзера');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось отклонить вывод — заявка осталась на рассмотрении'));
+    }
+  };
+  const handleUpdateSetting = async (key: string, value: string) => {
+    const label = SETTINGS_FIELDS.find(f => f.key === key)?.label ?? key;
+    try {
+      await api.put('/settings', { key, value });
+      setSettings((prev) => ({ ...prev, [key]: value }));
+      toast.success(`Настройка сохранена: ${label}`);
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось сохранить настройку — значение не применено'));
+    }
+  };
 
   /**
    * Смена статуса обращения (§4.3).
@@ -238,7 +322,7 @@ export default function AdminPage() {
    */
   const handleUpdateFeedback = async (id: string, status?: string) => {
     if (!status) {
-      toast.error('Нечего сохранять');
+      toast.error('Статус не выбран — сначала выбери его в списке');
       return;
     }
 
@@ -247,9 +331,9 @@ export default function AdminPage() {
       setFeedbacks((prev) =>
         prev.map((f) => (f.id === id ? { ...f, ...(r.data ?? {}), status } : f)),
       );
-      toast.success('Сохранено');
-    } catch {
-      toast.error('Ошибка');
+      toast.success(`Статус обращения изменён: ${FEEDBACK_STATUS_FILTERS.find((s) => s.key === status)?.label ?? status}`);
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось изменить статус обращения — попробуй ещё раз'));
     }
   };
 
@@ -317,7 +401,7 @@ export default function AdminPage() {
         <div key={p.id} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-[var(--color-text)] truncate">{p.title}</p>
-            <p className="text-xs text-[var(--color-muted)]">{p.author?.name} • {p.isAd ? 'Реклама' : 'Пост'} • {p.createdAt ? format(new Date(p.createdAt), 'd MMM', { locale: ru }) : ''}</p>
+            <p className="text-xs text-[var(--color-muted)]">{p.author?.name} • {p.isAd ? 'Реклама' : 'Пост'} • {formatDate(p.createdAt, 'short')}</p>
           </div>
           <button onClick={() => handleTogglePost(p.id)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 ml-3 ${p.isHidden ? 'bg-red-400/10 text-red-400 hover:bg-red-400/20' : 'bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20'}`}>{p.isHidden ? 'Скрыт' : 'Виден'}</button>
         </div>
@@ -327,7 +411,7 @@ export default function AdminPage() {
 
   const renderInvites = () => (
     <div>
-      <button onClick={handleCreateInvite} className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#22c55e] text-[#0d1512] text-sm font-bold hover:bg-[#16a34a] transition-all shadow-[0_8px_32px_-8px_rgba(34,197,94,0.5)] mb-4"><Plus size={15} /> Создать инвайт</button>
+      <button onClick={handleCreateInvite} className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#22c55e] text-[#0d1512] text-sm font-bold hover:bg-[#16a34a] transition-all shadow-[0_8px_32px_-8px_rgba(34,197,94,0.5)] mb-4"><Plus size={15} /> Создать приглашение</button>
       <div className="space-y-2">
         {invites.map((inv) => (
           <div key={inv.code} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
@@ -351,7 +435,7 @@ export default function AdminPage() {
         <div key={t.id} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-[var(--color-text)]">{t.type}</p>
-            <p className="text-xs text-[var(--color-muted)]">{t.orderId?.slice(0, 8)} • {t.createdAt ? format(new Date(t.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</p>
+            <p className="text-xs text-[var(--color-muted)]">{t.orderId?.slice(0, 8)} • {formatDate(t.createdAt, 'short')}</p>
           </div>
           <div className="text-right">
             <p className="text-sm font-bold text-[var(--color-text)]">{formatPrice(t.amount)}</p>
@@ -368,7 +452,7 @@ export default function AdminPage() {
         <div key={w.id} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-[var(--color-text)]">{formatPrice(w.amount)}</p>
-            <p className="text-xs text-[var(--color-muted)]">{w.userId?.slice(0, 8)} • {w.createdAt ? format(new Date(w.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</p>
+            <p className="text-xs text-[var(--color-muted)]">{w.userId?.slice(0, 8)} • {formatDate(w.createdAt, 'short')}</p>
           </div>
           <div className="flex items-center gap-2">
             <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${w.status === 'approved' ? 'bg-[#22c55e]/10 text-[#22c55e]' : w.status === 'rejected' ? 'bg-red-400/10 text-red-400' : 'bg-amber-400/10 text-amber-400'}`}>{statusMap[w.status] || w.status}</span>

@@ -96,26 +96,61 @@ export function PageSkeleton({
 
 /**
  * PERF-4 — скелетон карточки товара (сетка каталога/профиля).
- * Высота совпадает с реальной ProductCard: квадрат-фото + название + цена.
+ *
+ * B2 (WAVE 2, п.8): габариты СИНХРОНИЗИРОВАНЫ с реальной ProductCard.
+ * Было `aspect-square`, а сама карточка каталога — `h-44` (176px): на широком
+ * экране (4 колонки, карточка ~240px) блок фото в скелетоне был на 64px выше
+ * реального → при подмене сетка прыгала. Теперь по умолчанию `h-44`, как в
+ * `ProductCard.tsx`.
+ *
+ * `imageClassName` нужен страницам с ДРУГИМ форматом фото: у избранного
+ * карточка квадратная (`aspect-square`), поэтому оно передаёт свой класс.
+ * `cardClassName` — там же, где у реальной карточки другой радиус/фон.
  */
-export function ProductCardSkeleton() {
+export function ProductCardSkeleton({
+  imageClassName = 'w-full h-44 rounded-none',
+  cardClassName = 'rounded-xl bg-[var(--color-card)] border border-[var(--color-border)]',
+}: {
+  imageClassName?: string;
+  cardClassName?: string;
+} = {}) {
   return (
-    <div className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] overflow-hidden">
-      <SkeletonImage className="w-full aspect-square rounded-none" />
-      <div className="p-3 space-y-2">
-        <SkeletonLine className="h-3.5 w-4/5" />
-        <SkeletonLine className="h-3.5 w-2/5" />
+    <div className={`${cardClassName} overflow-hidden flex flex-col h-full`}>
+      <SkeletonImage className={`shrink-0 ${imageClassName}`} />
+      <div className="p-3 flex flex-col flex-1">
+        <SkeletonLine className="h-3.5 w-4/5 mb-2" />
+        <SkeletonLine className="h-3.5 w-3/5 mb-3" />
+        <div className="mt-auto flex items-center justify-between">
+          <SkeletonLine className="h-4 w-16" />
+          <SkeletonLine className="h-11 w-11 rounded-lg" />
+        </div>
       </div>
     </div>
   );
 }
 
-/** PERF-4 — сетка скелетонов товаров (2/3/4 колонки, как в каталоге). */
-export function ProductGridSkeleton({ count = 8 }: { count?: number }) {
+/**
+ * PERF-4 — сетка скелетонов товаров.
+ *
+ * B2 (WAVE 2, п.8): сетка по умолчанию — каталог (2/3/4 колонки, как в
+ * ProductsPage). Страницы с другой раскладкой передают `gridClassName`
+ * (напр. избранное: 2/3 колонки) и `imageClassName` под формат своей карточки.
+ */
+export function ProductGridSkeleton({
+  count = 8,
+  gridClassName = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4',
+  imageClassName,
+  cardClassName,
+}: {
+  count?: number;
+  gridClassName?: string;
+  imageClassName?: string;
+  cardClassName?: string;
+}) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4" role="status" aria-label="Загрузка">
+    <div className={gridClassName} role="status" aria-label="Загрузка">
       {Array.from({ length: count }).map((_, i) => (
-        <ProductCardSkeleton key={i} />
+        <ProductCardSkeleton key={i} imageClassName={imageClassName} cardClassName={cardClassName} />
       ))}
     </div>
   );

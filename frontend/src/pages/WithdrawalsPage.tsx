@@ -3,9 +3,7 @@ import { motion } from 'framer-motion';
 import api from '../api/axios';
 import { getBalance, getLedger, getMyWithdrawals, type BalanceResponse, type LedgerEntryItem } from '../api/users';
 import { Download, Clock, CheckCircle2, XCircle, Wallet, History, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
-import { formatPrice } from '../utils/format';
+import { formatPrice, formatDate } from '../utils/format';
 import toast from 'react-hot-toast';
 import { errorMessage } from '../utils/error';
 import type { ApiWithdrawal } from '../api/types';
@@ -39,6 +37,21 @@ const accountLabel: Record<string, string> = {
 const WITHDRAWALS_PAGE_SIZE = 100;
 const LEDGER_PAGE_SIZE = 20;
 
+/**
+ * B4 §9: поля формы вывода.
+ *
+ * Раньше четыре проверки (сумма / баланс / адрес) жили ТОЛЬКО в тостах: тост
+ * ушёл через 4 секунды — и юзер снова не понимает, почему кнопка «не работает».
+ * Теперь ошибка привязана к полю, которое её вызвало, и живёт, пока поле не
+ * поправят (образец — LoginPage: красная рамка + текст под полем).
+ */
+type WithdrawalField = 'amount' | 'wallet';
+type FieldErrors = Partial<Record<WithdrawalField, string>>;
+
+/** Красная рамка у проблемного поля (как `borderFor` в LoginPage). */
+const borderFor = (hasError: boolean) =>
+  hasError ? 'border-red-400/60' : 'border-[var(--color-border)]';
+
 export default function WithdrawalsPage() {
   const [list, setList] = useState<ApiWithdrawal[]>([]);
   const [balances, setBalances] = useState<BalanceResponse | null>(null);
@@ -47,6 +60,8 @@ export default function WithdrawalsPage() {
   const [amount, setAmount] = useState('');
   const [wallet, setWallet] = useState('');
   const [req, setReq] = useState(false);
+  /** B4 §9: ошибки, привязанные к полям формы (а не только к тостам). */
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   // L2: постраничная догрузка обоих списков.
   const [listHasMore, setListHasMore] = useState(false);
   const [listLoadingMore, setListLoadingMore] = useState(false);
@@ -115,18 +130,50 @@ export default function WithdrawalsPage() {
     .reduce((s, w) => s + (w.amount || 0), 0);
   const withdrawable = Math.max((balances?.totalWithdrawable ?? 0) - pendingSum, 0);
 
-  const handleReq = async () => {
+  /**
+   * B4 §9: валидация формы вывода.
+   *
+   * Возвращает карту ошибок по полям. Пустая карта = форма валидна.
+   * Порядок проверок сохранён как был (сумма → баланс → адрес), но теперь
+   * каждая привязана к своему полю и остаётся на экране.
+   */
+  const validate = (): FieldErrors => {
+    const next: FieldErrors = {};
     const a = parseFloat(amount);
-    if (!a || a <= 0) { toast.error('Введите сумму'); return; }
-    if (a > withdrawable) { toast.error('Недостаточно средств'); return; }
+    if (!a || a <= 0) {
+      next.amount = 'Введи сумму больше нуля';
+      return next;
+    }
+    if (a > withdrawable) {
+      next.amount = `Доступно к выводу ${formatPrice(withdrawable)} — уменьши сумму`;
+    }
     const trimmed = wallet.trim();
-    if (!/^0x[0-9a-fA-F]{40}$/.test(trimmed)) { toast.error('Введите корректный BSC-адрес кошелька (0x + 40 hex)'); return; }
+    if (!trimmed) {
+      next.wallet = 'Укажи BSC-адрес кошелька, куда выводить';
+    } else if (!/^0x[0-9a-fA-F]{40}$/.test(trimmed)) {
+      next.wallet = 'Адрес должен быть 0x и 40 hex-символов — проверь, что скопировал целиком';
+    }
+    return next;
+  };
+
+  const handleReq = async () => {
+    const errors = validate();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      // Тост оставляем как общий сигнал, но информация теперь не теряется:
+      // текст ошибки висит под конкретным полем.
+      toast.error(errors.amount || errors.wallet || 'Проверь форму вывода');
+      return;
+    }
+
+    const a = parseFloat(amount);
+    const trimmed = wallet.trim();
     setReq(true);
     try {
       await api.post('/users/me/withdrawal', { amount: a, toAddress: trimmed });
-      toast.success('Заявка создана');
-      setAmount(''); setWallet(''); fetch();
-    } catch (e: unknown) { toast.error(errorMessage(e)); }
+      toast.success('Заявка на вывод создана — ждёт одобрения админа');
+      setAmount(''); setWallet(''); setFieldErrors({}); fetch();
+    } catch (e: unknown) { toast.error(errorMessage(e, 'Не удалось создать заявку на вывод')); }
     finally { setReq(false); }
   };
 
@@ -169,11 +216,40 @@ export default function WithdrawalsPage() {
           )}
 
           <div className="space-y-2">
-            <div className="flex gap-2">
-              <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Сумма" className="flex-1 px-4 min-h-[44px] rounded-full bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-all" />
-              <button onClick={handleReq} disabled={req} className="px-5 min-h-[44px] rounded-full bg-[#22c55e] text-[#0d1512] font-bold text-sm transition-colors hover:bg-[#16a34a] disabled:opacity-50">{req ? '...' : 'Вывести'}</button>
+            {/* B4 §9: ошибка поля остаётся на экране, а не только в тосте. */}
+            <div>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => {
+                    setAmount(e.target.value);
+                    if (fieldErrors.amount) setFieldErrors((p) => ({ ...p, amount: undefined }));
+                  }}
+                  placeholder="Сумма"
+                  aria-label="Сумма вывода"
+                  aria-invalid={!!fieldErrors.amount}
+                  className={`flex-1 px-4 min-h-[44px] rounded-full bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-all ${borderFor(!!fieldErrors.amount)}`}
+                />
+                <button onClick={handleReq} disabled={req} className="px-5 min-h-[44px] rounded-full bg-[#22c55e] text-[#0d1512] font-bold text-sm transition-colors hover:bg-[#16a34a] disabled:opacity-50">{req ? '...' : 'Вывести'}</button>
+              </div>
+              {fieldErrors.amount && <p className="text-xs text-red-400 mt-1 px-1">{fieldErrors.amount}</p>}
             </div>
-            <input type="text" value={wallet} onChange={(e) => setWallet(e.target.value)} placeholder="BSC-адрес кошелька (0x...)" className="w-full px-4 min-h-[44px] rounded-full bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-all font-mono" />
+            <div>
+              <input
+                type="text"
+                value={wallet}
+                onChange={(e) => {
+                  setWallet(e.target.value);
+                  if (fieldErrors.wallet) setFieldErrors((p) => ({ ...p, wallet: undefined }));
+                }}
+                placeholder="BSC-адрес кошелька (0x...)"
+                aria-label="BSC-адрес кошелька"
+                aria-invalid={!!fieldErrors.wallet}
+                className={`w-full px-4 min-h-[44px] rounded-full bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-all font-mono ${borderFor(!!fieldErrors.wallet)}`}
+              />
+              {fieldErrors.wallet && <p className="text-xs text-red-400 mt-1 px-1">{fieldErrors.wallet}</p>}
+            </div>
           </div>
         </motion.div>
 
@@ -190,7 +266,7 @@ export default function WithdrawalsPage() {
                     <div className="w-9 h-9 rounded-xl bg-[var(--bg-3)] flex items-center justify-center text-[#22c55e]">{c.i}</div>
                     <div>
                       <p className="text-sm font-bold text-[var(--color-text)]">{formatPrice(w.amount)}</p>
-                      <p className="text-[11px] text-[var(--color-muted)]">{w.createdAt ? format(new Date(w.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}</p>
+                      <p className="text-[11px] text-[var(--color-muted)]">{formatDate(w.createdAt, 'short')}</p>
                     </div>
                   </div>
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${c.v === 'approved' ? 'bg-[#22c55e]/10 text-[#22c55e]' : c.v === 'rejected' ? 'bg-red-400/10 text-red-400' : 'bg-amber-400/10 text-amber-400'}`}>{c.l}</span>
@@ -222,7 +298,7 @@ export default function WithdrawalsPage() {
                 <motion.div key={e.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] px-4 py-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[12px] font-bold text-[var(--color-text)] truncate">{accountLabel[e.account] || e.account}</p>
-                    <p className="text-[10px] text-[var(--color-muted)] truncate">{e.type}{e.createdAt ? ` · ${format(new Date(e.createdAt), 'd MMM, HH:mm', { locale: ru })}` : ''}</p>
+                    <p className="text-[10px] text-[var(--color-muted)] truncate">{e.type}{e.createdAt ? ` · ${formatDate(e.createdAt, 'short')}` : ''}</p>
                   </div>
                   <span className={`text-sm font-extrabold shrink-0 ${e.amount >= 0 ? 'text-[#22c55e]' : 'text-red-400'}`}>
                     {e.amount >= 0 ? '+' : '−'}{formatPrice(Math.abs(e.amount))}

@@ -4,6 +4,7 @@ import { getProfile, updateProfile, getStats, becomeSeller, getMySellerRequest, 
 import { IMaskInput } from 'react-imask';
 import { formatPhone, unformatPhone } from '../utils/phone';
 import { formatPrice } from '../utils/format';
+import { errorMessage } from '../utils/error';
 import { User, Settings, TrendingUp, Gift, LogOut, Save, ShieldCheck, Store, Megaphone, ShoppingBag, Clock, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -38,7 +39,22 @@ export default function ProfilePage() {
     return () => { alive = false; };
   }, [refreshAuth]);
 
-  const handleSave = async () => { try { await updateProfile({ ...form, phone: unformatPhone(form.phone) }); const p = await getProfile(); setProfile(p); setEditing(false); toast.success('Профиль обновлён'); } catch { toast.error('Ошибка'); } };
+  /**
+   * B4 §1: было `catch { toast.error('Ошибка') }` — юзер не понимал, что
+   * случилось (сервер лёг? телефон занят? нет связи?) и что делать.
+   * `errorMessage` достаёт человеческий текст (429/5xx/сеть/сообщение бэка).
+   */
+  const handleSave = async () => {
+    try {
+      await updateProfile({ ...form, phone: unformatPhone(form.phone) });
+      const p = await getProfile();
+      setProfile(p);
+      setEditing(false);
+      toast.success('Профиль обновлён');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось сохранить профиль — попробуй ещё раз'));
+    }
+  };
   const handleLogout = () => { window.OneSignal?.logout()?.catch(() => {}); localStorage.clear(); clearAuthState(); navigate('/login'); };
 
   /** BUG-2: ручной ре-фетч серверной роли (админ одобрил заявку, пока мы тут). */
@@ -73,13 +89,15 @@ export default function ProfilePage() {
         toast.success('Заявка отправлена — ждём решения админа');
       }
     } catch (e) {
+      // B4 §1: было голое `toast.error('Не удалось отправить заявку')` без
+      // причины. Серверный текст (например «заявка уже на рассмотрении»)
+      // полезнее общей фразы.
       const status = (e as { response?: { status?: number } })?.response?.status;
-      const message = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
       if (status === 400) {
         setSellerRequest('PENDING');
-        toast(message || 'Заявка уже на рассмотрении', { icon: '⏳' });
+        toast(errorMessage(e, 'Заявка уже на рассмотрении'), { icon: '⏳' });
       } else {
-        toast.error('Не удалось отправить заявку');
+        toast.error(errorMessage(e, 'Не удалось отправить заявку — попробуй ещё раз'));
       }
     } finally {
       setBecoming(false);

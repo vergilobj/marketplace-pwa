@@ -4,11 +4,12 @@ import api from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 import { Package, Plus, EyeOff, Eye, Megaphone, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { formatPrice } from '../utils/format';
-import { resolveMedia } from '../utils/media';
+import { formatPrice, plural } from '../utils/format';
 import { mergeUniqueById } from '../utils/mergeUnique';
-import { PageSkeleton } from '../components/ui/Skeleton';
+import { ProductGridSkeleton, SkeletonLine } from '../components/ui/Skeleton';
+import EmptyState from '../components/ui/EmptyState';
 import ErrorState from '../components/ui/ErrorState';
+import MediaImage from '../components/ui/MediaImage';
 import { useListError } from '../hooks/useListError';
 import { errorMessage } from '../utils/error';
 
@@ -58,6 +59,19 @@ export default function MyProductsPage() {
   const [page, setPage] = useState(1);
   const [busyIds, setBusyIds] = useState<string[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  /**
+   * B2 (WAVE 2, п.9): `/users/me` упал — это ОШИБКА, а не «нет ссылки на витрину».
+   *
+   * Было `catch(() => setUserId(null))`: сбой глушился, и вместо ссылки
+   * «Как видят покупатели →» показывался счётчик «N товаров». Внешне —
+   * нормальная страница, по факту — фича отвалилась молча, а отличить
+   * «ещё не загрузилось» от «сломалось» было нельзя.
+   *
+   * Стало: признак сбоя + кнопка «Повторить»; счётчик показывается вместе с
+   * ней, чтобы страница оставалась полезной.
+   */
+  const [meFailed, setMeFailed] = useState(false);
+  const [meRetry, setMeRetry] = useState(0);
   const loaderRef = useRef<HTMLDivElement>(null);
   // HIGH-1: сбой загрузки → ErrorState с «Повторить», а не «Нет товаров».
   const { error, setError, retryKey, errorProps } = useListError();
@@ -106,15 +120,24 @@ export default function MyProductsPage() {
       });
 
     // Свой id — из профиля: клик по шапке ведёт на публичную страницу.
+    // B2 п.9: сбой больше не глушится — поднимаем флаг, UI показывает «Повторить».
     api
       .get<{ id: string }>('/users/me')
-      .then((r) => setUserId(r.data?.id ?? null))
-      .catch(() => setUserId(null));
+      .then((r) => {
+        if (cancelled) return;
+        setUserId(r.data?.id ?? null);
+        setMeFailed(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setUserId(null);
+        setMeFailed(true);
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [retryKey, setError]);
+  }, [retryKey, meRetry, setError]);
 
   useEffect(() => {
     const el = loaderRef.current;
@@ -145,9 +168,35 @@ export default function MyProductsPage() {
     }
   };
 
-  // PERF-4: зелёный квадрат 40×40 → скелетон сетки «Мои товары»
+  /**
+   * B2 (WAVE 2, п.8): скелетон совпадает с реальной сеткой «Мои товары».
+   *
+   * Было `PageSkeleton rows={0} wide` — широкая одноколоночная карточка, а
+   * страница рисует сетку 1/2/3 колонки с фото `aspect-video`. При подмене
+   * контент прыгал. Здесь — та же сетка, что у реальных карточек.
+   */
   if (loading) {
-    return <PageSkeleton rows={0} wide />;
+    return (
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        {/* Заголовок/кнопки сверху — как у загруженной страницы, чтобы верх не прыгал. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-8">
+          <div>
+            <SkeletonLine className="h-7 w-44 mb-3" />
+            <SkeletonLine className="h-3.5 w-40" />
+          </div>
+          <div className="flex items-center gap-2">
+            <SkeletonLine className="h-11 w-40 rounded-xl" />
+            <SkeletonLine className="h-11 w-32 rounded-xl" />
+          </div>
+        </div>
+        <ProductGridSkeleton
+          count={6}
+          gridClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+          imageClassName="w-full aspect-video rounded-none"
+          cardClassName="glass-card rounded-2xl"
+        />
+      </div>
+    );
   }
 
   return (
@@ -168,7 +217,22 @@ export default function MyProductsPage() {
               Как видят покупатели →
             </button>
           ) : (
-            <p className="text-[var(--color-muted)] text-sm">{products.length} товаров</p>
+            /* B2 п.9: сбой /users/me — показываем счётчик И выход («Повторить»),
+               а не молча подменяем ссылку счётчиком. */
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-[var(--color-muted)] text-sm">
+                {products.length} {plural(products.length, ['товар', 'товара', 'товаров'])}
+              </p>
+              {meFailed && (
+                <button
+                  type="button"
+                  onClick={() => setMeRetry((k) => k + 1)}
+                  className="tap-link text-xs font-semibold text-[#22c55e] hover:text-[#16a34a] transition-colors underline underline-offset-2"
+                >
+                  Не загрузилась ссылка на витрину — повторить
+                </button>
+              )}
+            </div>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -190,10 +254,14 @@ export default function MyProductsPage() {
       {products.length === 0 && error ? (
         <ErrorState {...errorProps} />
       ) : products.length === 0 ? (
-        <div className="text-center py-24">
-          <Package size={40} className="mx-auto text-[var(--color-muted)] opacity-20 mb-4" />
-          <p className="text-[var(--color-muted)]">Нет товаров</p>
-        </div>
+        /* B2: пустое состояние приведено к общему EmptyState с выходом. */
+        <EmptyState
+          icon={<Package size={32} />}
+          title="Нет товаров"
+          description="Выстави первую позицию — она сразу появится в каталоге."
+          headingLevel="h2"
+          action={{ label: 'Добавить товар', onClick: () => navigate('/products/new') }}
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {products.map((p, i) => {
@@ -208,21 +276,21 @@ export default function MyProductsPage() {
                 className="glass-card rounded-2xl overflow-hidden cursor-pointer group p-0 flex flex-col"
               >
                 <div className="aspect-video bg-[rgba(255,255,255,0.03)] relative">
-                  {p.media?.[0] ? (
-                    <img
-                      src={resolveMedia(p.media[0])}
-                      alt={p.title}
-                      loading="lazy"
-                      decoding="async"
-                      width={640}
-                      height={360}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Package size={28} className="text-[var(--color-muted)] opacity-20" />
-                    </div>
-                  )}
+                  {/* B2 п.4: битое/404-медиа → та же заглушка, что и при отсутствии фото. */}
+                  <MediaImage
+                    src={p.media?.[0]}
+                    alt={p.title}
+                    loading="lazy"
+                    decoding="async"
+                    width={640}
+                    height={360}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    fallback={
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package size={28} className="text-[var(--color-muted)] opacity-20" />
+                      </div>
+                    }
+                  />
                   <span
                     className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-[10px] font-semibold ${
                       p.isActive ? 'bg-emerald-400/10 text-emerald-400' : 'bg-red-400/10 text-red-400'

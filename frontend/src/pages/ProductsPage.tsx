@@ -7,6 +7,7 @@ import { formatPrice } from '../utils/format';
 import { mergeUniqueById } from '../utils/mergeUnique';
 import { useDebounced } from '../hooks/useDebounced';
 import { ProductGridSkeleton } from '../components/ui/Skeleton';
+import EmptyState from '../components/ui/EmptyState';
 import ErrorState from '../components/ui/ErrorState';
 import { useListError } from '../hooks/useListError';
 import { errorMessage } from '../utils/error';
@@ -37,6 +38,8 @@ export default function ProductsPage() {
 
   // HIGH-1: сетевой сбой → ErrorState с «Повторить», а не «Пока пусто».
   const { error, setError, retryKey, errorProps } = useListError();
+  /** B2 п.2: «Обновить» в пустом каталоге — тот же рефетч, что и у ErrorState. */
+  const { onRetry } = errorProps;
 
   // R10: поиск уходит на сервер, а не фильтрует первые 24 загруженных записи
   const debouncedSearch = useDebounced(search, 300);
@@ -195,14 +198,27 @@ export default function ProductsPage() {
              загруженного списка не должна стирать каталог. */
           <ErrorState {...errorProps} />
         ) : filteredProducts.length === 0 ? (
-          <div className="text-center py-24">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--color-surface)] flex items-center justify-center">
-              <Package size={28} className="text-[var(--color-faint)]" />
-            </div>
-            <div className="text-[var(--color-muted)] text-sm">
-              {search ? 'Ничего не нашли по запросу.' : 'Пока пусто. Здесь появится твой рынок.'}
-            </div>
-          </div>
+          /* B2 (WAVE 2, п.2): пустые состояния были свёрстаны вручную — без
+             единой системы и БЕЗ ВЫХОДА (ни одной кнопки). Тупик: «Ничего не
+             нашли по запросу» — и что дальше? Теперь общий EmptyState с
+             действием: сбросить поиск или обновить каталог. */
+          search ? (
+            <EmptyState
+              icon={<Package size={32} />}
+              title="Ничего не нашли по запросу"
+              description={`По запросу «${search}» товаров нет. Попробуй другое слово или посмотри весь каталог.`}
+              headingLevel="h2"
+              action={{ label: 'Сбросить поиск', onClick: () => setSearch('') }}
+            />
+          ) : (
+            <EmptyState
+              icon={<Package size={32} />}
+              title="Пока пусто. Здесь появится твой рынок"
+              description="Товаров ещё нет. Обнови — или выстави свой первым."
+              headingLevel="h2"
+              action={{ label: 'Обновить', onClick: onRetry }}
+            />
+          )
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">

@@ -6,12 +6,27 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import api from '../api/axios';
 import { uploadImage } from '../api/upload';
+import { errorMessage } from '../utils/error';
 import toast from 'react-hot-toast';
+
+/**
+ * B1: лимиты те же, что на бэкенде — пост title ≤200, content ≤5000
+ * (create-post.dto.ts), фото ≤20 МБ (upload.controller.ts).
+ */
+const TITLE_MAX = 200;
+const CONTENT_MAX = 5000;
+const LINK_MAX = 500;
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+
+/** Счётчик длины в стиле FeedbackPage: у самого лимита — янтарный. */
+function lengthCounterClass(length: number, max: number): string {
+  return `text-[11px] ${length > max - 100 ? 'text-amber-400' : 'text-[var(--color-faint)]'}`;
+}
 
 export default function EditPostPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ title: '', content: '', link: '', videoUrl: '' });
+  const [form, setForm] = useState({ title: '', content: '', link: '' });
   const [existingMedia, setExistingMedia] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -23,11 +38,13 @@ export default function EditPostPage() {
     if (id) {
       api.get(`/posts/${id}`).then(res => {
         const post = res.data;
+        // B1: поля «Видео URL» больше нет — при создании поста видео приходит
+        // только загрузкой файла (CreatePostPage). Существующее видео не
+        // трогаем: PATCH уходит без videoUrl, сервер его сохраняет.
         setForm({
           title: post.title,
           content: post.content || '',
           link: post.link || '',
-          videoUrl: post.videoUrl || '',
         });
         setExistingMedia(post.media || []);
       }).finally(() => setLoading(false));
@@ -36,8 +53,18 @@ export default function EditPostPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
-    setFiles(prev => [...prev, ...selected]);
-    selected.forEach(file => {
+    // B1: отказ ДО загрузки — файл сверх лимита сервера (20 МБ) не уходит в сеть.
+    const oversized = selected.filter(file => file.size > MAX_IMAGE_BYTES);
+    if (oversized.length > 0) {
+      toast.error(
+        oversized.length === 1
+          ? `Фото «${oversized[0].name}» больше 20 МБ`
+          : `Фото больше 20 МБ не добавлены: ${oversized.length}`,
+      );
+    }
+    const allowed = selected.filter(file => file.size <= MAX_IMAGE_BYTES);
+    setFiles(prev => [...prev, ...allowed]);
+    allowed.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => setPreviews(prev => [...prev, reader.result as string]);
       reader.readAsDataURL(file);
@@ -56,6 +83,15 @@ export default function EditPostPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // B1: сервер режет title ≤200 / content ≤5000 — не гоняем запрос зря.
+    if (form.title.length > TITLE_MAX || form.content.length > CONTENT_MAX) {
+      toast.error(
+        form.title.length > TITLE_MAX
+          ? `Слишком длинно: максимум ${TITLE_MAX} символов`
+          : `Слишком длинно: максимум ${CONTENT_MAX} символов`,
+      );
+      return;
+    }
     setSaving(true);
     try {
       // Загружаем новые фото
@@ -66,17 +102,20 @@ export default function EditPostPage() {
       }
       const allMedia = [...existingMedia, ...uploadedUrls];
 
+      // videoUrl не отправляем: поля в форме нет (видео — только загрузкой
+      // файла при создании). PATCH без ключа сохраняет текущее значение.
       await api.patch(`/posts/${id}`, {
         title: form.title,
         content: form.content,
         link: form.link || undefined,
-        videoUrl: form.videoUrl || undefined,
         media: allMedia.length > 0 ? allMedia : undefined,
       });
       toast.success('Пост обновлён');
       navigate(`/posts/${id}`);
-    } catch (_err) {
-      toast.error('Ошибка при сохранении');
+    } catch (err: unknown) {
+      // B1: раньше здесь стояло глухое «Ошибка при сохранении» — причина
+      // (лимит длины, 403, сеть) не доходила до пользователя.
+      toast.error(errorMessage(err, 'Ошибка при сохранении'));
     } finally {
       setSaving(false);
     }
@@ -87,7 +126,7 @@ export default function EditPostPage() {
   return (
     <div className="max-w-xl mx-auto">
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => navigate(`/posts/${id}`)}
         className="flex items-center text-sm text-[var(--color-muted)] hover:text-[#22c55e] transition-colors mb-6"
       >
         <ArrowLeft size={16} className="mr-1" /> Назад
@@ -98,18 +137,33 @@ export default function EditPostPage() {
           <h1 className="text-2xl font-bold text-[var(--color-text)]">Редактировать пост</h1>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="Заголовок" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required />
+          <div>
+            <Input label="Заголовок" value={form.title} maxLength={TITLE_MAX} onChange={e => setForm({ ...form, title: e.target.value })} required />
+            <div className="flex justify-end mt-1">
+              <span className={lengthCounterClass(form.title.length, TITLE_MAX)}>
+                {form.title.length}/{TITLE_MAX}
+              </span>
+            </div>
+          </div>
           <div>
             <label className="block text-sm font-medium text-[var(--color-muted)] mb-1">Текст</label>
             <textarea
               value={form.content}
+              maxLength={CONTENT_MAX}
               onChange={e => setForm({ ...form, content: e.target.value })}
               rows={4}
               className="w-full px-4 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--color-border)] text-[var(--color-text)] placeholder-[var(--color-faint)] focus:border-[rgba(34,197,94,0.6)] focus:shadow-[0_0_0_3px_rgba(34,197,94,0.15)] outline-none transition-all duration-200"
             />
+            <div className="flex justify-end mt-1">
+              <span className={lengthCounterClass(form.content.length, CONTENT_MAX)}>
+                {form.content.length}/{CONTENT_MAX}
+              </span>
+            </div>
           </div>
-          <Input label="Ссылка (необязательно)" value={form.link} onChange={e => setForm({ ...form, link: e.target.value })} />
-          <Input label="Видео URL" value={form.videoUrl} onChange={e => setForm({ ...form, videoUrl: e.target.value })} />
+          <Input label="Ссылка (необязательно)" value={form.link} maxLength={LINK_MAX} onChange={e => setForm({ ...form, link: e.target.value })} />
+
+          {/* B1: поля «Видео URL» здесь больше нет — при создании поста видео
+              приходит только загрузкой файла (CreatePostPage). */}
 
           {/* Существующие медиа */}
           {existingMedia.length > 0 && (

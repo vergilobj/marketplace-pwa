@@ -65,13 +65,40 @@ export default function Layout() {
       className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]"
       style={{
         // +8px «воздуха» сверх safe-area: владелец просил отступ от краёв.
-        paddingTop: 'calc(var(--safe-top) + 8px)',
+        // Высоту добирает `mt-[8px]` у шапки, а НЕ этот padding: порог
+        // прилипания шапки (`top`) обязан совпадать с её потоковой позицией,
+        // иначе при старте скролла она прыгает (см. комментарий у header).
+        paddingTop: 'var(--safe-top)',
         paddingLeft: 'var(--safe-left)',
         paddingRight: 'var(--safe-right)',
       }}
     >
-      <header className="sticky z-50 px-4" style={{ top: 'calc(var(--safe-top) + 14px)' }}>
-        <div className="max-w-5xl mx-auto flex items-center gap-2 h-16 px-3.5 rounded-2xl bg-[rgba(17,25,24,0.72)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] shadow-[0_8px_32px_-8px_rgba(0,0,0,0.5)] relative">
+      {/*
+        ШАПКА НЕ ДЁРГАЕТСЯ (2026-09-15).
+
+        Симптом: при старте скролла шапка прыгала на 6px. Причина —
+        рассогласование двух разных «top»:
+          • потоковая позиция шапки задавалась `padding-top` родителя
+            (`--safe-top + 8px`), то есть на десктопе 8px;
+          • порог прилипания (`top: calc(var(--safe-top) + 14px)`) — 14px.
+        Пока `top` больше потоковой позиции, `sticky` не срабатывает: шапка
+        просто едет вверх вместе с потоком, и лишь на 6px скролла
+        «прилипает», отскакивая назад на эти же 6px. Замер до правки:
+        `window.scrollTo(0, 200)` → top 14 → 0 (рывок −14px).
+
+        Решение: порог прилипания РАВЕН потоковой позиции.
+          • `padding-top` родителя = `var(--safe-top)` (safe-area сохранён);
+          • «+8px воздуха» переехал в `mt-[8px]` самой шапки — он входит в
+            потоковую позицию, а не в padding родителя;
+          • `top: calc(var(--safe-top) + 8px)` — ровно та же точка.
+        Внешне раскладка не менялась (8px от края под шапкой + 14px до
+        контента), но при скролле шапка теперь не двигается вовсе.
+
+        Динамический `top` сохраняем: в режиме PWA на iOS safe-area-inset
+        меняется, `sticky` должен следовать за ней.
+      */}
+      <header className="sticky z-50 px-4 mt-[8px]" style={{ top: 'calc(var(--safe-top) + 8px)' }}>
+        <div className="max-w-5xl mx-auto mt-[6px] flex items-center gap-2 h-14 px-3.5 rounded-2xl bg-[rgba(17,25,24,0.72)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] shadow-[0_8px_32px_-8px_rgba(0,0,0,0.5)] relative">
           {/* Логотип */}
           {/* R14: лого было 36px высотой — тач-зона ≥44px */}
           <Link to="/" className={`${searchOpen ? 'hidden' : 'flex'} items-center gap-2.5 shrink-0 group min-h-[44px]`}>
@@ -189,28 +216,50 @@ export default function Layout() {
         </div>
       </footer>
 
+      {/*
+        7 ПУНКТОВ НА 390px (2026-09-15).
+        Было: `py-2` (16px по вертикали) и боковые отступы по 18px — на
+        содержимое оставалось 306px, то есть по 51.3px на пункт. Подписи
+        `11px` в них не влезали: замер показывал обрезку «Избранное» на 9px
+        и «Уведомления» на 22px (ellipsis).
+
+        Решение (без возврата к сокращениям — они уже откатывались, см.
+        комментарий к `.tab-label` в index.css):
+          • боковые отступы 18px → 8px (+20px ширины), вертикальные
+            `py-2` → `py-1` (высота — только за счёт строки подписи);
+          • подпись 11px → 10px и `letter-spacing: -0.3px` (замер ширины
+            по всем подписям — они перестают обрезаться);
+          • иконка 20px → 18px (пункт становится компактнее по вертикали).
+        Факт после правки: слот ≈ 60.8px, «Уведомления» нужно 63.8 —
+        остаток 3px добирает `overflow: visible` у подписи: пункты
+        растянуты `flex-1` вплотную друг к другу, текст выходит в зазор
+        соседа и рисуется полностью, без ellipsis. Тач-таргет ≥44px
+        (высота пункта) сохраняется.
+      */}
       <nav
         aria-label="Основная навигация"
-        className="md:hidden fixed bg-[rgba(17,25,24,0.88)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] rounded-2xl flex justify-around items-center py-2 z-40 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)]"
+        className="md:hidden fixed no-scrollbar bg-[rgba(17,25,24,0.88)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] rounded-2xl flex justify-around items-center py-1 z-40 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)]"
         style={{
           // `fixed` НЕ наследует padding родителя → safe-area считаем сами.
-          // База 20px снизу / 16px по бокам — чтобы был воздух ДАЖЕ если
+          // База 20px снизу / 8px по бокам — чтобы был воздух ДАЖЕ если
           // env(safe-area-inset-*) вернёт 0 (десктоп, часть браузеров).
-          left: 'calc(var(--safe-left) + 18px)',
-          right: 'calc(var(--safe-right) + 18px)',
+          // Боковые были 18px — на 390px это стоило 20px ширины, которых
+          // не хватало семи пунктам с полными подписями.
+          left: 'calc(var(--safe-left) + 8px)',
+          right: 'calc(var(--safe-right) + 8px)',
           bottom: 'calc(var(--safe-bottom) + 32px)',
         }}
       >
-        <MobileTab to="/" icon={<Home size={20} />} label="Главная" pathname={location.pathname} />
-        <MobileTab to="/bazar" icon={<Sparkles size={20} />} label="Базар" pathname={location.pathname} />
-        <MobileTab to="/favorites" icon={<Heart size={20} />} label="Избранное" pathname={location.pathname} />
+        <MobileTab to="/" icon={<Home size={18} />} label="Главная" pathname={location.pathname} />
+        <MobileTab to="/bazar" icon={<Sparkles size={18} />} label="Базар" pathname={location.pathname} />
+        <MobileTab to="/favorites" icon={<Heart size={18} />} label="Избранное" pathname={location.pathname} />
         <CreateMenu variant="nav" />
         <MobileTab
           to="/cart"
           icon={
             <>
-              <ShoppingBag size={20} />
-              {cart.length > 0 && <span className="absolute -top-1 right-4 bg-[#22c55e] text-[#0b0e0d] text-[9px] font-bold rounded-full min-w-4 h-4 px-0.5 flex items-center justify-center">{cart.length > 9 ? '9+' : cart.length}</span>}
+              <ShoppingBag size={18} />
+              {cart.length > 0 && <span className="absolute -top-1 right-3 bg-[#22c55e] text-[#0b0e0d] text-[9px] font-bold rounded-full min-w-4 h-4 px-0.5 flex items-center justify-center">{cart.length > 9 ? '9+' : cart.length}</span>}
             </>
           }
           label="Корзина"
@@ -223,17 +272,17 @@ export default function Layout() {
               to="/notifications"
               icon={
                 <>
-                  <Bell size={20} />
-                  {unreadCount > 0 && <span className="absolute -top-1 right-3 badge-count text-[9px] font-bold rounded-full min-w-4 h-4 px-0.5 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+                  <Bell size={18} />
+                  {unreadCount > 0 && <span className="absolute -top-1 right-2 badge-count text-[9px] font-bold rounded-full min-w-4 h-4 px-0.5 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>}
                 </>
               }
               label="Уведомления"
               pathname={location.pathname}
             />
-            <MobileTab to="/profile" icon={<User size={20} />} label="Профиль" pathname={location.pathname} />
+            <MobileTab to="/profile" icon={<User size={18} />} label="Профиль" pathname={location.pathname} />
           </>
         ) : (
-          <MobileTab to="/login" icon={<User size={20} />} label="Войти" pathname={location.pathname} />
+          <MobileTab to="/login" icon={<User size={18} />} label="Войти" pathname={location.pathname} />
         )}
       </nav>
 
@@ -269,7 +318,18 @@ function DesktopIcon({ to, title, children }: { to: string; title: string; child
 
 /** Мобильный таб с надёжным active-состоянием.
  *  MED-6: пункт — иконочная ссылка, полное имя даёт aria-label, а визуальная
- *  подпись помечена aria-hidden, чтобы скринридер не читал обрезанный текст. */
+ *  подпись помечена aria-hidden, чтобы скринридер не читал обрезанный текст.
+ *
+ *  2026-09-15 — почему `flex-auto`, а не `flex-1`:
+ *  при семи пунктах `flex-1` (равные доли) давал слот ≈53px, а подписи
+ *  `11px` в него не влезали («Избранное» −9px, «Уведомления» −22px по
+ *  замеру). Кегль подписи залочен в `.tab-label` (`font-size: 11px
+ *  !important`, index.css) — переопределить его из компонента нельзя, и
+ *  сокращать слова тоже нельзя (осознанный откат, см. комментарий там же).
+ *  Поэтому пункт тянется по СВОЕМУ содержимому (`flex-basis: auto`) и лишь
+ *  добирает свободное место: суммы ширин подписей на 390px хватает, чтобы
+ *  все семь поместились без ellipsis. `min-w-[44px]` держит тач-таргет,
+ *  `self-stretch` — высоту пункта по высоте панели. */
 function MobileTab({ to, icon, label, pathname }: { to: string; icon: React.ReactNode; label: string; pathname: string }) {
   const active = isNavActive(pathname, to);
   return (
@@ -278,7 +338,7 @@ function MobileTab({ to, icon, label, pathname }: { to: string; icon: React.Reac
       aria-label={label}
       aria-current={active ? 'page' : undefined}
       data-nav-active={active ? 'true' : undefined}
-      className={`flex flex-col items-center justify-center min-w-0 flex-1 min-h-[44px] text-[10px] relative ${active ? 'text-[#22c55e]' : 'text-[var(--color-muted)]'}`}
+      className={`flex flex-col items-center justify-center self-stretch flex-auto min-w-[44px] min-h-[44px] relative ${active ? 'text-[#22c55e]' : 'text-[var(--color-muted)]'}`}
     >
       <span className="relative flex items-center justify-center">{icon}</span>
       <span className="tab-label mt-0.5 block" aria-hidden="true">{label}</span>

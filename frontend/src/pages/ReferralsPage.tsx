@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import api from '../api/axios';
 import { Gift, Users, Copy, Check } from 'lucide-react';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
-import { formatPrice } from '../utils/format';
+import { formatPrice, formatDate } from '../utils/format';
 import toast from 'react-hot-toast';
 import { PageSkeleton } from '../components/ui/Skeleton';
 
@@ -20,7 +18,7 @@ export default function ReferralsPage() {
   }, []);
 
   const copyCode = () => {
-    if (profile?.referralCode) { navigator.clipboard.writeText(profile.referralCode); setCopied(true); toast.success('Скопировано!'); setTimeout(()=>setCopied(false),2000); }
+    if (profile?.referralCode) { navigator.clipboard.writeText(profile.referralCode); setCopied(true); toast.success('Реферальный код скопирован'); setTimeout(()=>setCopied(false),2000); }
   };
 
   // PERF-4: зелёный квадрат 40×40 → скелетон списка рефералов
@@ -34,7 +32,9 @@ export default function ReferralsPage() {
 
       <div className="relative max-w-2xl mx-auto px-4 sm:px-6 pt-10 pb-20">
         <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Рефералы</h1>
-        <p className="text-[var(--color-muted)] text-sm mb-6">Приглашайте своих</p>
+        {/* B4 §5: было «Приглашайте своих» — вы-форма на странице, которая
+            ниже говорит «зазывай своих». Проект общается на «ты». */}
+        <p className="text-[var(--color-muted)] text-sm mb-6">Приглашай своих</p>
 
         <motion.div initial={{opacity:0,scale:.97}} animate={{opacity:1,scale:1}} className="rounded-[26px] bg-[var(--color-surface)] border border-[var(--color-border)] p-6 mb-8">
           <div className="text-center mb-4">
@@ -64,7 +64,7 @@ export default function ReferralsPage() {
               <motion.div key={r.id} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:i*.03}} className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-bold text-[var(--color-text)]">{r.buyer?.name||'Пользователь'}</p>
-                  <p className="text-xs text-[var(--color-muted)]">{r.product?.title||'Заказ'} • {r.createdAt?format(new Date(r.createdAt),'d MMM',{locale:ru}):''}</p>
+                  <p className="text-xs text-[var(--color-muted)]">{r.product?.title||'Заказ'} • {formatDate(r.createdAt, 'short')}</p>
                 </div>
                 <div className="text-right">
                   <p className="font-extrabold text-[#22c55e] text-sm">+{formatPrice(r.referralBonus || 0)}</p>

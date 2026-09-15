@@ -1,5 +1,5 @@
 /**
- * Единое форматирование чисел и цен по всему приложению.
+ * Единое форматирование чисел, цен и дат по всему приложению.
  *
  * Правило цены (R22): разделитель разрядов — обычный пробел,
  * копейки показываются ТОЛЬКО если они есть. Валюта — USDT.
@@ -8,6 +8,9 @@
  *   178072.43   -> "178 072.43 USDT"
  *   0           -> "0 USDT"
  */
+
+import { format, formatDistanceToNow } from 'date-fns';
+import { ru } from 'date-fns/locale';
 
 const THIN = /[\u00A0\u202F\u2009]/g;
 
@@ -50,6 +53,74 @@ export function plural(n: number, forms: [string, string, string]): string {
   if (mod10 === 1) return forms[0];
   if (mod10 >= 2 && mod10 <= 4) return forms[1];
   return forms[2];
+}
+
+/** «3 товара», «1 товар» — число + склонённое существительное одной строкой. */
+export function pluralize(n: number, forms: [string, string, string]): string {
+  return `${formatNumber(n)} ${plural(n, forms)}`;
+}
+
+/** Готовые наборы форм — чтобы не дублировать кортежи по страницам. */
+export const PLURAL = {
+  товар: ['товар', 'товара', 'товаров'] as [string, string, string],
+  заказ: ['заказ', 'заказа', 'заказов'] as [string, string, string],
+  день: ['день', 'дня', 'дней'] as [string, string, string],
+  пост: ['пост', 'поста', 'постов'] as [string, string, string],
+  отзыв: ['отзыв', 'отзыва', 'отзывов'] as [string, string, string],
+  приглашение: ['приглашение', 'приглашения', 'приглашений'] as [string, string, string],
+  уведомление: ['уведомление', 'уведомления', 'уведомлений'] as [string, string, string],
+};
+
+/**
+ * Вид формата даты.
+ *
+ *   short    — «15 сент., 14:32»      списки, карточки, таблицы
+ *   full     — «15 сентября 2026, 14:32»  детали, тред, шапка обращения
+ *   relative — «5 мин назад», но ТОЛЬКО пока событие свежее (<24 ч);
+ *              дальше автоматически падает в `short` — «3 недели назад»
+ *              рядом с датой заказа бесполезно, а место занимает.
+ */
+export type DateKind = 'short' | 'full' | 'relative';
+
+/**
+ * ЕДИНЫЙ формат дат по приложению (Волна 2 / B4).
+ *
+ * До этого в проекте жило шесть разных форматов одной и той же даты
+ * (`d MMM, HH:mm`, `d MMM`, `d MMM yyyy, HH:mm`, `d MMMM в HH:mm`,
+ * `d MMMM yyyy`, `DD.MM, HH:mm`) — юзер видел «15 сент.» на одной странице
+ * и «15.09, 14:32» на соседней. Теперь формат выбирается по назначению места,
+ * а не по файлу, где этот код когда-то написали.
+ *
+ * Часовой пояс — локальный для устройства (в проекте это Europe/Samara,
+ * UTC+4): даты приходят ISO-строками с Z, `new Date()` переводит их в
+ * локальное время, и админ видит то же время, что и юзер.
+ *
+ * Невалидная/пустая дата → «—» (а не «Invalid Date» в интерфейсе).
+ *
+ *   formatDate('2026-09-15T10:32:00Z')            -> '15 сент., 14:32'
+ *   formatDate('2026-09-15T10:32:00Z', 'full')    -> '15 сентября 2026, 14:32'
+ *   formatDate(<5 минут назад>, 'relative')       -> '5 минут назад'
+ *   formatDate(<3 дня назад>, 'relative')         -> '12 сент., 14:32'
+ */
+export function formatDate(iso: string | null | undefined, kind: DateKind = 'short'): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+
+  if (kind === 'relative') {
+    const diffMs = Date.now() - date.getTime();
+    // Будущее и «старше суток» — не относительный формат.
+    if (diffMs >= 0 && diffMs < 24 * 60 * 60 * 1000) {
+      return formatDistanceToNow(date, { addSuffix: true, locale: ru });
+    }
+    return format(date, 'd MMM, HH:mm', { locale: ru });
+  }
+
+  if (kind === 'full') {
+    return format(date, 'd MMMM yyyy, HH:mm', { locale: ru });
+  }
+
+  return format(date, 'd MMM, HH:mm', { locale: ru });
 }
 
 export default formatPrice;

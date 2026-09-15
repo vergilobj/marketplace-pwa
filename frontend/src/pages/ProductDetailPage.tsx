@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShoppingCart, Minus, Plus, ArrowLeft, ChevronLeft, ChevronRight, Heart,
@@ -61,7 +61,28 @@ function formatCountdown(totalSeconds: number): string {
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  /**
+   * «НАЗАД» БЕЗ ВЫХОДА ИЗ ПРИЛОЖЕНИЯ (2026-09-15).
+   *
+   * Было `navigate(-1)`: при заходе по прямой ссылке (из мессенджера, из
+   * уведомления, из новой вкладки) в истории браузера нет предыдущей записи
+   * ЭТОГО приложения — и кнопка выбрасывала пользователя на чужой сайт или
+   * на пустую вкладку. Плюс `navigate(-1)` слепо доверяет истории: если
+   * предыдущая запись ведёт на /login или на другой домен, «Назад» уводит
+   * именно туда.
+   *
+   * Теперь: если в текущей сессии приложения мы действительно куда-то
+   * переходили внутри него (react-router кладёт в `history.state.idx` номер
+   * записи, а `location.key !== 'default'` означает, что это не первая
+   * загрузка страницы) — возвращаемся по истории; иначе идём на явный
+   * маршрут каталога. Так «Назад» всегда остаётся внутри приложения.
+   */
+  const goBack = () => {
+    if (location.key !== 'default' && window.history.state?.idx > 0) navigate(-1);
+    else navigate('/products');
+  };
   const { isAuthenticated } = useAuth();
+  const location = useLocation();
   const { addToCart, toggleFavorite, isFavorite } = useApp();
   const [product, setProduct] = useState<ApiProduct | null>(null);
   const [loading, setLoading] = useState(true);
@@ -226,7 +247,7 @@ export default function ProductDetailPage() {
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2.5">
           <button
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="inline-flex items-center gap-2 px-5 h-11 rounded-full border border-[var(--color-border)] text-[var(--color-text)] text-sm font-bold hover:border-[#22c55e]/40 hover:bg-[var(--color-surface)] transition-colors"
           >
             <ArrowLeft size={16} /> Назад
@@ -291,7 +312,7 @@ export default function ProductDetailPage() {
 
   return (
     <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-6 pb-72 lg:pb-20 overflow-x-hidden">
-      <button onClick={() => navigate(-1)} className="tap-link items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
+      <button onClick={goBack} className="tap-link items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
         <ArrowLeft size={16} /> Назад
       </button>
 

@@ -1,12 +1,14 @@
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Inbox } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { bazarDeals, DEAL_STATUS_RU } from '../api/bazar';
 import type { BazarDeal } from '../api/bazar';
-import { resolveMedia } from '../utils/media';
 import { formatPrice } from '../utils/format';
 import ErrorState from '../components/ui/ErrorState';
+import EmptyState from '../components/ui/EmptyState';
+import MediaImage from '../components/ui/MediaImage';
+import { PageSkeleton } from '../components/ui/Skeleton';
 
 const fmt = (s?: string | null) => {
   if (!s) return '';
@@ -26,6 +28,21 @@ const fmt = (s?: string | null) => {
  */
 const LEADS_PAGE_SIZE = 100;
 
+/**
+ * B2 (WAVE 2, п.3): страница приведена к общей системе.
+ *
+ * Было:
+ *  - загрузка — зелёный спиннер в 24-пиксельном квадрате вместо скелетона;
+ *    остальные списки проекта рисуют скелетон, поэтому layout прыгал именно
+ *    здесь (спиннер не занимает высоту будущего списка);
+ *  - пустое состояние — голая плашка без иконки и БЕЗ действия: тупик;
+ *  - цвета заданы inline-хардкодом (`#0d1210`, `rgba(34,197,94,0.12)`),
+ *    из-за чего страница не следовала теме и расходилась с соседними.
+ *
+ * Стало: `PageSkeleton` (как в OrdersPage), `EmptyState` с действием «К товарам»,
+ * токены темы (`var(--color-surface)` / `var(--color-border)`) и `MediaImage`
+ * с заглушкой на битую картинку.
+ */
 export default function LeadsPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -45,19 +62,14 @@ export default function LeadsPage() {
     isAuthenticated,
   );
 
+  // B2 п.3: скелетон вместо спиннера — тот же паттерн, что в OrdersPage.
   if (loading) {
-    return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
-        <div className="flex justify-center py-24">
-          <div className="w-8 h-8 rounded-full border-2 border-[#22c55e] border-t-transparent animate-spin" />
-        </div>
-      </div>
-    );
+    return <PageSkeleton rows={4} wide />;
   }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 pb-20">
-      <h1 className="text-2xl font-bold text-white mb-1">Лиды</h1>
+      <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Лиды</h1>
       <p className="text-sm text-[var(--color-muted)] mb-6">Входящие заявки покупателей по вашим товарам</p>
 
       {!loading && deals.length === 0 && error ? (
@@ -68,12 +80,14 @@ export default function LeadsPage() {
           onRetry={reload}
         />
       ) : !loading && deals.length === 0 ? (
-        <div
-          className="rounded-3xl py-16 text-center"
-          style={{ background: '#0d1210', border: '1px solid rgba(34,197,94,0.12)' }}
-        >
-          <div className="text-sm text-[var(--color-muted)]">Пока нет входящих лидов</div>
-        </div>
+        /* B2 п.3: было плашкой без иконки и без выхода — теперь общий EmptyState с действием. */
+        <EmptyState
+          icon={<Inbox size={32} />}
+          title="Пока нет входящих лидов"
+          description="Как только покупатель напишет по твоему товару, заявка появится здесь."
+          headingLevel="h2"
+          action={{ label: 'К товарам', onClick: () => navigate('/products') }}
+        />
       ) : (
         <>
           <div className="space-y-3">
@@ -81,32 +95,25 @@ export default function LeadsPage() {
             <button
               key={d.id}
               onClick={() => navigate(`/bazar?dealId=${d.id}`)}
-              className="w-full text-left rounded-2xl p-4 transition-colors hover:border-[#22c55e]/40"
-              style={{ background: '#0d1210', border: '1px solid rgba(34,197,94,0.12)' }}
+              className="w-full text-left rounded-2xl p-4 bg-[var(--color-surface)] border border-[var(--color-border)] transition-colors hover:border-[#22c55e]/40"
             >
               <div className="flex items-start gap-3">
-                {d.product?.media?.[0] ? (
-                  <img
-                    src={resolveMedia(d.product.media[0])}
-                    alt=""
-                    width={48}
-                    height={48}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-12 h-12 rounded-xl object-cover shrink-0"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-xl shrink-0 bg-[rgba(255,255,255,0.04)]" />
-                )}
+                <MediaImage
+                  src={d.product?.media?.[0]}
+                  alt={d.product?.title ?? ''}
+                  width={48}
+                  height={48}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-12 h-12 rounded-xl object-cover shrink-0"
+                  fallback={<div className="w-12 h-12 rounded-xl shrink-0 bg-[rgba(255,255,255,0.04)]" />}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-bold text-white truncate">
+                    <span className="text-sm font-bold text-[var(--color-text)] truncate">
                       {d.product?.title ?? 'Сделка'}
                     </span>
-                    <span
-                      className="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md"
-                      style={{ color: '#34d399', background: 'rgba(52,211,153,0.12)' }}
-                    >
+                    <span className="shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md text-emerald-400 bg-emerald-400/10">
                       {DEAL_STATUS_RU[d.status] ?? d.status}
                     </span>
                   </div>
@@ -135,8 +142,7 @@ export default function LeadsPage() {
               <button
                 type="button"
                 onClick={loadMore}
-                className="px-5 min-h-[44px] rounded-full text-[var(--color-text)] text-sm font-semibold transition-colors hover:border-[#22c55e]/40"
-                style={{ background: '#0d1210', border: '1px solid rgba(34,197,94,0.12)' }}
+                className="px-5 min-h-[44px] rounded-full bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] text-sm font-semibold transition-colors hover:border-[#22c55e]/40"
               >
                 Показать ещё
               </button>

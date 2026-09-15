@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, MoreHorizontal, Megaphone, ExternalLink, Trash2, Edit3, Play } from 'lucide-react';
+import { Heart, MessageCircle, MoreHorizontal, Megaphone, ExternalLink, Trash2, Edit3, Play, ImageOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { useAuth } from '../hooks/useAuth';
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { resolveMedia } from '../utils/media';
 import { buildGallery } from '../utils/video';
 import Badge from './ui/Badge';
+import MediaImage from './ui/MediaImage';
 import type { ApiPost } from '../api/types';
 
 interface Props {
@@ -95,8 +96,9 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
                 <Play size={32} className="text-white/70" />
               </div>
             ) : (
-              <img
-                src={resolveMedia(first.src)}
+              /* B2 п.4: битое/404-медиа → заглушка-плейсхолдер вместо серого квадрата. */
+              <MediaImage
+                src={first.src}
                 alt={post.title}
                 className="w-full h-48 object-cover"
                 loading="lazy"
@@ -104,6 +106,11 @@ export default function PostCard({ post, onDelete, onEdit }: Props) {
                 width={640}
                 height={360}
                 style={{ aspectRatio: '16 / 9' }}
+                fallback={
+                  <div className="w-full h-48 bg-[var(--bg-3)] flex items-center justify-center">
+                    <ImageOff size={28} className="text-[var(--color-faint)]" />
+                  </div>
+                }
               />
             )}
             {extraCount > 0 && (

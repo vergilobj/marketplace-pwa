@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../api/axios';
 import { Bell, Heart, MessageCircle, ShoppingBag, Gift, CheckCheck, Sparkles } from 'lucide-react';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { pluralize, PLURAL, formatDate } from '../utils/format';
 import toast from 'react-hot-toast';
 import { PageSkeleton } from '../components/ui/Skeleton';
 import ErrorState from '../components/ui/ErrorState';
@@ -86,11 +85,26 @@ export default function NotificationsPage() {
         const seen = new Set(p.map(n => n.id));
         return [...p, ...data.filter(n => !seen.has(n.id))];
       });
-    } catch { toast.error('Ошибка загрузки'); }
+    } catch (e) {
+      toast.error(errorMessage(e, 'Не удалось загрузить ещё уведомления — попробуй ещё раз'));
+    }
     finally { setLoadingMore(false); }
   };
 
-  const readAll = async () => { try { await api.patch('/notifications/read-all'); setList(p => p.map(n=>({...n,isRead:true}))); toast.success('Всё прочитано'); } catch { toast.error('Ошибка'); } };
+  /**
+   * B4 §1/§7: было `catch { toast.error('Ошибка') }` и успех без объекта
+   * («Всё прочитано» — что именно?). Теперь и ошибка, и успех говорят
+   * конкретно, о чём речь.
+   */
+  const readAll = async () => {
+    try {
+      await api.patch('/notifications/read-all');
+      setList(p => p.map(n => ({ ...n, isRead: true })));
+      toast.success('Все уведомления прочитаны');
+    } catch (e: unknown) {
+      toast.error(errorMessage(e, 'Не удалось отметить уведомления прочитанными — попробуй ещё раз'));
+    }
+  };
   const markRead = async (id:string) => { try { await api.patch(`/notifications/${id}/read`); setList(p => p.map(n=>n.id===id?{...n,isRead:true}:n)); } catch { /* ignore */ } };
 
   // PERF-4: зелёный квадрат 40×40 → скелетон списка уведомлений
@@ -107,7 +121,7 @@ export default function NotificationsPage() {
           <h1 className="text-2xl font-bold text-[var(--color-text)]">Уведомления</h1>
           {list.some(n=>!n.isRead) && <button onClick={readAll} className="tap-link gap-1 text-sm text-[#22c55e] hover:text-[#34d399] font-bold"><CheckCheck size={14} /> Прочитать все</button>}
         </div>
-        {list.length > 0 && <p className="text-[var(--color-muted)] text-sm mb-6">{list.filter(n=>!n.isRead).length} непрочитанных</p>}
+        {list.length > 0 && <p className="text-[var(--color-muted)] text-sm mb-6">{pluralize(list.filter(n=>!n.isRead).length, PLURAL.уведомление)} непрочитанных</p>}
 
         {list.length === 0 && error ? (
           <ErrorState {...errorProps} />
@@ -144,7 +158,7 @@ export default function NotificationsPage() {
                     <div className="w-9 h-9 rounded-xl bg-[var(--bg-3)] flex items-center justify-center shrink-0">{icons[n.type]||<Bell size={13}/>}</div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm ${!n.isRead?'font-bold text-[var(--color-text)]':'text-[var(--color-muted)]'}`}>{n.message}</p>
-                      <p className="text-[11px] text-[var(--color-faint)] mt-1">{n.createdAt?format(new Date(n.createdAt),'d MMM, HH:mm',{locale:ru}):''}</p>
+                      <p className="text-[11px] text-[var(--color-faint)] mt-1">{formatDate(n.createdAt, 'relative')}</p>
                     </div>
                     {!n.isRead && <div className="w-2 h-2 rounded-full bg-[#22c55e] shrink-0 mt-1.5"/>}
                   </div>

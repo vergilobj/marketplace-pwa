@@ -9,9 +9,7 @@ import api from '../api/axios';
 import { getProducts } from '../api/products';
 import { getFeed } from '../api/posts';
 import { resolveMedia } from '../utils/media';
-import { formatPrice } from '../utils/format';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { formatPrice, formatDate, plural, PLURAL } from '../utils/format';
 import type { ApiProduct, ApiPost } from '../api/types';
 import { PageSkeleton } from '../components/ui/Skeleton';
 
@@ -101,7 +99,7 @@ export default function PublicProfilePage() {
         const status = (e as { response?: { status?: number } })?.response?.status;
         if (status === 401) {
           setAuthRequired(true);
-          setError('Войдите, чтобы посмотреть профиль');
+          setError('Войди, чтобы посмотреть профиль');
         } else if (status === 404) {
           setError('Пользователь не найден');
         } else {
@@ -155,8 +153,9 @@ export default function PublicProfilePage() {
         </div>
         <h1 className="text-2xl font-extrabold text-[var(--color-text)] mb-2">{error || 'Профиль недоступен'}</h1>
         <p className="text-sm text-[var(--color-muted)] mb-8">
+          {/* B4 §5: было «доступны участникам площадки» — вы-форма. */}
           {authRequired
-            ? 'Публичные профили доступны участникам площадки.'
+            ? 'Публичные профили видны только участникам площадки.'
             : 'Возможно, ссылка устарела или аккаунт удалён.'}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2.5">
@@ -258,18 +257,23 @@ export default function PublicProfilePage() {
 
               {user.createdAt && (
                 <p className="text-[11px] text-[var(--color-muted)] mt-2">
-                  На площадке с {format(new Date(user.createdAt), 'd MMMM yyyy', { locale: ru })}
+                  На площадке с {formatDate(user.createdAt, 'full')}
                 </p>
               )}
 
+              {/*
+                B4 §3: было «1 товаров» / «2 постов» — число подставлялось к
+                фиксированной форме. `plural` даёт «1 товар / 2 товара /
+                5 товаров».
+              */}
               <div className="flex flex-wrap gap-4 mt-4">
                 <div>
                   <div className="text-lg font-extrabold text-[var(--color-text)]">{products.length}</div>
-                  <div className="text-[10px] uppercase tracking-wider text-[var(--color-muted)]">товаров</div>
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--color-muted)]">{plural(products.length, PLURAL.товар)}</div>
                 </div>
                 <div>
                   <div className="text-lg font-extrabold text-[var(--color-text)]">{posts.length}</div>
-                  <div className="text-[10px] uppercase tracking-wider text-[var(--color-muted)]">постов</div>
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--color-muted)]">{plural(posts.length, PLURAL.пост)}</div>
                 </div>
               </div>
             </div>
@@ -366,7 +370,7 @@ export default function PublicProfilePage() {
                 >
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className="text-[11px] text-[var(--color-muted)]">
-                      {p.createdAt ? format(new Date(p.createdAt), 'd MMM, HH:mm', { locale: ru }) : ''}
+                      {formatDate(p.createdAt, 'short')}
                     </span>
                     {p.isAd && (
                       <span className="text-[9px] font-extrabold uppercase text-[#0d1512] bg-[#22c55e] px-1.5 py-0.5 rounded-full">

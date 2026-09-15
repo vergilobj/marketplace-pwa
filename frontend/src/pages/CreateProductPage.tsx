@@ -11,6 +11,24 @@ import DictateButton from '../components/DictateButton';
 import { errorMessage } from '../utils/error';
 import toast from 'react-hot-toast';
 
+/**
+ * B1: лимиты совпадают с бэкендом — товар title ≤200, description ≤2000
+ * (create-product.dto.ts), файлы: фото ≤20 МБ, видео ≤100 МБ
+ * (upload.controller.ts, Multer limits.fileSize).
+ */
+const TITLE_MAX = 200;
+const DESCRIPTION_MAX = 2000;
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+
+/**
+ * Счётчик длины в стиле FeedbackPage: серый, у самого лимита — янтарный,
+ * чтобы «перебор» был виден до отправки.
+ */
+function lengthCounterClass(length: number, max: number): string {
+  return `text-[11px] ${length > max - 100 ? 'text-amber-400' : 'text-[var(--color-faint)]'}`;
+}
+
 export default function CreateProductPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ title: '', description: '', price: '' });
@@ -30,8 +48,20 @@ export default function CreateProductPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
-    setFiles(prev => [...prev, ...selected]);
-    selected.forEach(file => {
+    // B1: отказ ДО загрузки — файл сверх лимита сервера (20 МБ) не должен
+    // уходить в сеть и падать 413-й уже после долгой загрузки.
+    const oversized = selected.filter(file => file.size > MAX_IMAGE_BYTES);
+    if (oversized.length > 0) {
+      setError(
+        oversized.length === 1
+          ? `Фото «${oversized[0].name}» больше 20 МБ — загрузи файл поменьше`
+          : `${oversized.length} фото больше 20 МБ — они не добавлены`,
+      );
+      toast.error('Фото больше 20 МБ не добавлены');
+    }
+    const allowed = selected.filter(file => file.size <= MAX_IMAGE_BYTES);
+    setFiles(prev => [...prev, ...allowed]);
+    allowed.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviews(prev => [...prev, reader.result as string]);
@@ -49,6 +79,17 @@ export default function CreateProductPage() {
   const handleVideoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // B1: отказ ДО загрузки — 100 МБ по сети на телефоне льются минутами,
+    // а сервер всё равно ответит 413.
+    if (file.size > MAX_VIDEO_BYTES) {
+      setError('Видео больше 100 МБ — загрузи файл поменьше');
+      toast.error('Видео больше 100 МБ не загружено');
+      setVideoFile(null);
+      setVideoPreview('');
+      setVideoUrl('');
+      if (videoInputRef.current) videoInputRef.current.value = '';
+      return;
+    }
     setVideoFile(file);
     setVideoPreview(URL.createObjectURL(file));
     setVideoUploading(true);
@@ -74,6 +115,15 @@ export default function CreateProductPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // B1: сервер режет title ≤200 / description ≤2000 — не гоняем запрос зря.
+    if (form.title.length > TITLE_MAX) {
+      setError(`Слишком длинно: максимум ${TITLE_MAX} символов`);
+      return;
+    }
+    if (form.description.length > DESCRIPTION_MAX) {
+      setError(`Слишком длинно: максимум ${DESCRIPTION_MAX} символов`);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -103,7 +153,7 @@ export default function CreateProductPage() {
   return (
     <div className="max-w-xl mx-auto">
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => navigate('/products')}
         className="tap-link text-sm text-[var(--color-muted)] hover:text-[#22c55e] transition-colors mb-6"
       >
         <ArrowLeft size={16} className="mr-1" /> Назад
@@ -114,7 +164,14 @@ export default function CreateProductPage() {
           <h1 className="text-2xl font-bold text-[var(--color-text)]">Новый товар</h1>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input label="Название" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required />
+          <div>
+            <Input label="Название" value={form.title} maxLength={TITLE_MAX} onChange={e => setForm({ ...form, title: e.target.value })} required />
+            <div className="flex justify-end mt-1">
+              <span className={lengthCounterClass(form.title.length, TITLE_MAX)}>
+                {form.title.length}/{TITLE_MAX}
+              </span>
+            </div>
+          </div>
           <div>
             <label htmlFor="product-description" className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">
               Описание
@@ -128,6 +185,7 @@ export default function CreateProductPage() {
               <textarea
                 id="product-description"
                 value={form.description}
+                maxLength={DESCRIPTION_MAX}
                 onChange={e => setForm({ ...form, description: e.target.value })}
                 rows={6}
                 placeholder="Расскажи о товаре: состояние, комплект, нюансы доставки…"
@@ -142,15 +200,20 @@ export default function CreateProductPage() {
                 onResult={(text) =>
                   setForm(f => ({
                     ...f,
-                    description: f.description ? `${f.description} ${text}` : text,
+                    description: (f.description ? `${f.description} ${text}` : text).slice(0, DESCRIPTION_MAX),
                   }))
                 }
                 onError={(msg) => toast.error(msg)}
               />
             </div>
+            <div className="flex justify-end mt-1">
+              <span className={lengthCounterClass(form.description.length, DESCRIPTION_MAX)}>
+                {form.description.length}/{DESCRIPTION_MAX}
+              </span>
+            </div>
           </div>
           <div>
-            <Input label="Цена (USDT)" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required />
+            <Input label="Цена (USDT)" type="number" inputMode="decimal" step="0.01" min={0} value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required />
             {pricePreview && (
               <p className="mt-1.5 text-[11px] text-[var(--color-muted)]">
                 Покажем как <span className="text-[#22c55e] font-semibold">{pricePreview}</span>

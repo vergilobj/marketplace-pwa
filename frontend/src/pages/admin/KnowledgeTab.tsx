@@ -15,18 +15,41 @@ import {
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import Modal from '../../components/ui/Modal';
+import { formatDate } from '../../utils/format';
 import { errorStatus, errorMessage } from '../../utils/error';
 
 /**
- * Вкладка «База знаний» в админке (ЭТАП 4 ТЗ §5, SPEC §4.6 и §6.4).
+ * B4 §12: счётчик символов для поля с `maxLength`.
+ *
+ * Без него ввод молча обрывается на лимите — админ видит, что «буквы не
+ * печатаются», и не понимает почему. Образец — FeedbackPage.
+ */
+function CharCounter({ value, max }: { value: number; max: number }) {
+  const near = value > max - 0.1 * max;
+  return (
+    <div className="flex justify-end mt-1">
+      <span className={`text-[11px] ${near ? 'text-amber-400' : 'text-[var(--color-faint)]'}`}>
+        {value}/{max}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Вкладка «Ответы» в админке (ЭТАП 4 ТЗ §5, SPEC §4.6 и §6.4).
+ *
+ * B4 §6: в UI слово «знание» заменено на «ответ» — владелец проекта прямо
+ * говорил, что «база знаний» и «кандидаты в знания» ему непонятны. Русские
+ * термины: «ответ на вопрос покупателя». Что осталось КАК ЕСТЬ (это контракт,
+ * а не текст для юзера): эндпоинты `/admin/knowledge*`, поля
+ * `question`/`answer`/`answerShort`/`productId`, значения статусов
+ * (DRAFT|ACTIVE|STALE|ARCHIVED|REVIEW), `KnowledgeCandidate` в API.
+ * Их переименование сломало бы запросы к бэкенду Этапа 3.
  *
  * ⚠️ Эндпоинты `/admin/knowledge*` пишет ПАРАЛЛЕЛЬНЫЙ builder (Этап 3). Если их
  * ещё нет в поднятом бэкенде, вкладка НЕ падает: любой 404 переводит её в
  * режим «модуль не подключён» с понятным пояснением и кнопкой «Повторить».
  * Ровно поэтому все запросы проходят через `safeGet/safePost`, а не напрямую.
- *
- * Статусы и источники — строки, как в `backend/src/knowledge/dto/knowledge.dto.ts`
- * (DRAFT | ACTIVE | STALE | ARCHIVED | REVIEW).
  */
 
 type KnowledgeEntry = {
@@ -82,7 +105,23 @@ const STATUS_FILTERS = [
   { key: 'ARCHIVED', label: 'Архив' },
 ];
 
-/** Пустая форма знания — и для создания, и как база для правки. */
+/**
+ * Лимиты полей формы.
+ *
+ * Вопрос/ответ совпадают с бэкендом (`KNOWLEDGE_QUESTION_MAX_LENGTH = 500`,
+ * `KNOWLEDGE_ANSWER_MAX_LENGTH = 5000` в `dto/knowledge.dto.ts`) — форма не
+ * должна пропускать то, что DTO отвергнет.
+ *
+ * B4 §11: у «короткой версии» стоял `maxLength={5000}` — лимит ПОЛНОГО ответа
+ * на однострочном поле: юзер мог вставить туда пять тысяч символов и не
+ * заметить, что это не то поле. Короткая версия идёт в чат консультанта, и ей
+ * хватает 280 символов (одно-два предложения) — лимит теперь свой.
+ */
+const QUESTION_MAX = 500;
+const ANSWER_MAX = 5000;
+const SHORT_MAX = 280;
+
+/** Пустая форма ответа — и для создания, и как база для правки. */
 type KnowledgeForm = {
   question: string;
   answer: string;
@@ -163,7 +202,7 @@ export default function KnowledgeTab() {
       if (errorStatus(e) === 404) {
         setModuleMissing(true);
       } else {
-        toast.error(errorMessage(e, 'Не удалось загрузить базу знаний'));
+        toast.error(errorMessage(e, 'Не удалось загрузить ответы — попробуй ещё раз'));
       }
       setItems([]);
       setCandidates([]);
@@ -210,19 +249,19 @@ export default function KnowledgeTab() {
     try {
       if (editing) {
         await api.patch(`/admin/knowledge/${editing.id}`, formToPayload(form));
-        toast.success('Знание обновлено');
+        toast.success('Ответ обновлён');
       } else {
         await api.post('/admin/knowledge', formToPayload(form));
-        toast.success('Знание добавлено');
+        toast.success('Ответ добавлен');
       }
       setModalOpen(false);
       await load();
     } catch (e) {
       // 409 — дубль (trgm > 0.75): бэкенд отдаёт id существующей записи.
       if (errorStatus(e) === 409) {
-        toast.error('Похожее знание уже есть — откройте его и отредактируйте');
+        toast.error('Похожий ответ уже есть — открой его и отредактируй');
       } else {
-        toast.error(errorMessage(e, 'Не удалось сохранить знание'));
+        toast.error(errorMessage(e, 'Не удалось сохранить ответ — попробуй ещё раз'));
       }
     } finally {
       setSaving(false);
@@ -236,7 +275,7 @@ export default function KnowledgeTab() {
         prev.map((k) => (k.id === entry.id ? { ...k, status } : k)),
       );
       toast.success(
-        status === 'ARCHIVED' ? 'Знание в архиве' : 'Статус обновлён',
+        status === 'ARCHIVED' ? 'Ответ убран в архив' : 'Статус ответа обновлён',
       );
     } catch (e) {
       // Фолбэк на DELETE (мягкое архивирование) — на случай, если роут
@@ -247,13 +286,13 @@ export default function KnowledgeTab() {
           setItems((prev) =>
             prev.map((k) => (k.id === entry.id ? { ...k, status: 'ARCHIVED' } : k)),
           );
-          toast.success('Знание в архиве');
+          toast.success('Ответ убран в архив');
           return;
         } catch {
           /* падаем в общий тост ниже */
         }
       }
-      toast.error(errorMessage(e, 'Не удалось изменить статус'));
+      toast.error(errorMessage(e, 'Не удалось изменить статус ответа — попробуй ещё раз'));
     }
   };
 
@@ -269,13 +308,13 @@ export default function KnowledgeTab() {
         `/admin/knowledge/from-candidate/${candidate.id}`,
         formToPayload(form),
       );
-      toast.success('Знание сохранено');
+      toast.success('Ответ сохранён');
       setCandidate(null);
       setForm(EMPTY_FORM);
       setModalOpen(false);
       await load();
     } catch (e) {
-      toast.error(errorMessage(e, 'Не удалось принять кандидата'));
+      toast.error(errorMessage(e, 'Не удалось сохранить ответ — попробуй ещё раз'));
     } finally {
       setSaving(false);
     }
@@ -285,9 +324,9 @@ export default function KnowledgeTab() {
     try {
       await api.post(`/admin/knowledge/candidates/${c.id}/reject`);
       setCandidates((prev) => prev.filter((x) => x.id !== c.id));
-      toast.success('Кандидат отклонён');
+      toast.success('Черновик отклонён — он больше не появится');
     } catch (e) {
-      toast.error(errorMessage(e, 'Не удалось отклонить кандидата'));
+      toast.error(errorMessage(e, 'Не удалось отклонить черновик — попробуй ещё раз'));
     }
   };
 
@@ -310,10 +349,10 @@ export default function KnowledgeTab() {
           <TriangleAlert size={20} className="text-amber-400 shrink-0 mt-0.5" />
           <div className="min-w-0">
             <p className="text-sm font-bold text-[var(--color-text)]">
-              Модуль базы знаний ещё не подключён на бэкенде
+              Раздел «Ответы» ещё не подключён на бэкенде
             </p>
             <p className="text-[13px] text-[var(--color-muted)] mt-1 leading-relaxed">
-              UI готов и ждёт эндпоинты <code>/api/admin/knowledge</code> (Этап 3, пишет
+              Экран готов и ждёт эндпоинты <code>/api/admin/knowledge</code> (Этап 3, пишет
               параллельный исполнитель). Как только они появятся — вкладка заработает
               без правок фронта.
             </p>
@@ -340,7 +379,7 @@ export default function KnowledgeTab() {
           onClick={openCreate}
           className="inline-flex items-center gap-2 px-4 min-h-[44px] rounded-full bg-[#22c55e] text-[#0d1512] text-sm font-bold hover:bg-[#16a34a] transition-all"
         >
-          <Plus size={15} /> Новое знание
+          <Plus size={15} /> Новый ответ
         </button>
         <div className="flex items-center gap-2 flex-1 min-w-[220px]">
           <div className="flex-1 flex items-center gap-2 px-3 min-h-[44px] rounded-full bg-[var(--bg-3)] border border-[var(--color-border)]">
@@ -348,8 +387,8 @@ export default function KnowledgeTab() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Поиск по базе знаний…"
-              aria-label="Поиск по базе знаний"
+              placeholder="Поиск по ответам…"
+              aria-label="Поиск по ответам"
               className="flex-1 bg-transparent outline-none text-sm text-[var(--color-text)] placeholder:text-[var(--color-faint)] min-h-[44px]"
             />
           </div>
@@ -374,11 +413,13 @@ export default function KnowledgeTab() {
         ))}
       </div>
 
-      {/* Кандидаты из ответов админов (ПУТЬ A) */}
+      {/* Черновики ответов из переписки (ПУТЬ A) */}
       {candidates.length > 0 && (
         <div className="mb-6">
           <h3 className="text-sm font-bold text-[var(--color-text)] mb-2">
-            Кандидаты из ответов админов ({candidates.length})
+            {/* B4 §6/§7: было «Кандидаты из ответов админов (N)» — «кандидат»
+                это жаргон, и неясно, кто их создал. */}
+            Черновики ответов из переписки ({candidates.length})
           </h3>
           <div className="space-y-2">
             {candidates.map((c) => (
@@ -401,7 +442,7 @@ export default function KnowledgeTab() {
                     onClick={() => openCandidate(c)}
                     className="inline-flex items-center gap-2 px-4 min-h-[44px] rounded-full bg-[#22c55e] text-[#0d1512] text-sm font-bold hover:bg-[#16a34a] transition-all"
                   >
-                    <Check size={15} /> Сохранить как знание
+                    <Check size={15} /> Сохранить ответ
                   </button>
                   <button
                     type="button"
@@ -428,7 +469,7 @@ export default function KnowledgeTab() {
         <div className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-8 text-center">
           <BookOpen size={28} className="text-[var(--color-faint)] mx-auto mb-2" />
           <p className="text-sm text-[var(--color-muted)]">
-            {statusFilter ? 'В этом статусе знаний нет' : 'База знаний пуста — добавьте первое'}
+            {statusFilter ? 'В этом статусе ответов нет' : 'Ответов пока нет — добавь первый'}
           </p>
         </div>
       ) : (
@@ -463,11 +504,15 @@ export default function KnowledgeTab() {
               </p>
 
               <div className="flex flex-wrap items-center gap-3 mt-3 text-[11px] text-[var(--color-faint)]">
-                <span>использовано: {k.usageCount ?? 0}</span>
+                {/* B4 §7: «использовано»/«полезно» — без объекта и с голыми
+                    числами. Теперь видно, что считаем, и есть склонение. */}
+                <span>подставлялся в чат: {k.usageCount ?? 0}</span>
                 <span>
-                  полезно: {k.helpfulCount ?? 0} / {k.notHelpfulCount ?? 0}
+                  помог: {k.helpfulCount ?? 0} · не помог: {k.notHelpfulCount ?? 0}
                 </span>
                 {k.productId && <span>товар: {k.productId.slice(0, 8)}</span>}
+                {/* B4 §4: единый хелпер дат — админ видит, когда ответ правили. */}
+                <span>обновлён: {formatDate(k.updatedAt ?? k.createdAt, 'short')}</span>
               </div>
 
               <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -501,7 +546,7 @@ export default function KnowledgeTab() {
         </div>
       )}
 
-      {/* Модал создания / правки / приёма кандидата */}
+      {/* Модал создания / правки / приёма черновика */}
       <Modal
         isOpen={modalOpen}
         onClose={() => {
@@ -510,18 +555,30 @@ export default function KnowledgeTab() {
         }}
         title={
           candidate
-            ? 'Сохранить как знание'
+            ? 'Сохранить ответ'
             : editing
-              ? 'Править знание'
-              : 'Новое знание'
+              ? 'Править ответ'
+              : 'Новый ответ'
         }
         size="lg"
       >
-        <div className="space-y-4">
+        {/*
+          B4 §10: модал был `<div>`, кнопка — `type="button"`, поэтому Enter в
+          полях ничего не делал (админ печатал вопрос, жал Enter и ничего не
+          сохранялось). Теперь это `<form>`: Enter отправляет, Esc/«Отмена»
+          закрывают. Внутри — те же поля, что были.
+        */}
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void (candidate ? approveCandidate() : handleSave());
+          }}
+        >
           {candidate && (
             <p className="text-[12px] text-[var(--color-muted)] leading-relaxed">
-              Сформулируйте вопрос так, как его задаст покупатель — по этой формулировке
-              консультант будет искать знание.
+              Сформулируй вопрос так, как его задаст покупатель — по этой формулировке
+              консультант будет искать ответ.
             </p>
           )}
 
@@ -535,11 +592,12 @@ export default function KnowledgeTab() {
             <input
               id="knowledge-question"
               value={form.question}
-              maxLength={500}
+              maxLength={QUESTION_MAX}
               onChange={(e) => setForm((f) => ({ ...f, question: e.target.value }))}
               placeholder="Сколько стоит доставка по Ижевску?"
               className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm outline-none focus:border-[#22c55e]/50 transition-all placeholder:text-[var(--color-faint)]"
             />
+            <CharCounter value={form.question.length} max={QUESTION_MAX} />
           </div>
 
           <div>
@@ -552,12 +610,13 @@ export default function KnowledgeTab() {
             <textarea
               id="knowledge-answer"
               value={form.answer}
-              maxLength={5000}
+              maxLength={ANSWER_MAX}
               rows={4}
               onChange={(e) => setForm((f) => ({ ...f, answer: e.target.value }))}
               placeholder="Доставка по Ижевску — 300 ₽, в течение дня."
               className="w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm leading-relaxed outline-none focus:border-[#22c55e]/50 transition-all resize-none placeholder:text-[var(--color-faint)]"
             />
+            <CharCounter value={form.answer.length} max={ANSWER_MAX} />
           </div>
 
           <div>
@@ -567,14 +626,21 @@ export default function KnowledgeTab() {
             >
               Короткая версия (для чата, необязательно)
             </label>
-            <input
+            {/*
+              B4 §11: было `<input maxLength={5000}>` — лимит полного ответа на
+              однострочном поле. Короткая версия уходит в чат консультанта, ей
+              хватает пары предложений: `<textarea rows={2}>` + свой лимит 280.
+            */}
+            <textarea
               id="knowledge-short"
               value={form.answerShort}
-              maxLength={5000}
+              maxLength={SHORT_MAX}
+              rows={2}
               onChange={(e) => setForm((f) => ({ ...f, answerShort: e.target.value }))}
               placeholder="300 ₽ по городу, от 500 ₽ за город"
-              className="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm outline-none focus:border-[#22c55e]/50 transition-all placeholder:text-[var(--color-faint)]"
+              className="w-full px-4 py-2.5 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm leading-relaxed outline-none focus:border-[#22c55e]/50 transition-all resize-none placeholder:text-[var(--color-faint)]"
             />
+            <CharCounter value={form.answerShort.length} max={SHORT_MAX} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -621,7 +687,7 @@ export default function KnowledgeTab() {
               htmlFor="knowledge-product"
               className="block text-sm font-bold text-[var(--color-text)] mb-1.5"
             >
-              ID товара (если знание про конкретный товар)
+              ID товара (если ответ про конкретный товар)
             </label>
             <input
               id="knowledge-product"
@@ -644,16 +710,17 @@ export default function KnowledgeTab() {
             >
               Отмена
             </button>
+            {/* B4 §10: `type="submit"` — кнопка теперь часть формы, Enter в
+                любом поле делает то же самое. */}
             <button
-              type="button"
-              onClick={() => void (candidate ? approveCandidate() : handleSave())}
+              type="submit"
               disabled={saving}
               className="px-5 min-h-[44px] rounded-full bg-[#22c55e] text-[#0d1512] text-sm font-bold hover:bg-[#16a34a] transition-all disabled:opacity-50"
             >
-              {saving ? 'Сохраняю…' : candidate ? 'Сохранить как знание' : 'Сохранить'}
+              {saving ? 'Сохраняю…' : candidate ? 'Сохранить ответ' : 'Сохранить'}
             </button>
           </div>
-        </div>
+        </form>
       </Modal>
     </div>
   );

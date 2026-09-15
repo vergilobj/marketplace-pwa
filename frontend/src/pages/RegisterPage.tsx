@@ -25,9 +25,18 @@ export default function RegisterPage() {
     e.preventDefault();
     setAttempted(true);
     if (!form.phone || !form.name || !form.password || !form.inviteCode) return;
+    // B1: плейсхолдер обещал «Минимум 6 символов», но проверялось только
+    // «не пусто» — короткий пароль уходил на сервер и возвращался 400.
+    if (form.password.length < 6) {
+      setError('Пароль — минимум 6 символов');
+      return;
+    }
     setLoading(true); setError('');
     try {
-      const { accessToken, refreshToken } = await register(unformatPhone(form.phone), form.name, form.password, form.inviteCode);
+      // B1: код из телеграма копируется с пробелом/переносом на конце.
+      // Раньше .toUpperCase() его сохранял → «Неверный или истёкший код».
+      const inviteCode = form.inviteCode.trim();
+      const { accessToken, refreshToken } = await register(unformatPhone(form.phone), form.name, form.password, inviteCode);
       localStorage.setItem('accessToken', accessToken); localStorage.setItem('refreshToken', refreshToken);
       // Тот же фикс, что и в LoginPage: декод не должен блокировать редирект.
       const payload = decodeJwtPayload(accessToken);
@@ -63,6 +72,9 @@ export default function RegisterPage() {
                 value={form.phone}
                 onAccept={(value: string) => setForm({ ...form, phone: value })}
                 placeholder="+7 (999) 123-45-67"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.phone)}`}
               />
               {attempted && !form.phone && <p className="text-xs text-red-400 mt-1">Заполни поле</p>}
@@ -70,14 +82,14 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Имя</label>
-              <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ваше имя" className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.name)}`} />
+              <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ваше имя" autoComplete="name" className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.name)}`} />
               {attempted && !form.name && <p className="text-xs text-red-400 mt-1">Заполни поле</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Пароль</label>
               <div className="relative">
-                <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Минимум 6 символов" className={`w-full px-4 py-3 pr-12 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.password)}`} />
+                <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Минимум 6 символов" minLength={6} autoComplete="new-password" className={`w-full px-4 py-3 pr-12 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.password)}`} />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'} title={showPassword ? 'Скрыть пароль' : 'Показать пароль'} className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -87,7 +99,7 @@ export default function RegisterPage() {
 
             <div>
               <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Код приглашения</label>
-              <input type="text" value={form.inviteCode} onChange={e => setForm({ ...form, inviteCode: e.target.value.toUpperCase() })} placeholder="Введите инвайт-код" className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.inviteCode)}`} />
+              <input type="text" value={form.inviteCode} onChange={e => setForm({ ...form, inviteCode: e.target.value.trim().toUpperCase() })} placeholder="Введите инвайт-код" autoComplete="one-time-code" autoCapitalize="characters" className={`w-full px-4 py-3 rounded-xl bg-[var(--bg-3)] border text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors ${borderFor(!!form.inviteCode)}`} />
               {attempted && !form.inviteCode && <p className="text-xs text-red-400 mt-1">Заполни поле</p>}
             </div>
 

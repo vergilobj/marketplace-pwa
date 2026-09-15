@@ -32,6 +32,26 @@ import {
 } from '../utils/adPayment';
 import { errorMessage } from '../utils/error';
 
+/**
+ * B1: лимиты совпадают с бэкендом — реклама title ≤200, content ≤5000
+ * (create-ad.dto.ts), файлы: фото ≤20 МБ, видео ≤100 МБ
+ * (upload.controller.ts, Multer limits.fileSize).
+ *
+ * Дни: у DTO только @Min(1), верхней границы нет. 90 — продуктовое
+ * ограничение UI (см. отчёт): без него можно случайно заказать 300 дней
+ * и переплатить adPrice × 300.
+ */
+const TITLE_MAX = 200;
+const CONTENT_MAX = 5000;
+const DAYS_MAX = 90;
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+
+/** Счётчик длины в стиле FeedbackPage: у самого лимита — янтарный. */
+function lengthCounterClass(length: number, max: number): string {
+  return `text-[11px] ${length > max - 100 ? 'text-amber-400' : 'text-[var(--color-faint)]'}`;
+}
+
 type Step = 'form' | 'pay' | 'paid';
 
 type Invoice = {
@@ -115,8 +135,19 @@ export default function CreateAdPage() {
   // A1: загрузка медиа рекламы — паттерн 1:1 как в CreatePostPage.
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
-    setFiles(prev => [...prev, ...selected]);
-    selected.forEach(file => {
+    // B1: отказ ДО загрузки — файл сверх лимита сервера (20 МБ) не уходит в сеть.
+    const oversized = selected.filter(file => file.size > MAX_IMAGE_BYTES);
+    if (oversized.length > 0) {
+      setError(
+        oversized.length === 1
+          ? `Фото «${oversized[0].name}» больше 20 МБ — загрузи файл поменьше`
+          : `${oversized.length} фото больше 20 МБ — они не добавлены`,
+      );
+      toast.error('Фото больше 20 МБ не добавлены');
+    }
+    const allowed = selected.filter(file => file.size <= MAX_IMAGE_BYTES);
+    setFiles(prev => [...prev, ...allowed]);
+    allowed.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => setPreviews(prev => [...prev, reader.result as string]);
       reader.readAsDataURL(file);
@@ -132,6 +163,16 @@ export default function CreateAdPage() {
   const handleVideoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // B1: отказ ДО загрузки — сервер режет по 100 МБ.
+    if (file.size > MAX_VIDEO_BYTES) {
+      setError('Видео больше 100 МБ — загрузи файл поменьше');
+      toast.error('Видео больше 100 МБ не загружено');
+      setVideoFile(null);
+      setVideoPreview('');
+      setVideoUrl('');
+      if (videoInputRef.current) videoInputRef.current.value = '';
+      return;
+    }
     setVideoFile(file);
     setVideoPreview(URL.createObjectURL(file));
     setVideoUploading(true);
@@ -157,6 +198,19 @@ export default function CreateAdPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // B1: сервер режет title ≤200 / content ≤5000, дни — @Min(1) без верха.
+    if (form.title.length > TITLE_MAX) {
+      setError(`Слишком длинно: максимум ${TITLE_MAX} символов`);
+      return;
+    }
+    if (form.content.length > CONTENT_MAX) {
+      setError(`Слишком длинно: максимум ${CONTENT_MAX} символов`);
+      return;
+    }
+    if (form.days > DAYS_MAX) {
+      setError(`Максимум ${DAYS_MAX} дней размещения`);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -293,30 +347,51 @@ export default function CreateAdPage() {
 
         {viewStep === 'form' && (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Заголовок"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              required
-            />
+            <div>
+              <Input
+                label="Заголовок"
+                value={form.title}
+                maxLength={TITLE_MAX}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                required
+              />
+              <div className="flex justify-end mt-1">
+                <span className={lengthCounterClass(form.title.length, TITLE_MAX)}>
+                  {form.title.length}/{TITLE_MAX}
+                </span>
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium text-[var(--color-text)] mb-1">Текст</label>
               <textarea
                 value={form.content}
+                maxLength={CONTENT_MAX}
                 onChange={(e) => setForm({ ...form, content: e.target.value })}
                 rows={3}
                 className="w-full px-4 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-transparent focus:border-[#22c55e] focus:ring-2 focus:ring-[#22c55e]/20 outline-none"
                 required
               />
+              <div className="flex justify-end mt-1">
+                <span className={lengthCounterClass(form.content.length, CONTENT_MAX)}>
+                  {form.content.length}/{CONTENT_MAX}
+                </span>
+              </div>
             </div>
-            <Input
-              label="Дней размещения"
-              type="number"
-              value={form.days}
-              onChange={(e) => setForm({ ...form, days: parseInt(e.target.value) || 1 })}
-              min={1}
-              required
-            />
+            <div>
+              <Input
+                label="Дней размещения"
+                type="number"
+                inputMode="numeric"
+                value={form.days}
+                onChange={(e) => setForm({ ...form, days: parseInt(e.target.value) || 1 })}
+                min={1}
+                max={DAYS_MAX}
+                required
+              />
+              <p className="mt-1.5 text-[11px] text-[var(--color-faint)]">
+                От 1 до {DAYS_MAX} дней — стоимость считается за каждый день.
+              </p>
+            </div>
 
             {/* A1: ЕДИНЫЙ БЛОК МЕДИА — паттерн CreatePostPage (видео первым, фото после). */}
             <div className="rounded-2xl border border-[var(--color-border)] p-4">

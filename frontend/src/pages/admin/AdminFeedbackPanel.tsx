@@ -1,20 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { formatDate } from '../../utils/format';
 import { Loader2, MessageSquare, Save, Send, X, Bot, StickyNote } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { errorMessage } from '../../utils/error';
 import { formatPhone } from '../../utils/phone';
+import { pluralize } from '../../utils/format';
 import { AI_BADGE, ADMIN_BADGE } from '../../components/consult/consult-ui.utils';
 
 /**
- * Двухпанельный тред обращений для админки (ЭТАП 4 ТЗ §5, SPEC §4.6).
+ * Двухпанельная переписка по обращениям для админки (ЭТАП 4 ТЗ §5, SPEC §4.6).
  *
- * Слева — список тредов с фильтрами, справа — переписка с ответом админа,
+ * B4 §6: в текстах для админа «тред» заменён на «переписку», «кандидат» — на
+ * «черновик», «знание» — на «ответ». Имена полей и эндпоинтов
+ * (`knowledgeCandidate`, `/admin/knowledge/...`, `kind: 'NOTE'`) — контракт с
+ * бэкендом, они не переименовываются.
+ *
+ * Слева — список переписок с фильтрами, справа — сообщения с ответом админа,
  * внутренней заметкой и сменой статуса.
  *
- * Плашка «Сохранить как знание?» (§6.1 ПУТЬ A): после ответа админа бэкенд
+ * Плашка «Сохранить как ответ?» (§6.1 ПУТЬ A): после ответа админа бэкенд
  * создаёт `KnowledgeCandidate` и возвращает его вместе с сообщением. В UI под
  * этим ответом появляется плашка с кнопками «Сохранить» / «Изменить» /
  * «Не надо» — админ ОБЯЗАН поправить формулировку вопроса (FR-3.2).
@@ -22,6 +27,12 @@ import { AI_BADGE, ADMIN_BADGE } from '../../components/consult/consult-ui.utils
  * Если бэкенд Этапа 3 ещё не поднят, `knowledgeCandidate` в ответе нет и
  * плашка просто не показывается — ничего не падает.
  */
+
+/**
+ * Лимит ответа админа. Совпадает с `maxLength` на textarea композера и с
+ * DTO бэкенда — счётчик ниже нужен, чтобы ввод не обрывался молча (B4 §12).
+ */
+const REPLY_MAX = 2000;
 
 export type AdminFeedbackListItem = {
   id: string;
@@ -67,7 +78,9 @@ const TYPE_LABELS: Record<string, string> = {
 export const FEEDBACK_STATUS_LABELS: Record<string, string> = {
   NEW: 'Новое',
   IN_PROGRESS: 'В работе',
-  WAITING_USER: 'Ждём юзера',
+  // B4 §5: было «Ждём юзера» — жаргон + неясно, кого именно ждём. Тот же
+  // статус на стороне юзера (FeedbackThreadPage) читается как «Ждём тебя».
+  WAITING_USER: 'Ждём ответа покупателя',
   WAITING_ADMIN: 'Ждёт админа',
   AI_HANDLED: 'Ответил ИИ',
   CLOSED: 'Закрыто',
@@ -89,6 +102,10 @@ const FILTERS = [
   { key: 'CLOSED', label: 'Закрытые' },
 ];
 
+/** Склонение для счётчика очереди (B4 §3). */
+const ОБРАЩЕНИЯ: [string, string, string] = ['обращение', 'обращения', 'обращений'];
+
+/** Значения статусов — контракт с бэкендом (`update-feedback.dto.ts`). */
 const STATUS_OPTIONS = ['NEW', 'IN_PROGRESS', 'WAITING_USER', 'WAITING_ADMIN', 'AI_HANDLED', 'CLOSED'];
 
 interface Props {
@@ -161,7 +178,7 @@ export default function AdminFeedbackPanel({
       }
       setCandidates(found);
     } catch (e) {
-      toast.error(errorMessage(e, 'Не удалось открыть тред'));
+      toast.error(errorMessage(e, 'Не удалось открыть переписку — попробуй ещё раз'));
       setMessages([]);
     } finally {
       setLoading(false);
@@ -197,10 +214,10 @@ export default function AdminFeedbackPanel({
       }
       setReply('');
       setNoteMode(false);
-      toast.success(kind === 'NOTE' ? 'Заметка сохранена' : 'Ответ отправлен');
+      toast.success(kind === 'NOTE' ? 'Заметка сохранена — юзер её не увидит' : 'Ответ отправлен юзеру');
       await onRefresh();
     } catch (e) {
-      toast.error(errorMessage(e, 'Не удалось отправить'));
+      toast.error(errorMessage(e, 'Сообщение не отправилось — попробуй ещё раз'));
     } finally {
       setSending(false);
     }
@@ -221,9 +238,9 @@ export default function AdminFeedbackPanel({
         return next;
       });
       setEditing(null);
-      toast.success('Сохранено в базу знаний');
+      toast.success('Ответ сохранён в раздел «Ответы»');
     } catch (e) {
-      toast.error(errorMessage(e, 'Не удалось сохранить знание'));
+      toast.error(errorMessage(e, 'Не удалось сохранить ответ — попробуй ещё раз'));
     } finally {
       setSavingKnowledge(false);
     }
@@ -233,10 +250,10 @@ export default function AdminFeedbackPanel({
     setDismissed((prev) => ({ ...prev, [messageId]: true }));
     try {
       await api.post(`/admin/knowledge/candidates/${cand.id}/reject`);
-      toast.success('Не сохраняем');
-    } catch {
+      toast.success('Черновик отклонён — плашка больше не появится');
+    } catch (e: unknown) {
       // Кандидат остаётся на сервере, но плашку не возвращаем — админ уже решил.
-      toast.error('Не удалось отметить отказ — попробуйте позже');
+      toast.error(errorMessage(e, 'Не удалось отметить отказ — попробуй позже'));
     }
   };
 
@@ -249,7 +266,12 @@ export default function AdminFeedbackPanel({
             Обращений нет
           </p>
         ) : (
-          items.map((f) => {
+          <div className="space-y-2">
+            {/* B4 §3/§7: счётчик очереди со склонением — админ видит объём. */}
+            <p className="text-[11px] text-[var(--color-faint)] px-1">
+              В очереди {pluralize(items.length, ОБРАЩЕНИЯ)}
+            </p>
+            {items.map((f) => {
             const isActive = f.id === activeId;
             return (
               <button
@@ -277,6 +299,10 @@ export default function AdminFeedbackPanel({
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(255,255,255,0.06)] text-[var(--color-muted)]">
                     {TYPE_LABELS[f.type] || f.type}
                   </span>
+                  {/* B4 §4: единый формат даты — в списке нужен «когда писали». */}
+                  <span className="text-[10px] text-[var(--color-faint)]">
+                    {formatDate(f.lastMessageAt ?? f.createdAt, 'short')}
+                  </span>
                   <span
                     className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                       STATUS_CLASSES[f.status] || STATUS_CLASSES.CLOSED
@@ -292,7 +318,8 @@ export default function AdminFeedbackPanel({
                 </div>
               </button>
             );
-          })
+          })}
+          </div>
         )}
       </div>
 
@@ -302,7 +329,7 @@ export default function AdminFeedbackPanel({
           <div className="flex-1 flex flex-col items-center justify-center text-center py-10">
             <MessageSquare size={28} className="text-[var(--color-faint)] mb-2" />
             <p className="text-sm text-[var(--color-muted)]">
-              Выберите обращение слева
+              Выбери обращение слева
             </p>
           </div>
         ) : (
@@ -404,9 +431,7 @@ export default function AdminFeedbackPanel({
                               isUser ? 'text-[#0b0e0d]/70' : 'text-[var(--color-faint)]'
                             }`}
                           >
-                            {m.createdAt
-                              ? format(new Date(m.createdAt), 'd MMM, HH:mm', { locale: ru })
-                              : ''}
+                            {formatDate(m.createdAt, 'short')}
                           </div>
                         </div>
 
@@ -420,7 +445,7 @@ export default function AdminFeedbackPanel({
                             }}
                           >
                             <p className="text-[12px] font-bold text-[#22c55e] mb-2">
-                              Сохранить как знание?
+                              Сохранить как ответ?
                             </p>
                             <div className="flex flex-wrap items-center gap-2">
                               <button
@@ -465,7 +490,7 @@ export default function AdminFeedbackPanel({
             {editing && (
               <div className="mt-3 rounded-xl p-3 border border-[#22c55e]/30 bg-[#0d1210]">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[12px] font-bold text-[#22c55e]">Формулировка знания</p>
+                  <p className="text-[12px] font-bold text-[#22c55e]">Формулировка ответа</p>
                   <button
                     type="button"
                     onClick={() => setEditing(null)}
@@ -501,7 +526,7 @@ export default function AdminFeedbackPanel({
                     disabled={savingKnowledge}
                     className="inline-flex items-center gap-1.5 px-4 min-h-[44px] rounded-full bg-[#22c55e] text-[#0d1512] text-xs font-bold hover:bg-[#16a34a] transition-all disabled:opacity-50"
                   >
-                    <Save size={13} /> Сохранить как знание
+                    <Save size={13} /> Сохранить как ответ
                   </button>
                 </div>
               </div>
@@ -512,12 +537,26 @@ export default function AdminFeedbackPanel({
               <textarea
                 value={reply}
                 rows={2}
-                maxLength={2000}
+                maxLength={REPLY_MAX}
                 onChange={(e) => setReply(e.target.value)}
                 placeholder={noteMode ? 'Внутренняя заметка (юзеру не видна)…' : 'Ответ юзеру…'}
                 aria-label={noteMode ? 'Внутренняя заметка' : 'Ответ юзеру'}
                 className="w-full min-h-[44px] px-3 py-2.5 rounded-xl bg-[var(--bg-3)] border border-[var(--color-border)] text-sm text-[var(--color-text)] outline-none focus:border-[#22c55e]/50 transition-all resize-none placeholder:text-[var(--color-faint)]"
               />
+              {/* B4 §12: `maxLength` есть, а счётчика не было — ввод обрывался
+                  молча. Образец — FeedbackPage. */}
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-[11px] text-[var(--color-faint)]">
+                  {noteMode ? 'Заметку юзер не увидит' : 'Ответ уйдёт юзеру в уведомления'}
+                </span>
+                <span
+                  className={`text-[11px] ${
+                    reply.length > REPLY_MAX - 100 ? 'text-amber-400' : 'text-[var(--color-faint)]'
+                  }`}
+                >
+                  {reply.length}/{REPLY_MAX}
+                </span>
+              </div>
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <button
                   type="button"
@@ -526,7 +565,7 @@ export default function AdminFeedbackPanel({
                   className="inline-flex items-center gap-1.5 px-4 min-h-[44px] rounded-full bg-[#22c55e] text-[#0d1512] text-[13px] font-bold hover:bg-[#16a34a] transition-all disabled:opacity-50"
                 >
                   {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                  Ответить
+                  Ответ юзеру
                 </button>
                 <button
                   type="button"

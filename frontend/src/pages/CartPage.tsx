@@ -4,7 +4,7 @@ import EmptyState from '../components/ui/EmptyState';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { formatPrice } from "../utils/format";
-import { resolveMedia } from '../utils/media';
+import MediaImage from '../components/ui/MediaImage';
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -56,12 +56,30 @@ export default function CartPage() {
                 className="flex items-center gap-4 p-3.5 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] cursor-pointer hover:border-[#22c55e]/40 transition-colors"
               >
                 <div className="w-16 h-16 rounded-xl overflow-hidden bg-[var(--bg-3)] shrink-0">
-                  {item.media?.[0]
-                    ? <img src={resolveMedia(item.media[0])} alt={item.title} className="w-full h-full object-cover" loading="lazy" decoding="async" width={128} height={128} />
-                    : <div className="w-full h-full flex items-center justify-center"><ShoppingBag size={20} className="text-[var(--color-faint)]" /></div>}
+                  {/* B2 п.4: битое/404-медиа → та же заглушка, что и при отсутствии фото. */}
+                  <MediaImage
+                    src={item.media?.[0]}
+                    alt={item.title}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                    width={128}
+                    height={128}
+                    fallback={
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ShoppingBag size={20} className="text-[var(--color-faint)]" />
+                      </div>
+                    }
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-[var(--color-text)] truncate">{item.title}</div>
+                  {/*
+                    * B2 (WAVE 2, п.7): `truncate` обрезал длинное название
+                    * НАСОВСЕМ — второй строки нет, title не подставлялся, и
+                    * конец названия было не увидеть никак. В ProductCard та же
+                    * проблема уже решена связкой `line-clamp-2` + `title`.
+                    */}
+                  <div className="text-sm font-bold text-[var(--color-text)] line-clamp-2" title={item.title}>{item.title}</div>
                   <div className="text-sm font-extrabold text-[#22c55e]">{formatPrice(item.price * item.quantity)}</div>
                 </div>
                 <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>

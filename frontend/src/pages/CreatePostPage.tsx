@@ -4,6 +4,23 @@ import { ArrowLeft, FileText, ImagePlus, Video, X } from 'lucide-react';
 import { createPost } from '../api/posts';
 import { uploadImage, uploadVideo } from '../api/upload';
 import { errorMessage } from '../utils/error';
+import toast from 'react-hot-toast';
+
+/**
+ * B1: лимиты совпадают с бэкендом — пост title ≤200, content ≤5000
+ * (create-post.dto.ts), файлы: фото ≤20 МБ, видео ≤100 МБ
+ * (upload.controller.ts, Multer limits.fileSize).
+ */
+const TITLE_MAX = 200;
+const CONTENT_MAX = 5000;
+const LINK_MAX = 500;
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+
+/** Счётчик длины в стиле FeedbackPage: у самого лимита — янтарный. */
+function lengthCounterClass(length: number, max: number): string {
+  return `text-[11px] ${length > max - 100 ? 'text-amber-400' : 'text-[var(--color-faint)]'}`;
+}
 
 export default function CreatePostPage() {
   const navigate = useNavigate();
@@ -21,8 +38,19 @@ export default function CreatePostPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
-    setFiles(prev => [...prev, ...selected]);
-    selected.forEach(file => {
+    // B1: отказ ДО загрузки — файл сверх лимита сервера (20 МБ) не уходит в сеть.
+    const oversized = selected.filter(file => file.size > MAX_IMAGE_BYTES);
+    if (oversized.length > 0) {
+      setError(
+        oversized.length === 1
+          ? `Фото «${oversized[0].name}» больше 20 МБ — загрузи файл поменьше`
+          : `${oversized.length} фото больше 20 МБ — они не добавлены`,
+      );
+      toast.error('Фото больше 20 МБ не добавлены');
+    }
+    const allowed = selected.filter(file => file.size <= MAX_IMAGE_BYTES);
+    setFiles(prev => [...prev, ...allowed]);
+    allowed.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => setPreviews(prev => [...prev, reader.result as string]);
       reader.readAsDataURL(file);
@@ -38,6 +66,16 @@ export default function CreatePostPage() {
   const handleVideoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // B1: отказ ДО загрузки — сервер режет по 100 МБ.
+    if (file.size > MAX_VIDEO_BYTES) {
+      setError('Видео больше 100 МБ — загрузи файл поменьше');
+      toast.error('Видео больше 100 МБ не загружено');
+      setVideoFile(null);
+      setVideoPreview('');
+      setVideoUrl('');
+      if (videoInputRef.current) videoInputRef.current.value = '';
+      return;
+    }
     setVideoFile(file);
     setVideoPreview(URL.createObjectURL(file));
     setVideoUploading(true);
@@ -63,6 +101,15 @@ export default function CreatePostPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // B1: сервер режет title ≤200 / content ≤5000 — не гоняем запрос зря.
+    if (form.title.length > TITLE_MAX) {
+      setError(`Слишком длинно: максимум ${TITLE_MAX} символов`);
+      return;
+    }
+    if (form.content.length > CONTENT_MAX) {
+      setError(`Слишком длинно: максимум ${CONTENT_MAX} символов`);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -89,7 +136,7 @@ export default function CreatePostPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-6 pb-20">
-      <button onClick={() => navigate(-1)} className="tap-link items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
+      <button onClick={() => navigate('/')} className="tap-link items-center gap-2 text-[var(--color-muted)] hover:text-[var(--color-text)] mb-6 transition-colors text-sm">
         <ArrowLeft size={16} /> Назад
       </button>
 
@@ -105,29 +152,42 @@ export default function CreatePostPage() {
           <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Заголовок</label>
           <input
             value={form.title}
+            maxLength={TITLE_MAX}
             onChange={e => setForm({ ...form, title: e.target.value })}
             placeholder="О чём пост?"
             className="w-full px-4 py-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors"
             required
           />
+          <div className="flex justify-end mt-1">
+            <span className={lengthCounterClass(form.title.length, TITLE_MAX)}>
+              {form.title.length}/{TITLE_MAX}
+            </span>
+          </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Текст</label>
           <textarea
             value={form.content}
+            maxLength={CONTENT_MAX}
             onChange={e => setForm({ ...form, content: e.target.value })}
             rows={5}
             placeholder="Расскажи своим..."
             className="w-full px-4 py-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors resize-none"
             required
           />
+          <div className="flex justify-end mt-1">
+            <span className={lengthCounterClass(form.content.length, CONTENT_MAX)}>
+              {form.content.length}/{CONTENT_MAX}
+            </span>
+          </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">Ссылка (необязательно)</label>
           <input
             value={form.link}
+            maxLength={LINK_MAX}
             onChange={e => setForm({ ...form, link: e.target.value })}
             placeholder="https://..."
             className="w-full px-4 py-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none focus:border-[#22c55e]/50 transition-colors"

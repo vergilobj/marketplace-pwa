@@ -3,8 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Send, CheckCircle2, Sparkles, Bot } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
-import { format } from 'date-fns';
-import { ru } from 'date-fns/locale';
+import { formatDate } from '../utils/format';
 import { PageSkeleton } from '../components/ui/Skeleton';
 import ErrorState from '../components/ui/ErrorState';
 import EmptyState from '../components/ui/EmptyState';
@@ -45,7 +44,8 @@ type ThreadFeedback = {
 const STATUS_LABELS: Record<string, string> = {
   NEW: 'Новое',
   IN_PROGRESS: 'В работе',
-  WAITING_USER: 'Ждём вас',
+  // B4 §5: было «Ждём вас» — вы-форма в треде, который общается на «ты».
+  WAITING_USER: 'Ждём тебя',
   WAITING_ADMIN: 'Ждём админа',
   AI_HANDLED: 'Ответил ИИ',
   CLOSED: 'Закрыто',
@@ -147,7 +147,7 @@ export default function FeedbackThreadPage() {
         <EmptyState
           icon={<Sparkles size={32} />}
           title="Обращение не найдено"
-          description="Возможно, ссылка устарела. Откройте список обращений."
+          description="Возможно, ссылка устарела. Открой список обращений."
         />
         <div className="text-center mt-4">
           <Link to="/feedback" className="text-[#22c55e] text-sm font-bold hover:underline">
@@ -184,9 +184,7 @@ export default function FeedbackThreadPage() {
               {STATUS_LABELS[feedback.status] || feedback.status}
             </span>
             <span className="text-[11px] text-[var(--color-faint)] ml-auto">
-              {feedback.createdAt
-                ? format(new Date(feedback.createdAt), 'd MMM yyyy, HH:mm', { locale: ru })
-                : ''}
+              {formatDate(feedback.createdAt, 'full')}
             </span>
           </div>
           <p className="text-sm text-[var(--color-text)] whitespace-pre-wrap break-words">
@@ -205,7 +203,7 @@ export default function FeedbackThreadPage() {
         {/* Лента сообщений */}
         {messages.length === 0 ? (
           <p className="text-sm text-[var(--color-muted)] text-center py-8">
-            Пока нет ответов. Напишите — админ увидит.
+            Пока нет ответов. Напиши — админ увидит.
           </p>
         ) : (
           <div className="space-y-3 mb-5">
@@ -246,9 +244,7 @@ export default function FeedbackThreadPage() {
                         isUser ? 'text-[#0b0e0d]/70' : 'text-[var(--color-faint)]'
                       }`}
                     >
-                      {m.createdAt
-                        ? format(new Date(m.createdAt), 'd MMM, HH:mm', { locale: ru })
-                        : ''}
+                      {formatDate(m.createdAt, 'short')}
                     </div>
                   </div>
                 </div>
@@ -261,7 +257,7 @@ export default function FeedbackThreadPage() {
         {closed ? (
           <div className="rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border)] p-4 text-center">
             <p className="text-sm text-[var(--color-muted)]">
-              Обращение закрыто. Нужен новый вопрос — создайте обращение.
+              Обращение закрыто. Нужен новый вопрос — создай обращение.
             </p>
             <Link
               to="/feedback"
@@ -278,7 +274,7 @@ export default function FeedbackThreadPage() {
                 maxLength={MESSAGE_MAX}
                 onChange={(e) => setInput(e.target.value)}
                 rows={2}
-                placeholder="Ваш ответ…"
+                placeholder="Твой ответ…"
                 aria-label="Сообщение в обращении"
                 className="flex-1 min-h-[44px] px-4 py-3 rounded-2xl bg-[var(--bg-3)] border border-[var(--color-border)] text-[var(--color-text)] text-sm leading-relaxed outline-none focus:border-[#22c55e]/50 transition-all resize-none placeholder:text-[var(--color-faint)]"
               />
@@ -294,7 +290,13 @@ export default function FeedbackThreadPage() {
             </div>
 
             <div className="flex items-center justify-between gap-3 mt-3">
-              <span className="text-[11px] text-[var(--color-faint)]">
+              {/* B4 §12: счётчик был всегда серым. У лимита он должен
+                  предупреждать — иначе ввод обрывается молча. */}
+              <span
+                className={`text-[11px] ${
+                  input.length > MESSAGE_MAX - 100 ? 'text-amber-400' : 'text-[var(--color-faint)]'
+                }`}
+              >
                 {input.length}/{MESSAGE_MAX}
               </span>
               <button

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getMyOrders, updateOrderStatus, payOrder, getOrderPayStatus, confirmOrderReceipt } from '../api/orders';
 import { PackageCheck, Clock, Truck, CheckCircle2, XCircle, Copy, Check, X, Loader2, ShieldCheck, RotateCcw, AlertTriangle } from 'lucide-react';
@@ -11,6 +12,7 @@ import { useAuth } from '../hooks/useAuth';
 import { errorMessage } from '../utils/error';
 import type { ApiOrder } from '../api/types';
 import { PageSkeleton } from '../components/ui/Skeleton';
+import EmptyState from '../components/ui/EmptyState';
 import ErrorState from '../components/ui/ErrorState';
 import { useListError } from '../hooks/useListError';
 
@@ -43,6 +45,7 @@ type PayModalState = {
 const ORDERS_PAGE_SIZE = 20;
 
 export default function OrdersPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [orders, setOrders] = useState<ApiOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -174,6 +177,17 @@ export default function OrdersPage() {
   const visible = filtered.slice(0, visibleCount);
   const hasMoreOrders = filtered.length > visible.length;
 
+  /**
+   * B2 (WAVE 2, п.1): «нет данных» и «нет по фильтру» — РАЗНЫЕ состояния.
+   *
+   * Было одно сообщение на оба случая: при активном фильтре без совпадений
+   * показывалось «Пока пусто. Начни с малого…» — человек читал это как
+   * «история заказов пропала». Заказы при этом никуда не девались, их просто
+   * отсёк фильтр. Теперь при непустой истории и пустой выдаче говорим прямо,
+   * что дело в фильтре, и даём выход одним кликом.
+   */
+  const filteredOut = filter !== '' && filtered.length === 0 && orders.length > 0;
+
   // L2: смена фильтра — счётчик показа снова с первой страницы.
   const handleFilter = (s: string) => { setFilter(s); setVisibleCount(ORDERS_PAGE_SIZE); };
 
@@ -208,11 +222,21 @@ export default function OrdersPage() {
 
         {orders.length === 0 && error ? (
           <ErrorState {...errorProps} />
+        ) : filteredOut ? (
+          <EmptyState
+            icon={<PackageCheck size={32} />}
+            title={`По статусу «${statusConfig[filter]?.label ?? filter}» ничего нет`}
+            description="Заказы с этим статусом не найдены. Остальная история на месте — сними фильтр."
+            headingLevel="h2"
+            action={{ label: 'Сбросить фильтр', onClick: () => handleFilter('') }}
+          />
         ) : filtered.length === 0 ? (
-          <div className="text-center py-16">
-            <PackageCheck size={40} className="mx-auto text-[var(--color-faint)] mb-4" />
-            <p className="text-[var(--color-muted)]">Пока пусто. Начни с малого — выбери что-нибудь на базаре.</p>
-          </div>
+          <EmptyState
+            icon={<PackageCheck size={32} />}
+            message="Пока пусто. Начни с малого — выбери что-нибудь на базаре."
+            headingLevel="h2"
+            action={{ label: 'На базар', onClick: () => navigate('/') }}
+          />
         ) : (
           <div className="space-y-3">
             {visible.map((order, i) => {
