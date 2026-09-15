@@ -241,13 +241,17 @@ export default function Layout() {
         className="md:hidden fixed no-scrollbar bg-[rgba(17,25,24,0.88)] backdrop-blur-xl border border-[rgba(255,255,255,0.08)] rounded-2xl flex justify-around items-center py-1 z-40 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)]"
         style={{
           // `fixed` НЕ наследует padding родителя → safe-area считаем сами.
-          // База 20px снизу / 8px по бокам — чтобы был воздух ДАЖЕ если
+          // База 8px снизу / 8px по бокам — чтобы был воздух ДАЖЕ если
           // env(safe-area-inset-*) вернёт 0 (десктоп, часть браузеров).
+          // ⚠️ Было 32px: на iPhone поверх этого добавляется ещё ~34px
+          // safe-area (home-индикатор) → меню уезжало на ~66px от низа,
+          // владелец жаловался «слишком отодвинуто» (замер 2026-09-15:
+          // отступ 32px при safe-bottom=0 на трёх размерах экрана).
           // Боковые были 18px — на 390px это стоило 20px ширины, которых
           // не хватало семи пунктам с полными подписями.
           left: 'calc(var(--safe-left) + 8px)',
           right: 'calc(var(--safe-right) + 8px)',
-          bottom: 'calc(var(--safe-bottom) + 32px)',
+          bottom: 'calc(var(--safe-bottom) + 8px)',
         }}
       >
         <MobileTab to="/" icon={<Home size={18} />} label="Главная" pathname={location.pathname} />
