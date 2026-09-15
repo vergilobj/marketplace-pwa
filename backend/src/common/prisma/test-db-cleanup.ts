@@ -75,6 +75,7 @@ export const ALL_TEST_PHONE_PREFIXES = [
   'cst-', // test/consult.e2e-spec.ts (ИИ-консультант, ЭТАП 2)
   'kno-', // test/knowledge.e2e-spec.ts (база знаний, ЭТАП 3)
   'gaps-a-', // test/gaps-a-validation-webhook-trust.e2e-spec.ts (GAPS-A)
+  'p1-', // test/p1-deleted-product-404.e2e-spec.ts (P1: удалённый товар → 404)
 ];
 
 /**
@@ -300,7 +301,9 @@ export async function cleanupTestData(
   // База знаний (ЭТАП 3): KnowledgeEntry/KnowledgeCandidate тоже БЕЗ FK на
   // User — чистим явно, иначе тестовые знания протекают в следующие прогоны
   // и ломают и дедупликацию, и статистику поиска.
-  await prisma.knowledgeCandidate.deleteMany({ where: { createdById: inUsers } });
+  await prisma.knowledgeCandidate.deleteMany({
+    where: { createdById: inUsers },
+  });
   await prisma.knowledgeEntry.deleteMany({ where: { createdById: inUsers } });
   // Кандидаты/знания, привязанные к тредам наших юзеров (createdById мог быть
   // null, если админ удалён раньше).

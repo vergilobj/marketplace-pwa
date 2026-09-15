@@ -125,21 +125,59 @@ export class ProductsService {
     return { items, total, page, pages: Math.ceil(total / limit) };
   }
 
-  async findById(id: string) {
+  /**
+   * P1 (2026-09-15): удалённый товар (`isActive=false`) виден только владельцу
+   * и ADMIN.
+   *
+   * Раньше метод не проверял `isActive` вообще (в отличие от `findAll`, где
+   * `where: { isActive: true }`), поэтому `GET /products/:id` отдавал анониму
+   * живой товар по прямой ссылке: название, цену, продавца и кнопку «Купить».
+   * `POST /orders` такой товар уже отклонял — UI просто врал и вёл человека в
+   * непонятную ошибку, а продавец терял контроль над тем, что считал удалённым.
+   *
+   * Отвечаем 404, а не 403 — не подтверждаем существование товара
+   * (та же политика, что в `PostsService.findById`, коммент G3).
+   *
+   * Внутренние вызовы (`update`/`remove`/`toggleActive`) передают userId/role
+   * явно — они уже авторизованы своим способом (см. места вызова).
+   */
+  async findById(id: string, userId?: string, role?: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: { seller: { select: { id: true, name: true } } },
     });
     if (!product) throw new NotFoundException('Товар не найден');
+
+    const isOwner = !!userId && product.sellerId === userId;
+    const isAdmin = role === 'ADMIN';
+    if (product.isActive === false && !isOwner && !isAdmin) {
+      throw new NotFoundException('Товар не найден');
+    }
+
     return product;
   }
 
-  async findSimilar(id: string) {
+  /**
+   * P1: тот же фильтр видимости, что в `findById`.
+   *
+   * `findSimilar` — второй путь чтения товара по id. Сам удалённый товар он не
+   * возвращает (в выборке `isActive: true`), но для несуществующего id отдаёт
+   * `[]`, а для удалённого с «соседями» — непустой список. Это оракул
+   * существования: `GET /products/<id>/similar` подтверждал бы, что товар был,
+   * ровно то, что мы закрываем 404-кой. Поэтому для не-владельца удалённый
+   * товар ведёт себя как несуществующий (пустой список).
+   * Публичное поведение АКТИВНЫХ товаров не меняется.
+   */
+  async findSimilar(id: string, userId?: string, role?: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },
-      select: { sellerId: true, title: true },
+      select: { sellerId: true, title: true, isActive: true },
     });
     if (!product) return [];
+
+    const isOwner = !!userId && product.sellerId === userId;
+    const isAdmin = role === 'ADMIN';
+    if (product.isActive === false && !isOwner && !isAdmin) return [];
 
     const firstWord = product.title.trim().split(/\s+/)[0];
     return this.prisma.product.findMany({
@@ -157,7 +195,10 @@ export class ProductsService {
   }
 
   async update(id: string, sellerId: string, dto: UpdateProductDto) {
-    const product = await this.findById(id);
+    // P1: НЕ this.findById() — тот с 2026-09-15 скрывает удалённый товар от
+    // не-владельца (404) и сломал бы этот ForbiddenException-путь.
+    const product = await this.prisma.product.findUnique({ where: { id } });
+    if (!product) throw new NotFoundException('Товар не найден');
     if (product.sellerId !== sellerId) {
       throw new ForbiddenException('Редактировать можно только свои товары');
     }
@@ -192,7 +233,11 @@ export class ProductsService {
   }
 
   async remove(id: string, sellerId: string) {
-    const product = await this.findById(id);
+    // P1: как и в update — прямой findUnique, чтобы владелец мог повторно
+    // удалить уже удалённый товар (иначе findById отдал бы 404 только владельцу
+    // при другом userId... но контракт ForbiddenException важнее сохранить).
+    const product = await this.prisma.product.findUnique({ where: { id } });
+    if (!product) throw new NotFoundException('Товар не найден');
     if (product.sellerId !== sellerId) {
       throw new ForbiddenException('Деактивировать можно только свои товары');
     }
@@ -243,7 +288,11 @@ export class ProductsService {
   }
 
   async toggleActive(id: string) {
-    const product = await this.findById(id);
+    // P1: admin-роут (`@Roles('ADMIN')`) обязан уметь вернуть в каталог
+    // УДАЛЁННЫЙ товар. Через this.findById() без userId/role это стало бы
+    // невозможно (404 на isActive=false) — поэтому читаем напрямую.
+    const product = await this.prisma.product.findUnique({ where: { id } });
+    if (!product) throw new NotFoundException('Товар не найден');
     const updated = await this.prisma.product.update({
       where: { id },
       data: { isActive: !product.isActive },

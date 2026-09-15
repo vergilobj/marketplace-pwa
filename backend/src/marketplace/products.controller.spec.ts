@@ -1,6 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductsController } from './products.controller';
 import { ProductsService } from './products.service';
+import type {
+  AuthenticatedRequest,
+  AuthenticatedUser,
+} from '../common/types/authenticated-request.interface';
+
+/**
+ * P1: запрос, каким его видит `OptionalJwtAuthGuard` — пользователя может НЕ
+ * быть (аноним). Контроллер объявляет параметр как `AuthenticatedRequest`
+ * (как в posts.controller.ts), поэтому здесь собираем совместимый объект.
+ * Приведение через `unknown` (а не `as any`) — типобезопасность декларируется
+ * явно, и `eslint no-explicit-any` остаётся честным.
+ */
+const reqFor = (user?: AuthenticatedUser): AuthenticatedRequest =>
+  ({ user }) as unknown as AuthenticatedRequest;
 
 describe('ProductsController', () => {
   let controller: ProductsController;
@@ -58,7 +72,61 @@ describe('ProductsController', () => {
   describe('findById', () => {
     it('should return product', async () => {
       service.findById.mockResolvedValue({ id: 'p1' });
-      expect(await controller.findById('p1')).toEqual({ id: 'p1' });
+      expect(await controller.findById('p1', reqFor())).toEqual({ id: 'p1' });
+    });
+
+    // P1: роут обязан ПРОКИНУТЬ пользователя в сервис, иначе фильтр удалённых
+    // товаров не сработает (аноним и владелец различить нельзя).
+    it('P1: аноним → в сервис уходит undefined/undefined', async () => {
+      service.findById.mockResolvedValue({ id: 'p1' });
+      await controller.findById('p1', reqFor());
+      expect(service.findById).toHaveBeenCalledWith('p1', undefined, undefined);
+    });
+
+    it('P1: владелец → в сервис уходят userId и role', async () => {
+      service.findById.mockResolvedValue({ id: 'p1', isActive: false });
+      await controller.findById(
+        'p1',
+        reqFor({ userId: 'seller-1', role: 'SELLER' }),
+      );
+      expect(service.findById).toHaveBeenCalledWith('p1', 'seller-1', 'SELLER');
+    });
+
+    it('P1: ADMIN → в сервис уходят userId и role=ADMIN', async () => {
+      service.findById.mockResolvedValue({ id: 'p1', isActive: false });
+      await controller.findById(
+        'p1',
+        reqFor({ userId: 'admin-1', role: 'ADMIN' }),
+      );
+      expect(service.findById).toHaveBeenCalledWith('p1', 'admin-1', 'ADMIN');
+    });
+  });
+
+  // P1: тот же прокид на findSimilar — иначе оракул существования остаётся.
+  describe('findSimilar', () => {
+    beforeEach(() => {
+      service.findSimilar = jest.fn().mockResolvedValue([]);
+    });
+
+    it('P1: прокидывает пользователя в сервис', async () => {
+      await controller.findSimilar(
+        'p1',
+        reqFor({ userId: 'seller-1', role: 'SELLER' }),
+      );
+      expect(service.findSimilar).toHaveBeenCalledWith(
+        'p1',
+        'seller-1',
+        'SELLER',
+      );
+    });
+
+    it('P1: аноним → undefined/undefined', async () => {
+      await controller.findSimilar('p1', reqFor());
+      expect(service.findSimilar).toHaveBeenCalledWith(
+        'p1',
+        undefined,
+        undefined,
+      );
     });
   });
 

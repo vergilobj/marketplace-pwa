@@ -110,6 +110,109 @@ describe('ProductsService', () => {
       expect(result).toEqual(mockProduct);
       expect(result.seller).toBeDefined();
     });
+
+    // ── P1: удалённый товар по прямой ссылке ────────────────────────────
+    const deletedProduct = { ...mockProduct, isActive: false };
+
+    it('P1: активный товар отдаётся анониму (поведение НЕ изменилось)', async () => {
+      mockPrisma.product.findUnique.mockResolvedValue(mockProduct);
+      const result = await service.findById('prod-1');
+      expect(result.id).toBe('prod-1');
+    });
+
+    it('P1: isActive=false + аноним → 404', async () => {
+      mockPrisma.product.findUnique.mockResolvedValue(deletedProduct);
+      await expect(service.findById('prod-1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('P1: isActive=false + чужой BUYER → 404', async () => {
+      mockPrisma.product.findUnique.mockResolvedValue(deletedProduct);
+      await expect(
+        service.findById('prod-1', 'other-buyer', 'BUYER'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('P1: isActive=false + чужой SELLER → 404', async () => {
+      mockPrisma.product.findUnique.mockResolvedValue(deletedProduct);
+      await expect(
+        service.findById('prod-1', 'other-seller', 'SELLER'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('P1: isActive=false + владелец → 200', async () => {
+      mockPrisma.product.findUnique.mockResolvedValue(deletedProduct);
+      const result = await service.findById('prod-1', 'seller-1', 'SELLER');
+      expect(result.id).toBe('prod-1');
+      expect(result.isActive).toBe(false);
+    });
+
+    it('P1: isActive=false + ADMIN (не владелец) → 200', async () => {
+      mockPrisma.product.findUnique.mockResolvedValue(deletedProduct);
+      const result = await service.findById('prod-1', 'admin-1', 'ADMIN');
+      expect(result.id).toBe('prod-1');
+    });
+
+    it('P1: несуществующий id → 404 как раньше', async () => {
+      mockPrisma.product.findUnique.mockResolvedValue(null);
+      await expect(
+        service.findById('bad-id', 'seller-1', 'ADMIN'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // P1: тот же фильтр на втором пути чтения — findSimilar.
+  describe('findSimilar', () => {
+    beforeEach(() => {
+      mockPrisma.product.findMany.mockResolvedValue([]);
+    });
+
+    it('P1: активный товар → соседи отдаются анониму', async () => {
+      mockPrisma.product.findUnique.mockResolvedValue({
+        sellerId: 'seller-1',
+        title: 'Test Product',
+        isActive: true,
+      });
+      await service.findSimilar('prod-1');
+      expect(mockPrisma.product.findMany).toHaveBeenCalled();
+    });
+
+    it('P1: isActive=false + аноним → [] (оракул существования закрыт)', async () => {
+      mockPrisma.product.findUnique.mockResolvedValue({
+        sellerId: 'seller-1',
+        title: 'Test Product',
+        isActive: false,
+      });
+      const result = await service.findSimilar('prod-1');
+      expect(result).toEqual([]);
+      expect(mockPrisma.product.findMany).not.toHaveBeenCalled();
+    });
+
+    it('P1: isActive=false + чужой → []', async () => {
+      mockPrisma.product.findUnique.mockResolvedValue({
+        sellerId: 'seller-1',
+        title: 'Test Product',
+        isActive: false,
+      });
+      const result = await service.findSimilar('prod-1', 'other', 'BUYER');
+      expect(result).toEqual([]);
+    });
+
+    it('P1: isActive=false + владелец → соседи отдаются', async () => {
+      mockPrisma.product.findUnique.mockResolvedValue({
+        sellerId: 'seller-1',
+        title: 'Test Product',
+        isActive: false,
+      });
+      await service.findSimilar('prod-1', 'seller-1', 'SELLER');
+      expect(mockPrisma.product.findMany).toHaveBeenCalled();
+    });
+
+    it('несуществующий товар → [] как раньше', async () => {
+      mockPrisma.product.findUnique.mockResolvedValue(null);
+      expect(await service.findSimilar('bad-id')).toEqual([]);
+    });
   });
 
   describe('update', () => {

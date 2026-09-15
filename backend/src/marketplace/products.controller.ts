@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.interface';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ProductsService } from './products.service';
@@ -108,14 +109,29 @@ export class ProductsController {
     return this.productsService.toggleActive(id);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id/similar')
-  async findSimilar(@Param('id') id: string) {
-    return this.productsService.findSimilar(id);
+  async findSimilar(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.productsService.findSimilar(
+      id,
+      req.user?.userId,
+      req.user?.role,
+    );
   }
 
+  // P1: OptionalJwtAuthGuard (а не жёсткий JWT) — активные товары по-прежнему
+  // открываются анонимно. Гард нужен только чтобы узнать, кто пришёл: удалённый
+  // товар (`isActive=false`) отдаём владельцу и ADMIN, остальным — 404.
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  async findById(@Param('id') id: string) {
-    return this.productsService.findById(id);
+  async findById(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.productsService.findById(id, req.user?.userId, req.user?.role);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
