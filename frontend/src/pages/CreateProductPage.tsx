@@ -7,7 +7,7 @@ import Card from '../components/ui/Card';
 import { createProduct } from '../api/products';
 import { uploadImage, uploadVideo } from '../api/upload';
 import { formatPrice } from '../utils/format';
-import DictateButton from '../components/DictateButton';
+
 import { errorMessage } from '../utils/error';
 import toast from 'react-hot-toast';
 
@@ -190,20 +190,6 @@ export default function CreateProductPage() {
                 rows={6}
                 placeholder="Расскажи о товаре: состояние, комплект, нюансы доставки…"
                 className="flex-1 min-w-0 px-4 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none transition-all duration-200 focus:border-[rgba(34,197,94,0.6)] focus:shadow-[0_0_0_3px_rgba(34,197,94,0.15)] resize-y"
-              />
-              {/* onResult ДОПОЛНЯЕТ описание, а не заменяет его.
-                  Раньше было `description: text` — одно касание микрофона
-                  стирало весь написанный текст. */}
-              <DictateButton
-                size={18}
-                className="w-11 h-11 shrink-0"
-                onResult={(text) =>
-                  setForm(f => ({
-                    ...f,
-                    description: (f.description ? `${f.description} ${text}` : text).slice(0, DESCRIPTION_MAX),
-                  }))
-                }
-                onError={(msg) => toast.error(msg)}
               />
             </div>
             <div className="flex justify-end mt-1">

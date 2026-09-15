@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, ThumbsUp, ThumbsDown, Headphones, Sparkles, RefreshCw, Lightbulb, Mic, Square } from 'lucide-react';
+import { Send, ThumbsUp, ThumbsDown, Headphones, Sparkles, RefreshCw, Lightbulb } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../hooks/useAuth';
 import { getProductById } from '../../api/products';
@@ -14,10 +14,6 @@ import {
   type ConsultSource,
 } from '../../api/consult';
 import { errorStatus, errorMessage } from '../../utils/error';
-import { isSpeechSupported } from '../../utils/speech';
-import { useVoiceInput } from '../../hooks/useVoiceInput';
-import DictationBars from '../ui/DictationBars';
-import { X } from 'lucide-react';
 import {
   AI_BADGE,
   AI_BUBBLE_STYLE,
@@ -74,16 +70,6 @@ export default function ConsultChat({ compact = false, onClose }: ConsultChatPro
   const [sending, setSending] = useState(false);
   const [callingAdmin, setCallingAdmin] = useState(false);
   const [input, setInput] = useState('');
-
-  // ── Голосовой ввод (тот же общий модуль, что в Базаре) ────────────────
-  // Непрерывный движок + живой саундбар; распознанный текст дополняет поле —
-  // семантику (дополнение) задаёт эта сторона.
-  const voice = useVoiceInput({
-    onFinal: (text) => setInput((prev) => (prev ? `${prev} ${text}` : text)),
-    onNotice: (message) => toast.error(message),
-    onError: (message) => toast.error(message),
-  });
-  const listening = voice.state === 'listening';
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -223,18 +209,6 @@ export default function ConsultChat({ compact = false, onClose }: ConsultChatPro
     if (!text || sending) return;
     setInput('');
     void sendText(text);
-  };
-
-  // ── Голосовой ввод (тот же модуль, что в Базаре) ──────────────────────
-  // Непрерывный движок: раньше здесь стоял одноразовый startDictation и
-  // диктовка умирала после первой фразы, молча — теперь ошибку видно.
-  const toggleDictation = () => {
-    if (listening) {
-      voice.stop();
-      return;
-    }
-    if (!isSpeechSupported()) return;
-    voice.start();
   };
 
   // ── Оценка ответа 👍/👎 (§2) ─────────────────────────────────────────
@@ -538,53 +512,8 @@ export default function ConsultChat({ compact = false, onClose }: ConsultChatPro
         </button>
       </div>
 
-      {/* Поле ввода. Пока идёт запись — вместо поля общий саундбар
-          (как в Базаре): полосы + кнопка отмены ×, текст копится в поле
-          и появится в нём, как только запись остановят. */}
+      {/* Поле ввода + кнопка отправки. */}
       <div className="flex items-center gap-2.5 mt-3 shrink-0 w-full min-w-0">
-        {listening ? (
-          <>
-            <motion.button
-              type="button"
-              onClick={() => voice.cancel()}
-              whileTap={{ scale: 0.9 }}
-              aria-label="Отменить голосовой ввод"
-              title="Отменить"
-              className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-opacity hover:opacity-80"
-              style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                color: 'var(--color-muted)',
-              }}
-            >
-              <X size={18} />
-            </motion.button>
-
-            <div
-              data-testid="consult-recording"
-              className="flex-1 min-w-0 max-w-full h-12 px-4 rounded-xl flex items-center overflow-hidden"
-              style={{ background: '#0d1210', border: '1px solid rgba(34,197,94,0.18)' }}
-            >
-              <DictationBars level={voice.level} />
-            </div>
-
-            <motion.button
-              type="button"
-              onClick={() => voice.stop()}
-              whileTap={{ scale: 0.93 }}
-              aria-label="Остановить голосовой ввод"
-              className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-              style={{
-                background: 'rgba(34,197,94,0.2)',
-                border: '1px solid rgba(52,211,153,0.45)',
-                color: '#34d399',
-              }}
-            >
-              <Square size={16} />
-            </motion.button>
-          </>
-        ) : (
-          <>
         <div
           className="flex-1 min-h-[48px] px-4 rounded-xl flex items-center gap-2.5 transition-colors duration-200"
           style={{ background: '#0d1210', border: '1px solid rgba(34,197,94,0.18)' }}
@@ -605,7 +534,7 @@ export default function ConsultChat({ compact = false, onClose }: ConsultChatPro
           />
         </div>
 
-        {hasText ? (
+        {hasText && (
           <motion.button
             type="button"
             onClick={handleSend}
@@ -617,24 +546,6 @@ export default function ConsultChat({ compact = false, onClose }: ConsultChatPro
           >
             <Send size={18} className="text-[#0b0e0d]" />
           </motion.button>
-        ) : isSpeechSupported() ? (
-          <motion.button
-            type="button"
-            onClick={toggleDictation}
-            whileTap={{ scale: 0.93 }}
-            aria-label="Голосовой ввод"
-            title="Голосовой ввод"
-            className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-            style={{
-              background: 'rgba(34,197,94,0.14)',
-              border: '1px solid rgba(52,211,153,0.45)',
-              color: '#34d399',
-            }}
-          >
-            <Mic size={18} />
-          </motion.button>
-        ) : null}
-          </>
         )}
       </div>
 

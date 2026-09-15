@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import CreateProductPage from './CreateProductPage';
 import * as productsApi from '../api/products';
-import * as speech from '../utils/speech';
 
 /**
  * Форма создания товара: поле «Описание» обязано быть многострочным.
@@ -12,6 +11,9 @@ import * as speech from '../utils/speech';
  * а onResult диктовки ЗАМЕНЯЛ описание целиком. Заполнить длинное описание
  * было невозможно: окно в одну строку, Enter отправлял форму и «выкидывал»
  * из поля валидацией required, микрофон стирал написанное.
+ *
+ * Позже (то же ТЗ, 2026-09-15) микрофон отсюда убрали совсем — остаётся
+ * только многострочное поле.
  */
 
 vi.mock('../api/products', () => ({
@@ -23,16 +25,7 @@ vi.mock('../api/upload', () => ({
   uploadVideo: vi.fn(),
 }));
 
-vi.mock('../utils/speech', () => ({
-  isSpeechSupported: () => true,
-  startContinuousDictation: vi.fn(() => vi.fn()),
-  // Саундбар общий (DictateButton → useVoiceInput) — аудио-метр нужен в моке,
-  // иначе хук падает на отсутствующем экспорте.
-  startAudioMeter: vi.fn(() => vi.fn()),
-}));
-
 const createProduct = vi.mocked(productsApi.createProduct);
-const startContinuousDictation = vi.mocked(speech.startContinuousDictation);
 
 function renderPage() {
   return render(
@@ -82,30 +75,5 @@ describe('CreateProductPage — поле «Описание»', () => {
         expect.objectContaining({ description: 'Строка 1\nСтрока 2' }),
       );
     });
-  });
-
-  it('диктовка ДОПОЛНЯЕТ описание, а не стирает его', () => {
-    renderPage();
-    fireEvent.change(descriptionField(), {
-      target: { value: 'Уже написанный текст' },
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Голосовой ввод' }));
-    expect(startContinuousDictation).toHaveBeenCalledTimes(1);
-
-    // Первый аргумент — набор колбэков движка (сигнатура допускает и старую
-    // позиционную форму, поэтому сужаем тип). Распознанный финальный
-    // фрагмент приходит в onFinal. Вызов колбэка обновляет state →
-    // оборачиваем в act(), иначе React не сбросит обновление в DOM и
-    // проверка увидит старое значение.
-    const arg = startContinuousDictation.mock.calls[0][0];
-    const handlers = arg as { onFinal?: (text: string) => void };
-    act(() => {
-      handlers.onFinal?.('добавлено голосом');
-    });
-
-    const value = descriptionField().value;
-    expect(value).toContain('Уже написанный текст');
-    expect(value).toContain('добавлено голосом');
   });
 });
