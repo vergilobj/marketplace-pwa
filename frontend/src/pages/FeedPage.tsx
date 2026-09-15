@@ -353,7 +353,12 @@ export default function FeedPage() {
               {/* Крестик первым в DOM: микрофон всегда прижат к правому краю
                   и не сдвигается, когда появляется/исчезает очистка. */}
               {search && <button onClick={() => setSearch('')} aria-label="Очистить поиск" className="w-11 h-11 flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-text)]"><X size={16} /></button>}
-              <DictateButton size={15} className="w-11 h-11" onResult={(text) => setSearch(text)} />
+              <DictateButton
+                size={15}
+                className="w-11 h-11"
+                onResult={(text) => setSearch(text)}
+                onError={(msg) => toast.error(msg)}
+              />
             </div>
           </div>
         </div>

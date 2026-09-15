@@ -331,21 +331,26 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
     setDictation('listening');
     setAudioLevel(0);
 
-    stopDictationRef.current = startContinuousDictation(
-      (text) => {
+    stopDictationRef.current = startContinuousDictation({
+      // Каждый финальный фрагмент дополняет черновик.
+      onFinal: (text) => {
         setDraft((prev) => {
           const next = prev ? `${prev} ${text}` : text;
           draftRef.current = next;
           return next;
         });
       },
-      () => {
+      // Фатальная ошибка: сессия закончилась — показываем состояние и текст.
+      onError: (_kind, message) => {
+        toast.error(message);
         setDictation(draftRef.current.trim() ? 'recorded' : 'idle');
       },
-      () => {
+      // Помеха (тишина, сеть) — движок продолжает слушать, но юзер должен знать.
+      onNotice: (_kind, message) => toast.error(message),
+      onEnd: () => {
         setDictation(draftRef.current.trim() ? 'recorded' : 'idle');
       },
-    );
+    });
 
     stopAudioMeterRef.current = startAudioMeter((level) => {
       setAudioLevel(level);

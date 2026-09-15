@@ -9,6 +9,7 @@ import { uploadImage, uploadVideo } from '../api/upload';
 import { formatPrice } from '../utils/format';
 import DictateButton from '../components/DictateButton';
 import { errorMessage } from '../utils/error';
+import toast from 'react-hot-toast';
 
 export default function CreateProductPage() {
   const navigate = useNavigate();
@@ -114,11 +115,39 @@ export default function CreateProductPage() {
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="Название" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required />
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <Input label="Описание" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+          <div>
+            <label htmlFor="product-description" className="block text-sm font-medium text-[var(--color-muted)] mb-1.5">
+              Описание
+            </label>
+            <div className="flex items-end gap-2">
+              {/* Многострочное поле. Раньше здесь был однострочный <Input>:
+                  Enter отправлял форму (и «выкидывал» из поля валидацией
+                  required), а Shift+Enter не переносил строку — заполнять
+                  длинное описание было невозможно. resize-y + rows={6} дают
+                  просторное окно. */}
+              <textarea
+                id="product-description"
+                value={form.description}
+                onChange={e => setForm({ ...form, description: e.target.value })}
+                rows={6}
+                placeholder="Расскажи о товаре: состояние, комплект, нюансы доставки…"
+                className="flex-1 min-w-0 px-4 py-3 rounded-xl bg-[rgba(255,255,255,0.04)] border border-[var(--color-border)] text-[var(--color-text)] text-sm placeholder:text-[var(--color-faint)] outline-none transition-all duration-200 focus:border-[rgba(34,197,94,0.6)] focus:shadow-[0_0_0_3px_rgba(34,197,94,0.15)] resize-y"
+              />
+              {/* onResult ДОПОЛНЯЕТ описание, а не заменяет его.
+                  Раньше было `description: text` — одно касание микрофона
+                  стирало весь написанный текст. */}
+              <DictateButton
+                size={18}
+                className="w-11 h-11 shrink-0"
+                onResult={(text) =>
+                  setForm(f => ({
+                    ...f,
+                    description: f.description ? `${f.description} ${text}` : text,
+                  }))
+                }
+                onError={(msg) => toast.error(msg)}
+              />
             </div>
-            <DictateButton size={18} className="w-11 h-11" onResult={(text) => setForm(f => ({ ...f, description: text }))} />
           </div>
           <div>
             <Input label="Цена (USDT)" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required />

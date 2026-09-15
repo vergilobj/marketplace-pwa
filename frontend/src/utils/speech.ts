@@ -23,6 +23,8 @@ type SpeechRecognitionResultList = {
 
 type SpeechRecognitionEvent = {
   results: SpeechRecognitionResultList;
+  /** Индекс первого результата, который относится к ТЕКУЩЕМУ событию. */
+  resultIndex: number;
 };
 
 type SpeechRecognitionErrorEvent = {
@@ -57,74 +59,114 @@ export function isSpeechSupported(): boolean {
   return typeof getCtor() === 'function';
 }
 
-/**
- * Запускает диктовку. Распознаёт одну фразу (ru-RU), по результату вызывает onResult.
- * Возвращает функцию принудительной остановки.
- */
-export function startDictation(
-  onResult: (text: string) => void,
-  onEnd?: () => void,
-  onError?: () => void,
-): () => void {
-  const Ctor = getCtor();
-  if (!Ctor) {
-    onEnd?.();
-    return () => {};
-  }
+/** Понятный наружу код ошибки распознавания. */
+export type SpeechErrorKind =
+  | 'not-allowed'
+  | 'service-not-allowed'
+  | 'no-speech'
+  | 'audio-capture'
+  | 'network'
+  | 'aborted'
+  | 'unknown';
 
-  const rec = new Ctor();
-  rec.lang = 'ru-RU';
-  rec.continuous = false;
-  rec.interimResults = false;
+/** Человеческий текст для каждого кода — UI показывает его как есть. */
+export const SPEECH_ERROR_MESSAGES: Record<SpeechErrorKind, string> = {
+  'not-allowed': 'Нет доступа к микрофону. Разрешите доступ в настройках браузера.',
+  'service-not-allowed': 'Браузер запретил распознавание речи. Проверьте настройки.',
+  'no-speech': 'Ничего не расслышал — говорите ближе к микрофону.',
+  'audio-capture': 'Микрофон не найден. Подключите его и попробуйте снова.',
+  network: 'Распознавание речи без сети не работает.',
+  aborted: 'Распознавание прервано.',
+  unknown: 'Распознавание остановилось. Нажмите микрофон ещё раз.',
+};
 
-  rec.onresult = (event: SpeechRecognitionEvent) => {
-    const transcript = event?.results?.[0]?.[0]?.transcript;
-    if (typeof transcript === 'string' && transcript.trim()) {
-      onResult(transcript.trim());
-    }
-  };
+const KNOWN_KINDS: readonly SpeechErrorKind[] = [
+  'not-allowed',
+  'service-not-allowed',
+  'no-speech',
+  'audio-capture',
+  'network',
+  'aborted',
+];
 
-  let finished = false;
-  const finish = () => {
-    if (finished) return;
-    finished = true;
-    onEnd?.();
-  };
-
-  rec.onend = finish;
-  rec.onerror = (event: SpeechRecognitionErrorEvent) => {
-    // 'no-speech' и 'aborted' — не ошибка с точки зрения UX, просто завершение.
-    if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
-      onError?.();
-    }
-    finish();
-  };
-
-  try {
-    rec.start();
-  } catch {
-    finish();
-  }
-
-  return () => {
-    try {
-      rec.stop();
-    } catch {
-      /* уже остановлена */
-    }
-  };
+function normalizeErrorKind(raw: string): SpeechErrorKind {
+  return (KNOWN_KINDS as readonly string[]).includes(raw)
+    ? (raw as SpeechErrorKind)
+    : 'unknown';
 }
 
 /**
- * Непрерывная диктовка: сессия распознавания живёт, пока её не остановят вручную.
- * Каждый финальный результат дополняет текст через onResult. onEnd вызывается
- * только при реальном завершении сессии (stop(), ошибка, конец речи).
+ * Ошибки, после которых перезапускаться бессмысленно: доступ запрещён или
+ * микрофона нет вовсе. Повторный `start()` даст тот же отказ и цикл запросов.
+ */
+const FATAL_KINDS = new Set<SpeechErrorKind>([
+  'not-allowed',
+  'service-not-allowed',
+  'audio-capture',
+]);
+
+/**
+ * Потолок автоперезапусков. На Android Chrome движок умирает после каждой
+ * фразы, поэтому перезапуск — норма; но если он умирает мгновенно и всегда,
+ * без потолка получится вечный цикл. 50 хватает на длинный монолог.
+ */
+export const MAX_AUTO_RESTARTS = 50;
+
+/** Пауза перед автоперезапуском: мгновенный `start()` в `onend` бросает. */
+const RESTART_DELAY_MS = 250;
+
+/** Состояние живой сессии диктовки. */
+export type DictationStatus = 'listening' | 'restarting';
+
+export interface ContinuousDictationHandlers {
+  /** Каждый ФИНАЛЬНЫЙ фрагмент речи (может прийти несколько за событие). */
+  onFinal?: (text: string) => void;
+  /** Живой (неподтверждённый) текст. Пустая строка — живой текст сброшен. */
+  onInterim?: (text: string) => void;
+  /** Фатальная ошибка: сессия закончилась, сама не поднимется. */
+  onError?: (kind: SpeechErrorKind, message: string) => void;
+  /** Нефатальная помеха (`no-speech`, `network`) — движок продолжает слушать. */
+  onNotice?: (kind: SpeechErrorKind, message: string) => void;
+  /** Сессия диктовки окончательно завершена (ручной stop или фатальная ошибка). */
+  onEnd?: () => void;
+  /** Живость движка: слушает / перезапускается. */
+  onStatus?: (status: DictationStatus) => void;
+}
+
+/**
+ * Непрерывная диктовка — единственный движок распознавания в приложении.
+ *
+ * Чем отличается от наивного `rec.start()`:
+ *  - `continuous` + `interimResults`: сессия живёт до ручной остановки, есть
+ *    живой текст;
+ *  - собираются ВСЕ финальные результаты события (раньше брался последний —
+ *    середина фразы молча терялась);
+ *  - авто-рестарт в `onend`: Android Chrome игнорирует `continuous = true` и
+ *    глушит движок после каждой фразы, поэтому сессию поднимаем сами;
+ *  - ошибки разведены: фатальные (`not-allowed`, `service-not-allowed`,
+ *    `audio-capture`) отдаются в `onError` и НЕ перезапускаются, помехи
+ *    (`no-speech`, `network`) идут в `onNotice` и не рвут запись.
+ *
+ * Совместимость: старый позиционный вызов
+ * `startContinuousDictation(onResult, onEnd, onError)` продолжает работать —
+ * первый аргумент может быть функцией. Второй/третий аргументы в этом режиме
+ * трактуются как `onEnd` / `onError`.
+ *
+ * @returns функция остановки: снимает флаг «слушаем», глушит движок и
+ *          микрофон, после неё авто-рестарт не срабатывает.
  */
 export function startContinuousDictation(
-  onResult: (text: string) => void,
-  onEnd?: () => void,
-  onError?: () => void,
+  handlersOrOnFinal: ((text: string) => void) | ContinuousDictationHandlers,
+  legacyOnEnd?: () => void,
+  legacyOnError?: (kind: SpeechErrorKind, message: string) => void,
 ): () => void {
+  const handlers: ContinuousDictationHandlers =
+    typeof handlersOrOnFinal === 'function'
+      ? { onFinal: handlersOrOnFinal, onEnd: legacyOnEnd, onError: legacyOnError }
+      : handlersOrOnFinal;
+
+  const { onFinal, onInterim, onError, onNotice, onEnd, onStatus } = handlers;
+
   const Ctor = getCtor();
   if (!Ctor) {
     onEnd?.();
@@ -134,52 +176,146 @@ export function startContinuousDictation(
   const rec = new Ctor();
   rec.lang = 'ru-RU';
   rec.continuous = true;
-  rec.interimResults = false;
+  rec.interimResults = true;
+
+  /** Пользователь вызвал stop() — автоперезапуск запрещён. */
+  let stopped = false;
+  /** Ошибка, после которой подниматься нельзя. */
+  let fatal = false;
+  /** onEnd уже отдан — второй раз не дёргаем. */
+  let ended = false;
+  let restarts = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const emitEnd = () => {
+    if (ended) return;
+    ended = true;
+    onEnd?.();
+  };
+
+  const emitError = (kind: SpeechErrorKind) => {
+    onError?.(kind, SPEECH_ERROR_MESSAGES[kind]);
+  };
+
+  const emitNotice = (kind: SpeechErrorKind) => {
+    onNotice?.(kind, SPEECH_ERROR_MESSAGES[kind]);
+  };
 
   rec.onresult = (event: SpeechRecognitionEvent) => {
     const results = event?.results;
     if (!results) return;
-    // Берём последний зафиксированный (isFinal) результат текущего события.
-    let transcript = '';
-    for (let i = 0; i < results.length; i++) {
+
+    // resultIndex — граница «уже отдано в прошлых событиях». Идём от неё и
+    // копим ВСЕ финальные результаты события, а не только последний.
+    const start =
+      typeof event.resultIndex === 'number' && event.resultIndex >= 0
+        ? event.resultIndex
+        : 0;
+
+    let finalText = '';
+    let interimText = '';
+    for (let i = start; i < results.length; i++) {
       const res = results[i];
-      if (res?.isFinal && res[0]?.transcript) {
-        transcript = res[0].transcript.trim();
-      }
+      if (!res) continue;
+      const transcript = res[0]?.transcript ?? '';
+      if (res.isFinal) finalText += transcript;
+      else interimText += transcript;
     }
-    if (transcript) {
-      onResult(transcript);
-    }
+
+    const final = finalText.trim();
+    if (final) onFinal?.(final);
+    // Живой текст отдаём всегда: пустая строка означает «сбросить».
+    onInterim?.(interimText.trim());
   };
 
-  let finished = false;
-  const finish = () => {
-    if (finished) return;
-    finished = true;
-    onEnd?.();
-  };
-
-  rec.onend = finish;
   rec.onerror = (event: SpeechRecognitionErrorEvent) => {
-    if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
-      onError?.();
+    const kind = normalizeErrorKind(
+      typeof event?.error === 'string' ? event.error : '',
+    );
+
+    if (FATAL_KINDS.has(kind)) {
+      fatal = true;
+      emitError(kind);
+      // Следом придёт onend — он завершит сессию без перезапуска.
+      return;
     }
-    finish();
+
+    if (kind === 'aborted' && stopped) return;
+
+    // no-speech / network / aborted — движок поднимется сам, сессию не рвём.
+    if (kind !== 'aborted') emitNotice(kind);
+  };
+
+  rec.onend = () => {
+    if (stopped || fatal) {
+      emitEnd();
+      return;
+    }
+
+    if (restarts >= MAX_AUTO_RESTARTS) {
+      fatal = true;
+      emitError('unknown');
+      emitEnd();
+      return;
+    }
+
+    restarts += 1;
+    onStatus?.('restarting');
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      if (stopped || fatal) {
+        emitEnd();
+        return;
+      }
+      try {
+        rec.start();
+        onStatus?.('listening');
+      } catch {
+        fatal = true;
+        emitEnd();
+      }
+    }, RESTART_DELAY_MS);
+  };
+
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+
+    // Снимаем колбэки до abort(): после ручной остановки движок может
+    // выплюнуть onend/onerror, и они не должны ничего запускать.
+    rec.onresult = null;
+    rec.onend = null;
+    rec.onerror = null;
+
+    try {
+      rec.stop();
+    } catch {
+      /* уже остановлен */
+    }
+    try {
+      rec.abort();
+    } catch {
+      /* уже остановлен */
+    }
+
+    onInterim?.('');
+    emitEnd();
   };
 
   try {
     rec.start();
+    onStatus?.('listening');
   } catch {
-    finish();
+    fatal = true;
+    emitEnd();
   }
 
-  return () => {
-    try {
-      rec.stop();
-    } catch {
-      /* уже остановлена */
-    }
-  };
+  return stop;
 }
 
 /**

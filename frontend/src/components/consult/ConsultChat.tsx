@@ -14,7 +14,7 @@ import {
   type ConsultSource,
 } from '../../api/consult';
 import { errorStatus, errorMessage } from '../../utils/error';
-import { isSpeechSupported, startDictation } from '../../utils/speech';
+import { isSpeechSupported, startContinuousDictation } from '../../utils/speech';
 import {
   AI_BADGE,
   AI_BUBBLE_STYLE,
@@ -222,19 +222,31 @@ export default function ConsultChat({ compact = false, onClose }: ConsultChatPro
   };
 
   // ── Голосовой ввод (тот же модуль, что в Базаре) ──────────────────────
+  // Непрерывный движок: раньше здесь стоял одноразовый startDictation и
+  // диктовка умирала после первой фразы, молча — теперь ошибку видно.
   const toggleDictation = () => {
     if (listening) {
       stopDictationRef.current?.();
+      stopDictationRef.current = null;
       setListening(false);
       return;
     }
     if (!isSpeechSupported()) return;
     setListening(true);
-    stopDictationRef.current = startDictation(
-      (text) => setInput((prev) => (prev ? `${prev} ${text}` : text)),
-      () => setListening(false),
-      () => setListening(false),
-    );
+    stopDictationRef.current = startContinuousDictation({
+      // Дополняем ввод — семантику задаёт эта сторона, движок её не трогает.
+      onFinal: (text) => setInput((prev) => (prev ? `${prev} ${text}` : text)),
+      onNotice: (_kind, message) => toast.error(message),
+      onError: (_kind, message) => {
+        setListening(false);
+        stopDictationRef.current = null;
+        toast.error(message);
+      },
+      onEnd: () => {
+        setListening(false);
+        stopDictationRef.current = null;
+      },
+    });
   };
 
   // ── Оценка ответа 👍/👎 (§2) ─────────────────────────────────────────
