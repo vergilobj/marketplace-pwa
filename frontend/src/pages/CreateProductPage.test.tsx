@@ -26,6 +26,9 @@ vi.mock('../api/upload', () => ({
 vi.mock('../utils/speech', () => ({
   isSpeechSupported: () => true,
   startContinuousDictation: vi.fn(() => vi.fn()),
+  // Саундбар общий (DictateButton → useVoiceInput) — аудио-метр нужен в моке,
+  // иначе хук падает на отсутствующем экспорте.
+  startAudioMeter: vi.fn(() => vi.fn()),
 }));
 
 const createProduct = vi.mocked(productsApi.createProduct);
