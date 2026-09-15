@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, RotateCcw, Mic, X } from 'lucide-react';
@@ -20,62 +20,12 @@ import { getProductById } from '../../api/products';
 import { BazarAvatar, BazarDots, BazarRefRow } from './bazar-ui';
 import { MINT, formatPrice, parseBazarResponse } from './bazar-ui.utils';
 import { bazarStore } from '../../state/bazarStore';
-import {
-  isSpeechSupported,
-  startContinuousDictation,
-  startAudioMeter,
-} from '../../utils/speech';
+import { isSpeechSupported } from '../../utils/speech';
+import DictationBars from '../ui/DictationBars';
+import { useVoiceInput } from '../../hooks/useVoiceInput';
 
 interface BazarChatProps {
   compact?: boolean;
-}
-
-/**
- * Саундбар — ряд вертикальных полос с градиентом #22c55e → #34d399.
- * Реагирует на реальный уровень громкости (level: 0..1).
- * Каждая полоса имеет свою фазовую вариацию, чтобы играли не синхронно.
- * Плавные пружинные переходы высоты через framer-motion.
- *
- * Полос 28 (а не 160): контейнер записи — flex-1 в ряду с двумя кнопками по
- * 48px, на 390px ему достаётся ~230px. 160 полос по 2px + 159 гэпов давали
- * ~480px и саундбар уезжал за вьюпорт. Ширина полосы здесь в процентах
- * (flex-basis 0 + flex-grow), поэтому ряд всегда вписывается в родителя.
- */
-function DictationBars({ level }: { level: number }) {
-  const bars = useMemo(
-    () =>
-      Array.from({ length: 28 }, (_, i) => {
-        // Фазовая вариация: каждая полоса чуть иначе реагирует на голос.
-        const phase = 0.3 + 0.7 * Math.abs(Math.sin(i * 0.35 + 0.6));
-        return { id: i, phase };
-      }),
-    [],
-  );
-
-  const height = (phase: number) => Math.max(2, 2 + level * 46 * phase);
-
-  return (
-    <div
-      className="flex-1 min-w-0 max-w-full flex items-center justify-between overflow-hidden"
-      style={{ height: 48, gap: 2 }}
-      aria-hidden="true"
-    >
-      {bars.map((b) => (
-        <motion.span
-          key={b.id}
-          className="rounded-full shrink min-w-0"
-          style={{
-            flex: '1 1 0',
-            maxWidth: 3,
-            background: 'linear-gradient(to top, #22c55e, #34d399)',
-          }}
-          initial={false}
-          animate={{ height: height(b.phase) }}
-          transition={{ type: 'spring', stiffness: 420, damping: 22, mass: 0.4 }}
-        />
-      ))}
-    </div>
-  );
 }
 
 const BazarChat = ({ compact = false }: BazarChatProps) => {
@@ -100,24 +50,16 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
   const [acting, setActing] = useState(false);
   const [input, setInput] = useState('');
 
-  // ── Голосовой ввод: черновик распознанного текста и состояние записи ──
-  const [draft, setDraft] = useState('');
-  const [dictation, setDictation] = useState<'idle' | 'listening' | 'recorded'>('idle');
-  const [audioLevel, setAudioLevel] = useState(0);
-  const draftRef = useRef('');
-  const stopDictationRef = useRef<(() => void) | null>(null);
-  const stopAudioMeterRef = useRef<(() => void) | null>(null);
+  // ── Голосовой ввод: общий хук (диктовка + аудио-метр + черновик) ──
+  // Поведение эталонное: черновик копится, отмена обнуляет, отправка отдаёт
+  // накопленный текст в sendText. Саундбар — общий компонент DictationBars.
+  // Глушение движка и метра при размонтировании внутри хука.
+  const voice = useVoiceInput({
+    onError: (message) => toast.error(message),
+    onNotice: (message) => toast.error(message),
+  });
 
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  // Останавливаем распознавание и аудио-метр при размонтировании.
-  useEffect(
-    () => () => {
-      stopDictationRef.current?.();
-      stopAudioMeterRef.current?.();
-    },
-    [],
-  );
 
   // ── Режим сделки: грузим тред GET /bazar/deals/:id ──
   const loadDeal = useCallback(async () => {
@@ -328,58 +270,17 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
   // ── Голосовой ввод ──
   const startListening = () => {
     if (!isSpeechSupported()) return;
-    setDictation('listening');
-    setAudioLevel(0);
-
-    stopDictationRef.current = startContinuousDictation({
-      // Каждый финальный фрагмент дополняет черновик.
-      onFinal: (text) => {
-        setDraft((prev) => {
-          const next = prev ? `${prev} ${text}` : text;
-          draftRef.current = next;
-          return next;
-        });
-      },
-      // Фатальная ошибка: сессия закончилась — показываем состояние и текст.
-      onError: (_kind, message) => {
-        toast.error(message);
-        setDictation(draftRef.current.trim() ? 'recorded' : 'idle');
-      },
-      // Помеха (тишина, сеть) — движок продолжает слушать, но юзер должен знать.
-      onNotice: (_kind, message) => toast.error(message),
-      onEnd: () => {
-        setDictation(draftRef.current.trim() ? 'recorded' : 'idle');
-      },
-    });
-
-    stopAudioMeterRef.current = startAudioMeter((level) => {
-      setAudioLevel(level);
-    });
+    voice.start();
   };
 
   const cancelDictation = () => {
-    stopDictationRef.current?.();
-    stopAudioMeterRef.current?.();
-    stopDictationRef.current = null;
-    stopAudioMeterRef.current = null;
-    draftRef.current = '';
-    setDraft('');
-    setAudioLevel(0);
-    setDictation('idle');
+    voice.cancel();
   };
 
   const sendDraft = async () => {
-    const text = draft.trim();
-    if (!text || sending) return;
-    stopDictationRef.current?.();
-    stopAudioMeterRef.current?.();
-    stopDictationRef.current = null;
-    stopAudioMeterRef.current = null;
-    draftRef.current = '';
-    setDraft('');
-    setAudioLevel(0);
-    setDictation('idle');
-    await sendText(text);
+    if (sending) return;
+    // Отправку задаём здесь (актуальная sendText на момент коммита).
+    await voice.commit(sendText);
   };
 
   const handleReset = async () => {
@@ -467,7 +368,7 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
       : 'Сделка'
     : 'Сделка';
 
-  const isRecording = dictation !== 'idle';
+  const isRecording = voice.state !== 'idle';
   const hasText = input.trim() !== '';
 
   return (
@@ -687,12 +588,12 @@ const BazarChat = ({ compact = false }: BazarChatProps) => {
                 className="flex-1 min-w-0 max-w-full h-12 px-4 rounded-xl flex items-center overflow-hidden"
                 style={{ background: '#0d1210', border: '1px solid rgba(34,197,94,0.18)' }}
               >
-                <DictationBars level={audioLevel} />
+                <DictationBars level={voice.level} />
               </div>
 
               <motion.button
                 onClick={sendDraft}
-                disabled={sending || !draft.trim()}
+                disabled={sending || !voice.draft.trim()}
                 whileTap={{ scale: 0.93 }}
                 className="w-12 h-12 rounded-xl flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                 style={{ background: '#22c55e', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
