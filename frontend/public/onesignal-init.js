@@ -187,8 +187,55 @@ function showPushPrompt(mode, OneSignal) {
   requestAnimationFrame(() => {
     el.style.opacity = '1';
     el.style.transform = 'translateY(0)';
+    avoidOverlap(el);
   });
 
+  // Обработчики кнопок плашки — вынесены в отдельную функцию, вызываем здесь.
+  attachPushPromptHandlers(el, isIOS, OneSignal);
+}
+
+/**
+ * Плашка не должна накрывать интерактивные элементы.
+ *
+ * Фиксированный `bottom: 208px` рассчитан на страницы С нижним меню и FAB
+ * консультанта. Там, где их нет (например `/login` — FAB скрыт для
+ * неавторизованных), плашка садится прямо на поле телефона: замер на 390px
+ * показал перекрытие 276×15px (реальный баг 2026-09-15).
+ *
+ * Поэтому после отрисовки проверяем пересечение с видимыми полями ввода и
+ * кнопками и поднимаем плашку ровно настолько, чтобы зазор был 12px.
+ * Позицию меняем ОДИН раз, чтобы не войти в цикл пересчётов.
+ */
+function avoidOverlap(el) {
+  try {
+    const r = el.getBoundingClientRect();
+    // Плашка уже выше верхней трети экрана — дальше поднимать некуда.
+    if (r.top < window.innerHeight * 0.35) return;
+
+    const targets = document.querySelectorAll('input, textarea, select, button, a[href]');
+    let lift = 0;
+    for (const t of targets) {
+      if (el.contains(t)) continue;
+      const cs = getComputedStyle(t);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      const b = t.getBoundingClientRect();
+      if (b.width === 0 || b.height === 0) continue;
+      // Пересечение по обеим осям
+      const ix = Math.min(r.right, b.right) - Math.max(r.left, b.left);
+      const iy = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
+      if (ix > 0 && iy > 0) {
+        // Насколько поднять, чтобы верх плашки оказался НАД верхом элемента
+        lift = Math.max(lift, r.bottom - b.top + 12);
+      }
+    }
+    if (lift > 0) {
+      const cur = parseFloat(getComputedStyle(el).bottom) || 0;
+      el.style.bottom = `${Math.round(cur + lift)}px`;
+    }
+  } catch (_) { /* геометрия недоступна — оставляем как есть */ }
+}
+
+function attachPushPromptHandlers(el, isIOS, OneSignal) {
   const close = () => {
     // ⚠️ ПОРЯДОК КРИТИЧЕН: сначала визуально прячем, потом пишем в хранилище.
     // В приватном режиме Safari `sessionStorage` бросает QuotaExceededError.
