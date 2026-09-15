@@ -187,8 +187,20 @@ function showPushPrompt(mode, OneSignal) {
   requestAnimationFrame(() => {
     el.style.opacity = '1';
     el.style.transform = 'translateY(0)';
-    avoidOverlap(el);
   });
+
+  // ⚠️ Плашку создаём по DOMContentLoaded, а формы (логин, создание товара)
+  // рендерит React ПОЗЖЕ. Одноразовый замер не находит полей в DOM и даёт
+  // lift = 0 — реально проверено: поле телефона появлялось уже после вызова.
+  // Поэтому перепроверяем несколько раз, пока форма не отрисуется.
+  // Останавливаемся сразу после успешного подъёма — дальше дёргать незачем.
+  let tries = 0;
+  const recheck = () => {
+    if (++tries > 12 || !el.isConnected) return;
+    if (avoidOverlap(el)) return;              // подняли — готово
+    setTimeout(recheck, 300);
+  };
+  recheck();
 
   // Обработчики кнопок плашки — вынесены в отдельную функцию, вызываем здесь.
   attachPushPromptHandlers(el, isIOS, OneSignal);
@@ -204,13 +216,15 @@ function showPushPrompt(mode, OneSignal) {
  *
  * Поэтому после отрисовки проверяем пересечение с видимыми полями ввода и
  * кнопками и поднимаем плашку ровно настолько, чтобы зазор был 12px.
- * Позицию меняем ОДИН раз, чтобы не войти в цикл пересчётов.
+ *
+ * @returns {boolean} true — подняли (или поднимать не нужно); false — цели ещё
+ *   не отрисованы, стоит перепроверить позже.
  */
 function avoidOverlap(el) {
   try {
     const r = el.getBoundingClientRect();
     // Плашка уже выше верхней трети экрана — дальше поднимать некуда.
-    if (r.top < window.innerHeight * 0.35) return;
+    if (r.top < window.innerHeight * 0.35) return true;
 
     const targets = document.querySelectorAll('input, textarea, select, button, a[href]');
     let lift = 0;
@@ -231,8 +245,12 @@ function avoidOverlap(el) {
     if (lift > 0) {
       const cur = parseFloat(getComputedStyle(el).bottom) || 0;
       el.style.bottom = `${Math.round(cur + lift)}px`;
+      return true;
     }
-  } catch (_) { /* геометрия недоступна — оставляем как есть */ }
+    return false;   // целей нет — возможно, ещё не отрисовались
+  } catch (_) {
+    return true;    // геометрия недоступна — дальше не пытаемся
+  }
 }
 
 function attachPushPromptHandlers(el, isIOS, OneSignal) {
